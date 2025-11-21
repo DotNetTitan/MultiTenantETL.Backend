@@ -1,0 +1,674 @@
+{
+    "info": {
+        "_postman_id": "multitenant-etl-auth",
+        "name": "MultiTenant ETL - Authentication",
+        "description": "Complete test collection for OpenIddict authentication flows including login, token refresh, revocation, logout, and protected endpoints.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "1. Authentication",
+            "item": [
+                {
+                    "name": "Login (Password Flow)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200) {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.environment.set(\"access_token\", jsonData.access_token);",
+                                    "    pm.environment.set(\"refresh_token\", jsonData.refresh_token);",
+                                    "    pm.environment.set(\"id_token\", jsonData.id_token);",
+                                    "    console.log(\"✅ Tokens saved to environment\");",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/x-www-form-urlencoded"
+                            }
+                        ],
+                        "body": {
+                            "mode": "urlencoded",
+                            "urlencoded": [
+                                {
+                                    "key": "grant_type",
+                                    "value": "password",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "client_id",
+                                    "value": "multitenant-etl-postman",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "client_secret",
+                                    "value": "postman-secret-key-change-in-production",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "username",
+                                    "value": "admin@multitenant-etl.com",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "password",
+                                    "value": "Admin@123456",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "scope",
+                                    "value": "openid email profile roles api",
+                                    "type": "text"
+                                }
+                            ]
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/connect/token",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "connect",
+                                "token"
+                            ]
+                        },
+                        "description": "Authenticate using password grant type. Returns access_token, refresh_token, and id_token."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Refresh Token",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200) {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.environment.set(\"access_token\", jsonData.access_token);",
+                                    "    console.log(\"✅ New access token saved\");",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/x-www-form-urlencoded"
+                            }
+                        ],
+                        "body": {
+                            "mode": "urlencoded",
+                            "urlencoded": [
+                                {
+                                    "key": "grant_type",
+                                    "value": "refresh_token",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "client_id",
+                                    "value": "multitenant-etl-postman",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "client_secret",
+                                    "value": "postman-secret-key-change-in-production",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "refresh_token",
+                                    "value": "{{refresh_token}}",
+                                    "type": "text"
+                                }
+                            ]
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/connect/token",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "connect",
+                                "token"
+                            ]
+                        },
+                        "description": "Exchange refresh token for a new access token. Access token expires in 15 minutes."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Revoke Token",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/x-www-form-urlencoded"
+                            }
+                        ],
+                        "body": {
+                            "mode": "urlencoded",
+                            "urlencoded": [
+                                {
+                                    "key": "token",
+                                    "value": "{{refresh_token}}",
+                                    "type": "text",
+                                    "description": "The refresh token to revoke"
+                                },
+                                {
+                                    "key": "client_id",
+                                    "value": "multitenant-etl-postman",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "client_secret",
+                                    "value": "postman-secret-key-change-in-production",
+                                    "type": "text"
+                                }
+                            ]
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/connect/revoke",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "connect",
+                                "revoke"
+                            ]
+                        },
+                        "description": "Manually revoke a refresh token. Use this to test that revoked tokens cannot be used."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Logout",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200) {",
+                                    "    console.log(\"✅ Logged out - all tokens revoked\");",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{access_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/api/account/logout",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "account",
+                                "logout"
+                            ]
+                        },
+                        "description": "Logout user and revoke all refresh tokens. Access token remains valid until expiry (15 min)."
+                    },
+                    "response": []
+                }
+            ],
+            "description": "OAuth 2.0 / OpenIddict authentication endpoints"
+        },
+        {
+            "name": "2. Account Management",
+            "item": [
+                {
+                    "name": "Register",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"testuser@example.com\",\n  \"password\": \"Test@123456\",\n  \"confirmPassword\": \"Test@123456\",\n  \"firstName\": \"Test\",\n  \"lastName\": \"User\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/account/register",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "account",
+                                "register"
+                            ]
+                        },
+                        "description": "Register a new user account"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Change Password",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{access_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"currentPassword\": \"Admin@123456\",\n  \"newPassword\": \"NewPassword@123\",\n  \"confirmPassword\": \"NewPassword@123\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/account/change-password",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "account",
+                                "change-password"
+                            ]
+                        },
+                        "description": "Change user password. This will revoke all refresh tokens for security."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Forgot Password",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"admin@multitenant-etl.com\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/account/forgot-password",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "account",
+                                "forgot-password"
+                            ]
+                        },
+                        "description": "Request password reset email"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Switch Tenant",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{access_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"tenantId\": \"{{tenant_id}}\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/account/switch-tenant",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "account",
+                                "switch-tenant"
+                            ]
+                        },
+                        "description": "Switch to a different tenant. Use refresh token to get new access token with updated tenant_id."
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Account management endpoints (registration, password change, etc.)"
+        },
+        {
+            "name": "3. Test Protected Endpoints",
+            "item": [
+                {
+                    "name": "Protected - With Valid Token",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{access_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/api/account/logout",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "account",
+                                "logout"
+                            ]
+                        },
+                        "description": "Test a protected endpoint with valid bearer token. Should return 200 OK."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Protected - Without Token",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/api/account/logout",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "account",
+                                "logout"
+                            ]
+                        },
+                        "description": "Test a protected endpoint without authentication. Should return 401 Unauthorized."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Protected - With Expired Token",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "expired_token_here",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/api/account/logout",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "account",
+                                "logout"
+                            ]
+                        },
+                        "description": "Test a protected endpoint with expired token. Should return 401 Unauthorized."
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Test protected endpoint authentication"
+        },
+        {
+            "name": "4. Token Revocation Tests",
+            "item": [
+                {
+                    "name": "Test 1: Login",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200) {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.environment.set(\"test_access_token\", jsonData.access_token);",
+                                    "    pm.environment.set(\"test_refresh_token\", jsonData.refresh_token);",
+                                    "    console.log(\"✅ Test tokens saved\");",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/x-www-form-urlencoded"
+                            }
+                        ],
+                        "body": {
+                            "mode": "urlencoded",
+                            "urlencoded": [
+                                {
+                                    "key": "grant_type",
+                                    "value": "password",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "client_id",
+                                    "value": "multitenant-etl-postman",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "client_secret",
+                                    "value": "postman-secret-key-change-in-production",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "username",
+                                    "value": "admin@multitenant-etl.com",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "password",
+                                    "value": "Admin@123456",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "scope",
+                                    "value": "openid email profile roles api",
+                                    "type": "text"
+                                }
+                            ]
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/connect/token",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "connect",
+                                "token"
+                            ]
+                        },
+                        "description": "Step 1: Get tokens"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Test 2: Logout (Revoke All)",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{test_access_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/api/account/logout",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "account",
+                                "logout"
+                            ]
+                        },
+                        "description": "Step 2: Logout to revoke all tokens"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Test 3: Try Refresh (Should Fail)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 400) {",
+                                    "    console.log(\"✅ Token revocation working - refresh failed as expected\");",
+                                    "} else {",
+                                    "    console.log(\"❌ Token still valid - revocation may not be working\");",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/x-www-form-urlencoded"
+                            }
+                        ],
+                        "body": {
+                            "mode": "urlencoded",
+                            "urlencoded": [
+                                {
+                                    "key": "grant_type",
+                                    "value": "refresh_token",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "client_id",
+                                    "value": "multitenant-etl-postman",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "client_secret",
+                                    "value": "postman-secret-key-change-in-production",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "refresh_token",
+                                    "value": "{{test_refresh_token}}",
+                                    "type": "text"
+                                }
+                            ]
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/connect/token",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "connect",
+                                "token"
+                            ]
+                        },
+                        "description": "Step 3: Try to refresh - should fail with 'invalid_grant' error"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Test token revocation workflow: Login → Logout → Verify tokens are revoked"
+        }
+    ],
+    "event": [
+        {
+            "listen": "prerequest",
+            "script": {
+                "type": "text/javascript",
+                "exec": [
+                    ""
+                ]
+            }
+        },
+        {
+            "listen": "test",
+            "script": {
+                "type": "text/javascript",
+                "exec": [
+                    ""
+                ]
+            }
+        }
+    ],
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "http://localhost:5244",
+            "type": "string"
+        }
+    ]
+}

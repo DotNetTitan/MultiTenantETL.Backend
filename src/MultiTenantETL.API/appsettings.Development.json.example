@@ -1,0 +1,16 @@
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=localhost;Port=5432;Database=MultiTenantETL;Username=YOUR_POSTGRES_USERNAME;Password=YOUR_POSTGRES_PASSWORD"
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning",
+      "Microsoft.EntityFrameworkCore.Database.Command": "Information"
+    }
+  },
+  "Seeding": {
+    "AdminPassword": "CHANGE_THIS_SECURE_PASSWORD_123!",
+    "OAuthClientSecret": "CHANGE_THIS_OAUTH_SECRET_KEY"
+  }
+}
