@@ -5,11 +5,13 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using MultiTenantETL.Infrastructure.Identity;
 using MultiTenantETL.Infrastructure.Persistence;
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
 using static OpenIddict.Abstractions.OpenIddictConstants;
+using CustomClaims = MultiTenantETL.Domain.Constants.ClaimTypes;
 
 namespace MultiTenantETL.API.Controllers
 {
@@ -185,13 +187,50 @@ namespace MultiTenantETL.API.Controllers
             identity.SetClaim(Claims.Name, $"{user.FirstName} {user.LastName}");
             
             // Custom claims
-            identity.SetClaim("tenant_id", user.CurrentTenantId?.ToString() ?? "");
+            identity.SetClaim(CustomClaims.TenantId, user.CurrentTenantId?.ToString() ?? "");
 
-            // Get user's roles
-            var roles = await _userManager.GetRolesAsync(user);
-            foreach (var role in roles)
+            // Get user's tenant-specific role and permissions
+            if (user.CurrentTenantId.HasValue)
             {
-                identity.AddClaim(new Claim(ClaimTypes.Role, role));
+                var userTenant = await _context.UserTenants
+                    .Include(ut => ut.Tenant)
+                    .FirstOrDefaultAsync(ut =>
+                        ut.UserId == user.Id &&
+                        ut.TenantId == user.CurrentTenantId.Value &&
+                        ut.IsActive);
+
+                if (userTenant != null)
+                {
+                    // Add role claim for the current tenant
+                    identity.AddClaim(new Claim(ClaimTypes.Role, userTenant.RoleCode));
+
+                    // Add tenant name claim
+                    identity.SetClaim(CustomClaims.TenantName, userTenant.Tenant.Name);
+
+                    // Get role permissions from ApplicationRole
+                    var role = await _roleManager.FindByNameAsync(userTenant.RoleCode);
+                    if (role?.Permissions != null && role.Permissions.Any())
+                    {
+                        // Add individual permission claims
+                        foreach (var permission in role.Permissions)
+                        {
+                            identity.AddClaim(new Claim(CustomClaims.Permission, permission));
+                        }
+
+                        // Add permissions as a single JSON claim for easy access
+                        identity.SetClaim(CustomClaims.Permissions,
+                            System.Text.Json.JsonSerializer.Serialize(role.Permissions));
+                    }
+                }
+            }
+            else
+            {
+                // Fallback: Get user's global roles if no tenant is selected
+                var roles = await _userManager.GetRolesAsync(user);
+                foreach (var role in roles)
+                {
+                    identity.AddClaim(new Claim(ClaimTypes.Role, role));
+                }
             }
 
             identity.SetDestinations(claim => claim.Type switch
@@ -202,9 +241,14 @@ namespace MultiTenantETL.API.Controllers
                 or Claims.Name
                 or Claims.Email
                 or ClaimTypes.Role
-                or "tenant_id"
-                or "tenant_name"
                     => [Destinations.AccessToken, Destinations.IdentityToken],
+                
+                // Permission claims go to access token only
+                var type when type == CustomClaims.Permission 
+                           || type == CustomClaims.Permissions 
+                           || type == CustomClaims.TenantId
+                           || type == CustomClaims.TenantName
+                    => [Destinations.AccessToken],
                 
                 _ => [Destinations.AccessToken]
             });

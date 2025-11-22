@@ -6,6 +6,7 @@ using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Identity;
 using MultiTenantETL.Infrastructure.Persistence;
 using OpenIddict.Abstractions;
+using Permissions = MultiTenantETL.Domain.Constants.Permissions;
 
 namespace MultiTenantETL.Infrastructure.Data;
 
@@ -33,12 +34,12 @@ public static class DbSeeder
                 Description = "System administrator with full access to all tenants and system configuration",
                 Permissions = new List<string>
                 {
-                    "system.manage",
-                    "tenants.create",
-                    "tenants.delete",
-                    "tenants.manage",
-                    "users.manage",
-                    "roles.manage"
+                    Permissions.System.Manage,
+                    Permissions.Tenants.Create,
+                    Permissions.Tenants.Delete,
+                    Permissions.Tenants.Manage,
+                    Permissions.Users.Manage,
+                    Permissions.Roles.Manage
                 }
             },
             new ApplicationRole
@@ -47,10 +48,10 @@ public static class DbSeeder
                 Description = "Tenant administrator with full access within their tenant",
                 Permissions = new List<string>
                 {
-                    "tenant.users.manage",
-                    "tenant.settings.manage",
-                    "tenant.data.manage",
-                    "etl.manage"
+                    Permissions.Users.Manage,
+                    Permissions.TenantSettings.Manage,
+                    Permissions.TenantData.Manage,
+                    Permissions.ETL.Manage
                 }
             },
             new ApplicationRole
@@ -59,10 +60,10 @@ public static class DbSeeder
                 Description = "Standard user with read and basic write access",
                 Permissions = new List<string>
                 {
-                    "tenant.data.read",
-                    "tenant.data.write",
-                    "etl.view",
-                    "etl.execute"
+                    Permissions.TenantData.Read,
+                    Permissions.TenantData.Write,
+                    Permissions.ETL.View,
+                    Permissions.ETL.Execute
                 }
             },
             new ApplicationRole
@@ -71,8 +72,8 @@ public static class DbSeeder
                 Description = "Read-only access to tenant data",
                 Permissions = new List<string>
                 {
-                    "tenant.data.read",
-                    "etl.view"
+                    Permissions.TenantData.Read,
+                    Permissions.ETL.View
                 }
             }
         };
