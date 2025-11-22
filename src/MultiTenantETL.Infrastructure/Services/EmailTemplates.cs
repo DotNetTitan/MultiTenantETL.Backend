@@ -22,8 +22,8 @@ namespace MultiTenantETL.Infrastructure.Services
         body {{ 
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             line-height: 1.6; 
-            color: #2d3748; 
-            background-color: #f5f7fa;
+            color: #1a1a1a; 
+            background-color: #f7f7f7;
             margin: 0; 
             padding: 40px 20px; 
         }}
@@ -31,47 +31,28 @@ namespace MultiTenantETL.Infrastructure.Services
             max-width: 600px; 
             margin: 0 auto; 
             background: white; 
-            border-radius: 12px; 
+            border-radius: 8px; 
             overflow: hidden; 
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-            border: 1px solid #e2e8f0;
-        }}
-        .header {{ 
-            background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%); 
-            color: white; 
-            padding: 40px 30px; 
-            text-align: center; 
-        }}
-        .header h1 {{ 
-            margin: 0; 
-            font-size: 28px; 
-            font-weight: 700;
-            letter-spacing: -0.5px;
-        }}
-        .header p {{
-            margin: 8px 0 0 0;
-            font-size: 14px;
-            opacity: 0.95;
-            font-weight: 400;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
         }}
         .content {{ 
-            padding: 40px 30px; 
+            padding: 50px 40px; 
             background: white;
         }}
         .content h2 {{
-            color: #1a202c;
-            font-size: 22px;
+            color: #1a1a1a;
+            font-size: 20px;
             margin-bottom: 16px;
             font-weight: 600;
         }}
         .content p {{
-            color: #4a5568;
+            color: #333;
             font-size: 15px;
             margin-bottom: 16px;
-            line-height: 1.7;
+            line-height: 1.6;
         }}
         .content ul {{
-            color: #4a5568;
+            color: #333;
             font-size: 15px;
             margin: 20px 0;
             padding-left: 24px;
@@ -82,96 +63,94 @@ namespace MultiTenantETL.Infrastructure.Services
         }}
         .button-wrapper {{
             text-align: center;
-            margin: 32px 0;
+            margin: 28px 0;
         }}
         .button {{ 
             display: inline-block; 
-            padding: 14px 32px; 
-            background: #2563eb;
+            padding: 12px 28px; 
+            background: #0066FF;
             color: white !important; 
             text-decoration: none; 
             border-radius: 6px; 
-            font-weight: 600; 
+            font-weight: 500; 
             font-size: 15px;
-            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
-            transition: all 0.2s;
+            transition: background 0.2s;
         }}
         .button:hover {{
-            background: #1e40af;
-            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+            background: #0052CC;
         }}
         .security-note {{ 
-            background: #fef3c7;
-            border-left: 4px solid #f59e0b; 
-            padding: 16px 20px; 
+            background: #FFF8E1;
+            border-left: 3px solid #FFA000; 
+            padding: 16px; 
             margin: 24px 0; 
-            border-radius: 6px;
+            border-radius: 4px;
             font-size: 14px;
-            color: #78350f;
+            color: #5D4037;
         }}
         .security-note strong {{
-            color: #78350f;
+            color: #5D4037;
             display: block;
             margin-bottom: 4px;
             font-weight: 600;
         }}
         .success-note {{
-            background: #d1fae5;
-            border-left: 4px solid #10b981;
-            padding: 16px 20px;
+            background: #E8F5E9;
+            border-left: 3px solid #4CAF50;
+            padding: 16px;
             margin: 24px 0;
-            border-radius: 6px;
+            border-radius: 4px;
             font-size: 14px;
-            color: #065f46;
+            color: #1B5E20;
         }}
         .success-note strong {{
-            color: #065f46;
+            color: #1B5E20;
             display: block;
             margin-bottom: 4px;
             font-weight: 600;
         }}
         .link-box {{
-            background: #f8fafc;
+            background: #F5F5F5;
             padding: 16px;
-            border-radius: 6px;
+            border-radius: 4px;
             margin: 20px 0;
-            border: 1px solid #e2e8f0;
+            border: 1px solid #E0E0E0;
         }}
         .link-box p {{
             margin: 0;
             font-size: 13px;
-            color: #64748b;
+            color: #666;
         }}
         .link-text {{
-            color: #2563eb !important;
+            color: #0066FF !important;
             word-break: break-all;
             font-size: 12px;
             font-family: 'Courier New', monospace;
             background: white;
             padding: 8px;
             border-radius: 4px;
-            border: 1px solid #e2e8f0;
+            border: 1px solid #E0E0E0;
             display: block;
             margin-top: 8px;
         }}
         .footer {{ 
-            background: #f8fafc; 
-            padding: 30px; 
+            background: #FAFAFA; 
+            padding: 30px 40px; 
             text-align: center; 
             font-size: 13px; 
-            color: #64748b; 
-            border-top: 1px solid #e2e8f0;
+            color: #666; 
+            border-top: 1px solid #E5E5E5;
         }}
         .footer p {{
             margin: 6px 0;
         }}
         .footer a {{
-            color: #2563eb;
+            color: #0066FF;
             text-decoration: none;
         }}
         .divider {{
             height: 1px;
-            background: #e2e8f0;
+            background: #E5E5E5;
             margin: 24px 0;
         }}
         @media only screen and (max-width: 600px) {{
@@ -179,11 +158,11 @@ namespace MultiTenantETL.Infrastructure.Services
                 padding: 20px 10px;
             }}
             .container {{
-                border-radius: 8px;
+                border-radius: 6px;
             }}
             .content, .header, .footer {{
-                padding-left: 20px;
-                padding-right: 20px;
+                padding-left: 24px;
+                padding-right: 24px;
             }}
             .button {{
                 display: block;
@@ -194,10 +173,6 @@ namespace MultiTenantETL.Infrastructure.Services
 </head>
 <body>
     <div class='container'>
-        <div class='header'>
-            <h1>MultiTenant ETL</h1>
-            <p>Your Complete Data Integration Platform</p>
-        </div>
         <div class='content'>{content}</div>
         <div class='footer'>
             <p><strong>© 2025 MultiTenant ETL</strong> · All rights reserved</p>
@@ -280,7 +255,7 @@ namespace MultiTenantETL.Infrastructure.Services
                 <a href='http://localhost:5173/login' class='button'>Get Started</a>
             </div>
             <div class='divider'></div>
-            <p style='text-align: center; color: #718096; font-size: 14px;'>Need help getting started? Check out our <a href='#' style='color: #667eea;'>documentation</a> or <a href='#' style='color: #667eea;'>contact support</a>.</p>";
+            <p style='text-align: center; color: #666; font-size: 14px;'>Need help getting started? Check out our <a href='#' style='color: #0066FF;'>documentation</a> or <a href='#' style='color: #0066FF;'>contact support</a>.</p>";
             
             return GetBaseTemplate(content);
         }
@@ -300,7 +275,7 @@ namespace MultiTenantETL.Infrastructure.Services
             <div class='divider'></div>
             <div class='security-note'>
                 <strong>Security Alert</strong>
-                If you didn't make this change, please <a href='mailto:support@multitenanteti.com' style='color: #92400e; font-weight: 600;'>contact support immediately</a> to secure your account.
+                If you didn't make this change, please <a href='mailto:support@multitenanteti.com' style='color: #5D4037; font-weight: 600;'>contact support immediately</a> to secure your account.
             </div>";
             
             return GetBaseTemplate(content);
