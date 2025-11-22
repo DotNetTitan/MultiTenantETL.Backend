@@ -7,6 +7,7 @@ using MultiTenantETL.Infrastructure.Identity;
 using MultiTenantETL.Infrastructure.Persistence;
 using OpenIddict.Abstractions;
 using Permissions = MultiTenantETL.Domain.Constants.Permissions;
+using Roles = MultiTenantETL.Domain.Constants.Roles;
 
 namespace MultiTenantETL.Infrastructure.Data;
 
@@ -30,7 +31,7 @@ public static class DbSeeder
         {
             new ApplicationRole
             {
-                Name = "SuperAdmin",
+                Name = Roles.SuperAdmin,
                 Description = "System administrator with full access to all tenants and system configuration",
                 Permissions = new List<string>
                 {
@@ -44,7 +45,7 @@ public static class DbSeeder
             },
             new ApplicationRole
             {
-                Name = "TenantAdmin",
+                Name = Roles.TenantAdmin,
                 Description = "Tenant administrator with full access within their tenant",
                 Permissions = new List<string>
                 {
@@ -56,7 +57,7 @@ public static class DbSeeder
             },
             new ApplicationRole
             {
-                Name = "User",
+                Name = Roles.User,
                 Description = "Standard user with read and basic write access",
                 Permissions = new List<string>
                 {
@@ -68,7 +69,7 @@ public static class DbSeeder
             },
             new ApplicationRole
             {
-                Name = "Viewer",
+                Name = Roles.Viewer,
                 Description = "Read-only access to tenant data",
                 Permissions = new List<string>
                 {
@@ -139,7 +140,7 @@ public static class DbSeeder
             
             if (result.Succeeded)
             {
-                await userManager.AddToRoleAsync(adminUser, "SuperAdmin");
+                await userManager.AddToRoleAsync(adminUser, Roles.SuperAdmin);
 
                 if (defaultTenant != null)
                 {
@@ -147,7 +148,7 @@ public static class DbSeeder
                     {
                         UserId = adminUser.Id,
                         TenantId = defaultTenant.Id,
-                        RoleCode = "SuperAdmin",
+                        RoleCode = Roles.SuperAdmin,
                         IsActive = true
                     };
 

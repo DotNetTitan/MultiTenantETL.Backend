@@ -32,7 +32,7 @@ public class CurrentUserService : ICurrentUserService
 
     public string GetRole()
     {
-        return User?.FindFirst(ClaimTypes.Role)?.Value ?? "user";
+        return User?.FindFirst(ClaimTypes.Role)?.Value ?? MultiTenantETL.Domain.Constants.Roles.User;
     }
 
     public string GetEmail()
