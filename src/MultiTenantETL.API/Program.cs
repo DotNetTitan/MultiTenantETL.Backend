@@ -109,8 +109,20 @@ builder.Services.AddAuthentication(options =>
 });
 builder.Services.AddAuthorization();
 
-// Email Service (using stub for now, replace with actual implementation later)
-builder.Services.AddScoped<IEmailService, StubEmailService>();
+// Configure Azure Communication Services settings
+builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.AzureCommunicationSettings>(
+    builder.Configuration.GetSection("AzureCommunicationServices"));
+
+// Email Service
+var useStubEmailService = builder.Configuration.GetValue<bool>("EmailService:UseStub", true);
+if (useStubEmailService)
+{
+    builder.Services.AddScoped<IEmailService, StubEmailService>();
+}
+else
+{
+    builder.Services.AddScoped<IEmailService, AzureCommunicationEmailService>();
+}
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
