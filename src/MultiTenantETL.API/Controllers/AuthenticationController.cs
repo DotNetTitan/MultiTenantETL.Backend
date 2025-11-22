@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MultiTenantETL.Infrastructure.Identity;
 using MultiTenantETL.Infrastructure.Persistence;
+using MultiTenantETL.Infrastructure.Interfaces;
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
 using static OpenIddict.Abstractions.OpenIddictConstants;
@@ -24,19 +25,22 @@ namespace MultiTenantETL.API.Controllers
         private readonly RoleManager<ApplicationRole> _roleManager;
         private readonly ApplicationDbContext _context;
         private readonly IOpenIddictTokenManager _tokenManager;
+        private readonly IClaimsService _claimsService;
 
         public AuthenticationController(
             SignInManager<ApplicationUser> signInManager,
             UserManager<ApplicationUser> userManager,
             RoleManager<ApplicationRole> roleManager,
             ApplicationDbContext context,
-            IOpenIddictTokenManager tokenManager)
+            IOpenIddictTokenManager tokenManager,
+            IClaimsService claimsService)
         {
             _signInManager = signInManager;
             _userManager = userManager;
             _roleManager = roleManager;
             _context = context;
             _tokenManager = tokenManager;
+            _claimsService = claimsService;
         }
 
         [HttpPost("token")]
@@ -51,6 +55,35 @@ namespace MultiTenantETL.API.Controllers
                 return await HandleRefreshTokenFlow(request);
 
             throw new NotImplementedException("The specified grant type is not implemented.");
+        }
+
+        [HttpPost("revoke")]
+        public async Task<IActionResult> Revoke()
+        {
+            var request = HttpContext.GetOpenIddictServerRequest();
+
+            // Retrieve the token from the request
+            if (string.IsNullOrEmpty(request.Token))
+            {
+                return BadRequest(new
+                {
+                    error = OpenIddictConstants.Errors.InvalidRequest,
+                    error_description = "The token parameter is missing."
+                });
+            }
+
+            // Find the token in the database
+            var token = await _tokenManager.FindByIdAsync(request.Token);
+            if (token == null)
+            {
+                // Token not found - this is not an error per RFC 7009
+                return Ok();
+            }
+
+            // Revoke the token and any associated tokens (e.g., refresh tokens)
+            await _tokenManager.TryRevokeAsync(token);
+
+            return Ok();
         }
 
         [HttpGet("authorize"), HttpPost("authorize")]
@@ -178,111 +211,7 @@ namespace MultiTenantETL.API.Controllers
             ApplicationUser user,
             ImmutableArray<string> scopes)
         {
-            var principal = await _signInManager.CreateUserPrincipalAsync(user);
-            var identity = (ClaimsIdentity)principal.Identity!;
-
-            // OpenIddict required claims - using SetClaim to ensure proper setting
-            identity.SetClaim(Claims.Subject, user.Id.ToString());
-            identity.SetClaim(Claims.Email, user.Email);
-            identity.SetClaim(Claims.Name, $"{user.FirstName} {user.LastName}");
-            
-            // Custom claims
-            identity.SetClaim(CustomClaims.TenantId, user.CurrentTenantId?.ToString() ?? "");
-
-            // Get user's tenant-specific role and permissions
-            if (user.CurrentTenantId.HasValue)
-            {
-                var userTenant = await _context.UserTenants
-                    .Include(ut => ut.Tenant)
-                    .FirstOrDefaultAsync(ut =>
-                        ut.UserId == user.Id &&
-                        ut.TenantId == user.CurrentTenantId.Value &&
-                        ut.IsActive);
-
-                if (userTenant != null)
-                {
-                    // Add role claim for the current tenant
-                    identity.AddClaim(new Claim(ClaimTypes.Role, userTenant.RoleCode));
-
-                    // Add tenant name claim
-                    identity.SetClaim(CustomClaims.TenantName, userTenant.Tenant.Name);
-
-                    // Get role permissions from ApplicationRole
-                    var role = await _roleManager.FindByNameAsync(userTenant.RoleCode);
-                    if (role?.Permissions != null && role.Permissions.Any())
-                    {
-                        // Add individual permission claims
-                        foreach (var permission in role.Permissions)
-                        {
-                            identity.AddClaim(new Claim(CustomClaims.Permission, permission));
-                        }
-
-                        // Add permissions as a single JSON claim for easy access
-                        identity.SetClaim(CustomClaims.Permissions,
-                            System.Text.Json.JsonSerializer.Serialize(role.Permissions));
-                    }
-                }
-            }
-            else
-            {
-                // Fallback: Get user's global roles if no tenant is selected
-                var roles = await _userManager.GetRolesAsync(user);
-                foreach (var role in roles)
-                {
-                    identity.AddClaim(new Claim(ClaimTypes.Role, role));
-                }
-            }
-
-            identity.SetDestinations(claim => claim.Type switch
-            {
-                "AspNet.Identity.SecurityStamp" => ImmutableArray<string>.Empty,
-                
-                Claims.Subject
-                or Claims.Name
-                or Claims.Email
-                or ClaimTypes.Role
-                    => [Destinations.AccessToken, Destinations.IdentityToken],
-                
-                // Permission claims go to access token only
-                var type when type == CustomClaims.Permission 
-                           || type == CustomClaims.Permissions 
-                           || type == CustomClaims.TenantId
-                           || type == CustomClaims.TenantName
-                    => [Destinations.AccessToken],
-                
-                _ => [Destinations.AccessToken]
-            });
-
-            return principal;
-        }
-
-        [HttpPost("revoke")]
-        public async Task<IActionResult> Revoke()
-        {
-            var request = HttpContext.GetOpenIddictServerRequest();
-
-            // Retrieve the token from the request
-            if (string.IsNullOrEmpty(request.Token))
-            {
-                return BadRequest(new
-                {
-                    error = OpenIddictConstants.Errors.InvalidRequest,
-                    error_description = "The token parameter is missing."
-                });
-            }
-
-            // Find the token in the database
-            var token = await _tokenManager.FindByIdAsync(request.Token);
-            if (token == null)
-            {
-                // Token not found - this is not an error per RFC 7009
-                return Ok();
-            }
-
-            // Revoke the token and any associated tokens (e.g., refresh tokens)
-            await _tokenManager.TryRevokeAsync(token);
-
-            return Ok();
+            return await _claimsService.BuildClaimsPrincipalAsync(user, scopes);
         }
     }
 }

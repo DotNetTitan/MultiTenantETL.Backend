@@ -124,13 +124,16 @@ else
     builder.Services.AddScoped<IEmailService, AzureCommunicationEmailService>();
 }
 
-// Current User Service
+// Custom Services
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<MultiTenantETL.Application.Common.Interfaces.ICurrentUserService, 
     MultiTenantETL.Infrastructure.Identity.CurrentUserService>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.Interfaces.IClaimsService,
+    MultiTenantETL.Infrastructure.Services.ClaimsService>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.Interfaces.ITenantService,
+    MultiTenantETL.Infrastructure.Services.TenantService>();
 
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 

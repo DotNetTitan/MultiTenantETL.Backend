@@ -1,12 +1,10 @@
 using System.Collections.Immutable;
-using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
-using Microsoft.EntityFrameworkCore;
 using MultiTenantETL.Application.Common.Models;
 using MultiTenantETL.Application.Authentication.Models;
 using MultiTenantETL.Application.Interfaces;
@@ -14,6 +12,7 @@ using MultiTenantETL.Domain.Enums;
 using MultiTenantETL.Infrastructure.Identity;
 using MultiTenantETL.Infrastructure.Persistence;
 using OpenIddict.Abstractions;
+using MultiTenantETL.Infrastructure.Interfaces;
 
 namespace MultiTenantETL.API.Controllers
 {
@@ -29,6 +28,8 @@ namespace MultiTenantETL.API.Controllers
         private readonly ILogger<AccountController> _logger;
         private readonly IOpenIddictScopeManager _scopeManager;
         private readonly IOpenIddictTokenManager _tokenManager;
+        private readonly ITenantService _tenantService;
+        private readonly IClaimsService _claimsService;
 
         public AccountController(
             UserManager<ApplicationUser> userManager,
@@ -38,7 +39,9 @@ namespace MultiTenantETL.API.Controllers
             ApplicationDbContext context,
             ILogger<AccountController> logger,
             IOpenIddictScopeManager scopeManager,
-            IOpenIddictTokenManager tokenManager)
+            IOpenIddictTokenManager tokenManager,
+            ITenantService tenantService,
+            IClaimsService claimsService)
         {
             _userManager = userManager;
             _signInManager = signInManager;
@@ -48,6 +51,8 @@ namespace MultiTenantETL.API.Controllers
             _logger = logger;
             _scopeManager = scopeManager;
             _tokenManager = tokenManager;
+            _tenantService = tenantService;
+            _claimsService = claimsService;
         }
 
         [HttpPost("register")]
@@ -274,51 +279,18 @@ namespace MultiTenantETL.API.Controllers
             if (user == null)
                 return Unauthorized();
 
-            var userTenant = await _context.UserTenants
-                .Include(ut => ut.Tenant)
-                .FirstOrDefaultAsync(ut =>
-                    ut.UserId == user.Id &&
-                    ut.TenantId == request.TenantId &&
-                    ut.IsActive);
-
-            if (userTenant == null)
+            // Use tenant service to switch tenant
+            var result = await _tenantService.SwitchUserTenantAsync(user.Id, request.TenantId);
+            
+            if (!result.Success)
             {
-                return BadRequest(new ErrorResponse(
-                    AuthErrorCode.TenantAccessDenied,
-                    "You don't have access to this tenant"));
+                return BadRequest(new ErrorResponse(result.ErrorCode!.Value, result.ErrorMessage!));
             }
-
-            user.CurrentTenantId = request.TenantId;
-            await _userManager.UpdateAsync(user);
 
             _logger.LogInformation("User {Email} switched to tenant {TenantId}", user.Email, request.TenantId);
 
-            // Create new claims principal with updated tenant
-            var principal = await _signInManager.CreateUserPrincipalAsync(user);
-            var identity = (ClaimsIdentity)principal.Identity!;
-            
-            // Add updated tenant claims
-            identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()));
-            identity.AddClaim(new Claim(ClaimTypes.Email, user.Email!));
-            identity.AddClaim(new Claim(ClaimTypes.Name, $"{user.FirstName} {user.LastName}"));
-            identity.AddClaim(new Claim("tenant_id", request.TenantId.ToString()));
-            identity.AddClaim(new Claim("tenant_name", userTenant.Tenant.Name));
-
-            // Generate new OpenIddict token with updated claims
-            identity.SetDestinations(claim => claim.Type switch
-            {
-                "AspNet.Identity.SecurityStamp" => ImmutableArray<string>.Empty,
-                ClaimTypes.NameIdentifier
-                or ClaimTypes.Name
-                or ClaimTypes.Email
-                or ClaimTypes.Role
-                or "tenant_id"
-                or "tenant_name"
-                    => ImmutableArray.Create(
-                        OpenIddictConstants.Destinations.AccessToken,
-                        OpenIddictConstants.Destinations.IdentityToken),
-                _ => ImmutableArray.Create(OpenIddictConstants.Destinations.AccessToken)
-            });
+            // Use ClaimsService to build new principal with updated tenant
+            var principal = await _claimsService.BuildClaimsPrincipalAsync(user, ImmutableArray<string>.Empty);
 
             // Sign in with new claims to generate new token
             var authProperties = new AuthenticationProperties();
@@ -330,7 +302,7 @@ namespace MultiTenantETL.API.Controllers
             return Ok(new
             {
                 currentTenantId = request.TenantId,
-                tenantName = userTenant.Tenant.Name,
+                tenantName = result.UserTenant!.Tenant.Name,
                 message = "Tenant switched successfully. Use your current refresh token to get a new access token with updated tenant."
             });
         }
