@@ -159,6 +159,36 @@ Two OAuth clients are seeded by default:
 | `/api/account/logout` | POST | Yes | Logout and revoke tokens |
 | `/api/account/switch-tenant` | POST | Yes | Switch active tenant |
 
+### User Management
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/api/users/me` | GET | Yes | Get current user profile |
+| `/api/users/me` | PUT | Yes | Update current user profile |
+| `/api/users` | GET | Admin | List/search users |
+| `/api/users/{id}` | GET | Admin | Get user by ID |
+| `/api/users/{id}` | PUT | SuperAdmin | Update user |
+| `/api/users/{id}/status` | PUT | SuperAdmin | Activate/deactivate user |
+| `/api/users/{id}` | DELETE | SuperAdmin | Delete user |
+| `/api/users/{id}/roles` | POST | SuperAdmin | Assign role to user |
+| `/api/users/{id}/roles` | DELETE | SuperAdmin | Remove role from user |
+| `/api/users/{id}/reset-password` | POST | SuperAdmin | Admin password reset |
+
+### Tenant Management
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/api/tenants` | GET | SuperAdmin | List all tenants |
+| `/api/tenants/my-tenants` | GET | Yes | Get current user's tenants |
+| `/api/tenants/{id}` | GET | Yes | Get tenant by ID |
+| `/api/tenants` | POST | SuperAdmin | Create tenant |
+| `/api/tenants/{id}` | PUT | Admin | Update tenant |
+| `/api/tenants/{id}` | DELETE | SuperAdmin | Delete tenant |
+| `/api/tenants/{id}/users` | GET | Admin | List tenant users |
+| `/api/tenants/{id}/users` | POST | Admin | Add user to tenant |
+| `/api/tenants/{tenantId}/users/{userId}` | DELETE | Admin | Remove user from tenant |
+| `/api/tenants/{tenantId}/users/{userId}/role` | PUT | Admin | Update user role in tenant |
+
 ## 🧪 Testing with Postman
 
 ### 1. Login (Password Grant)

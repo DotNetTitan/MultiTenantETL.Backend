@@ -65,6 +65,7 @@ public class ClaimsService : IClaimsService
             foreach (var role in globalRoles)
             {
                 identity.AddClaim(new Claim(ClaimTypes.Role, role));
+                identity.AddClaim(new Claim(OpenIddictConstants.Claims.Role, role));
             }
             return;
         }
@@ -79,8 +80,9 @@ public class ClaimsService : IClaimsService
         if (userTenant == null)
             return;
 
-        // Add role claim for the current tenant
+        // Add role claims for the current tenant (both claim types for compatibility)
         identity.AddClaim(new Claim(ClaimTypes.Role, userTenant.RoleCode));
+        identity.AddClaim(new Claim(OpenIddictConstants.Claims.Role, userTenant.RoleCode));
 
         // Add tenant name claim
         identity.SetClaim(CustomClaims.TenantName, userTenant.Tenant.Name);
@@ -115,6 +117,7 @@ public class ClaimsService : IClaimsService
             OpenIddictConstants.Claims.Subject
             or OpenIddictConstants.Claims.Name
             or OpenIddictConstants.Claims.Email
+            or OpenIddictConstants.Claims.Role
             or ClaimTypes.Role
                 => new[] { OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken },
 

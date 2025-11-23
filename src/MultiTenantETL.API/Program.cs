@@ -80,6 +80,12 @@ builder.Services.AddOpenIddict()
             "api"
         );
 
+        // Register claims to include in tokens
+        options.RegisterClaims(
+            OpenIddictConstants.Claims.Role,
+            System.Security.Claims.ClaimTypes.Role
+        );
+
         // Certificates
         if (builder.Environment.IsDevelopment())
         {
@@ -114,6 +120,15 @@ builder.Services.AddAuthentication(options =>
     options.DefaultScheme = OpenIddict.Validation.AspNetCore.OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme;
     options.DefaultAuthenticateScheme = OpenIddict.Validation.AspNetCore.OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme;
     options.DefaultChallengeScheme = OpenIddict.Validation.AspNetCore.OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme;
+});
+
+// Configure Identity options to map role claims correctly
+builder.Services.Configure<IdentityOptions>(options =>
+{
+    // Map role claim type for authorization
+    options.ClaimsIdentity.RoleClaimType = System.Security.Claims.ClaimTypes.Role;
+    options.ClaimsIdentity.UserNameClaimType = OpenIddictConstants.Claims.Name;
+    options.ClaimsIdentity.UserIdClaimType = OpenIddictConstants.Claims.Subject;
 });
 
 // Authorization with policies
@@ -246,6 +261,8 @@ builder.Services.AddScoped<MultiTenantETL.Infrastructure.Interfaces.IClaimsServi
     MultiTenantETL.Infrastructure.Services.ClaimsService>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.Interfaces.ITenantService,
     MultiTenantETL.Infrastructure.Services.TenantService>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.Interfaces.IUserService,
+    MultiTenantETL.Infrastructure.Services.UserService>();
 builder.Services.AddSingleton<IInputSanitizer, InputSanitizer>();
 
 builder.Services.AddControllers();
