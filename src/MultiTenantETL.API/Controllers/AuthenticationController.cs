@@ -157,6 +157,20 @@ namespace MultiTenantETL.API.Controllers
                     }));
             }
 
+            // Check if user account is active
+            if (!user.IsActive)
+            {
+                return Forbid(
+                    authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
+                    properties: new AuthenticationProperties(new Dictionary<string, string>
+                    {
+                        [OpenIddictServerAspNetCoreConstants.Properties.Error] =
+                            OpenIddictConstants.Errors.InvalidGrant,
+                        [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] =
+                            "Account is inactive. Please contact your administrator."
+                    }));
+            }
+
             var result = await _signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
 
             if (!result.Succeeded)
