@@ -8,16 +8,33 @@ MultiTenant ETL is a production-ready, secure multi-tenant ASP.NET Core Web API 
 
 ## Core Features
 
-- Multi-tenant architecture with per-user tenant switching and complete data isolation
-- OAuth 2.0 & OpenID Connect authentication powered by OpenIddict
-- Role-based and permission-based authorization system
-- User management with email confirmation and password reset flows
-- Secure token management with refresh token rotation and revocation
+- **Multi-tenant Architecture**: Complete tenant isolation with per-user tenant switching, automatic personal workspace creation on registration
+- **OAuth 2.0 & OpenID Connect**: Powered by OpenIddict 7.2.0 with Password Grant and Authorization Code + PKCE flows
+- **Authorization System**: Role-based (SuperAdmin, Admin, User) and permission-based authorization with custom handlers
+- **User Management**: Full CRUD operations, email confirmation, password reset, account activation/deactivation
+- **Tenant Management**: Tenant CRUD, user-tenant relationships, role assignment within tenants
+- **Token Management**: Refresh token rotation, revocation on password change/logout, short-lived access tokens (15 min)
+- **Email Integration**: Azure Communication Services for welcome emails, confirmations, password resets
 
 ## Target Use Case
 
-The platform enables organizations to manage ETL pipelines, connectors, and data transformations in a multi-tenant environment where each tenant's data is completely isolated from others.
+The platform enables organizations to manage ETL pipelines, connectors, and data transformations in a multi-tenant environment where each tenant's data is completely isolated from others. Users can belong to multiple tenants and switch between them seamlessly.
+
+## User Roles
+
+- **SuperAdmin**: System-wide administration, tenant management, user management across all tenants
+- **Admin**: Tenant-level administration, user management within tenant, full pipeline operations
+- **User**: Access to pipelines, connectors, transformations, and executions within their tenant
 
 ## Security Focus
 
-Security is a primary concern with features including account lockout, rate limiting, CORS configuration, security headers, password complexity requirements, and email enumeration prevention.
+Security is a primary concern with features including:
+- Account lockout (5 failed attempts, 15-minute lockout)
+- Rate limiting on authentication endpoints
+- CORS configuration for frontend origins
+- Security headers middleware
+- Password complexity requirements (min 8 chars, uppercase, lowercase, digit, special char)
+- Email enumeration prevention
+- BCrypt password hashing
+- Input sanitization utilities
+- Permission-based authorization policies

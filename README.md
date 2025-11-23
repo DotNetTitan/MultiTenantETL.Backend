@@ -1,6 +1,6 @@
 # MultiTenant ETL - Multi-Tenant ASP.NET Core Web API
 
-A production-ready, secure multi-tenant ASP.NET Core 8.0 Web API with OpenIddict OAuth 2.0/OpenID Connect authentication.
+A production-ready, secure multi-tenant ASP.NET Core 8.0 Web API for managing ETL (Extract, Transform, Load) pipelines with OpenIddict OAuth 2.0/OpenID Connect authentication.
 
 ## 🚀 Features
 
@@ -8,17 +8,19 @@ A production-ready, secure multi-tenant ASP.NET Core 8.0 Web API with OpenIddict
   - Automatic personal workspace creation on registration
   - Full tenant CRUD operations
   - User-tenant relationship management
-  - Role-based access within tenants
+  - Role-based access within tenants (Admin, User)
 - **OAuth 2.0 & OpenID Connect**: Powered by OpenIddict 7.2.0
 - **Authentication Flows**:
   - Password Grant (for API testing/machine-to-machine)
   - Authorization Code + PKCE (for SPAs)
-  - Refresh Token support
+  - Refresh Token support with rotation
 - **Token Management**: Token refresh and revocation endpoints
 - **ASP.NET Core Identity**: User and role management with custom claims
+- **Permission-Based Authorization**: Fine-grained access control with custom authorization handlers
 - **PostgreSQL**: Entity Framework Core with database migrations
-- **Email Integration**: Welcome emails, password reset, email confirmation
-- **Security**: Token revocation on password change, email confirmation
+- **Email Integration**: Azure Communication Services for welcome emails, password reset, email confirmation
+- **Security**: Account lockout, rate limiting, CORS, security headers, token revocation on password change
+- **Clean Architecture**: Strict separation of concerns with Domain, Application, Infrastructure, and API layers
 
 ## 📋 Prerequisites
 
@@ -90,23 +92,31 @@ After seeding, you can log in with:
 
 ## 🏗️ Architecture
 
-The project follows **Clean Architecture** principles:
+The project follows **Clean Architecture** principles with strict dependency rules:
 
 ```
 MultiTenantETL/
 ├── src/
-│   ├── MultiTenantETL.API/          # Web API & Controllers
-│   ├── MultiTenantETL.Application/  # DTOs, Business Logic
-│   ├── MultiTenantETL.Domain/       # Entities, Interfaces
-│   └── MultiTenantETL.Infrastructure/ # EF Core, Identity, Data Access
+│   ├── MultiTenantETL.Domain/          # No dependencies - Pure business entities
+│   ├── MultiTenantETL.Application/     # Depends on Domain only
+│   ├── MultiTenantETL.Infrastructure/  # Depends on Domain + Application
+│   └── MultiTenantETL.API/             # Depends on all layers
+└── docs/                                # Documentation
 ```
 
-### Key Components
+### Layer Responsibilities
 
-- **API Layer**: Controllers, OpenIddict configuration, middleware
-- **Application Layer**: Request/response models, service interfaces
-- **Domain Layer**: Entity models (User, Tenant, UserTenant, etc.)
-- **Infrastructure Layer**: DbContext, Identity, database seeding, migrations
+- **Domain Layer**: Pure business entities (Tenant), domain interfaces (ITenantResource), enums, constants (Roles, Permissions, Policies)
+- **Application Layer**: Service interfaces (IEmailService, ICurrentUserService), DTOs, request/response models, business logic abstractions
+- **Infrastructure Layer**: ApplicationDbContext, Identity models (ApplicationUser, ApplicationRole, UserTenant), service implementations, authorization handlers, migrations, data seeding
+- **API Layer**: Controllers (Authentication, Account, Users, Tenants), middleware (SecurityHeadersMiddleware), OpenIddict configuration, rate limiting, CORS
+
+### Key Design Decisions
+
+- Authentication entities (ApplicationUser, ApplicationRole) live in Infrastructure rather than Domain due to tight coupling with ASP.NET Core Identity and Entity Framework
+- Permission-based authorization with custom handlers (PermissionAuthorizationHandler, TenantResourceAuthorizationHandler)
+- Tenant context managed through claims (TenantId claim in JWT tokens)
+- Database uses snake_case naming convention for tables
 
 ## 🔐 Authentication & Authorization
 
@@ -230,15 +240,20 @@ token=YOUR_REFRESH_TOKEN
 
 ## 🔒 Security Features
 
-- ✅ Password hashing with ASP.NET Core Identity
+- ✅ Password hashing with BCrypt.Net (ASP.NET Core Identity)
 - ✅ Email confirmation required for new accounts
-- ✅ Refresh token rotation
-- ✅ Token revocation on password change
-- ✅ Token revocation on logout
-- ✅ Account lockout after failed login attempts
-- ✅ Password validation (min 8 chars, complexity requirements)
+- ✅ Refresh token rotation and revocation
+- ✅ Token revocation on password change and logout
+- ✅ Account lockout after failed login attempts (5 attempts, 15-minute lockout)
+- ✅ Password validation (min 8 chars, uppercase, lowercase, digit, special char)
 - ✅ Short-lived access tokens (15 minutes)
 - ✅ Long-lived refresh tokens (7 days)
+- ✅ Rate limiting on authentication endpoints (AspNetCoreRateLimit)
+- ✅ CORS configuration for frontend origins
+- ✅ Security headers middleware (X-Content-Type-Options, X-Frame-Options, etc.)
+- ✅ Input sanitization utilities
+- ✅ Email enumeration prevention
+- ✅ Permission-based authorization with custom policies
 
 ## 🗄️ Database Schema
 
@@ -255,13 +270,29 @@ token=YOUR_REFRESH_TOKEN
 
 ## 📧 Email Configuration
 
-The application requires email service configuration for:
-- Welcome emails
-- Email confirmation
-- Password reset
+The application uses **Azure Communication Services** for email delivery:
+- Welcome emails on registration
+- Email confirmation links
+- Password reset tokens
 - Password change notifications
 
-Configure your email service in `appsettings.json` (implementation pending).
+Configure in `appsettings.json`:
+
+```json
+{
+  "AzureCommunication": {
+    "ConnectionString": "your-azure-communication-connection-string",
+    "SenderEmail": "noreply@yourdomain.com"
+  }
+}
+```
+
+Or use user secrets for development:
+
+```bash
+dotnet user-secrets set "AzureCommunication:ConnectionString" "your-connection-string"
+dotnet user-secrets set "AzureCommunication:SenderEmail" "noreply@yourdomain.com"
+```
 
 ## 🚢 Deployment
 
@@ -306,11 +337,14 @@ dotnet ef database update --project src/MultiTenantETL.Infrastructure --startup-
 
 ### Project Structure
 
-- **Controllers**: API endpoints and request handling
-- **Migrations**: EF Core database migrations
-- **DbSeeder**: Initial data seeding (roles, admin, OAuth clients)
-- **Identity**: Custom ApplicationUser and ApplicationRole models
-- **Entities**: Domain models (Tenant, UserTenant)
+- **Controllers**: AuthenticationController (OAuth), AccountController (registration, password), UsersController, TenantsController
+- **Migrations**: EF Core database migrations in Infrastructure layer
+- **DbSeeder**: Initial data seeding (roles, permissions, admin user, OAuth clients, scopes)
+- **Identity**: ApplicationUser, ApplicationRole, UserTenant models in Infrastructure
+- **Domain**: Tenant entity, ITenantResource interface, constants (Roles, Permissions, Policies, ClaimTypes)
+- **Authorization**: PermissionAuthorizationHandler, TenantResourceAuthorizationHandler
+- **Services**: EmailService (Azure Communication), ClaimsService, TenantService, CurrentUserService
+- **Middleware**: SecurityHeadersMiddleware for HTTP security headers
 
 ## 📝 License
 
