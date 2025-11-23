@@ -138,18 +138,24 @@ public class UsersController : ControllerBase
             request.Page,
             request.PageSize);
 
-        var userResponses = users.Select(u => new UserResponse
+        var userResponses = new List<UserResponse>();
+        foreach (var u in users)
         {
-            Id = u.Id,
-            Email = u.Email!,
-            FirstName = u.FirstName,
-            LastName = u.LastName,
-            IsActive = u.IsActive,
-            EmailConfirmed = u.EmailConfirmed,
-            CreatedAt = u.CreatedAt,
-            CurrentTenantId = u.CurrentTenantId,
-            CurrentTenantName = u.CurrentTenant?.Name
-        }).ToList();
+            var roles = await _userService.GetUserRolesAsync(u.Id);
+            userResponses.Add(new UserResponse
+            {
+                Id = u.Id,
+                Email = u.Email!,
+                FirstName = u.FirstName,
+                LastName = u.LastName,
+                IsActive = u.IsActive,
+                EmailConfirmed = u.EmailConfirmed,
+                CreatedAt = u.CreatedAt,
+                CurrentTenantId = u.CurrentTenantId,
+                CurrentTenantName = u.CurrentTenant?.Name,
+                Roles = roles
+            });
+        }
 
         var response = new PagedUserResponse
         {

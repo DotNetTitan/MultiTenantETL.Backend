@@ -315,21 +315,13 @@ namespace MultiTenantETL.API.Controllers
 
             _logger.LogInformation("User {Email} switched to tenant {TenantId}", user.Email, request.TenantId);
 
-            // Use ClaimsService to build new principal with updated tenant
-            var principal = await _claimsService.BuildClaimsPrincipalAsync(user, ImmutableArray<string>.Empty);
-
-            // Sign in with new claims to generate new token
-            var authProperties = new AuthenticationProperties();
-            await HttpContext.SignInAsync(
-                OpenIddict.Server.AspNetCore.OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
-                principal,
-                authProperties);
-
+            // Return success - client should use refresh token to get new access token with updated tenant claims
             return Ok(new
             {
                 currentTenantId = request.TenantId,
                 tenantName = result.UserTenant!.Tenant.Name,
-                message = "Tenant switched successfully. Use your current refresh token to get a new access token with updated tenant."
+                message = "Tenant switched successfully. Please refresh your token to get updated claims.",
+                requiresTokenRefresh = true
             });
         }
 

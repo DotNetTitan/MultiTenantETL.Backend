@@ -13,6 +13,7 @@ public record UserResponse
     public DateTime CreatedAt { get; init; }
     public Guid? CurrentTenantId { get; init; }
     public string? CurrentTenantName { get; init; }
+    public List<string> Roles { get; init; } = new();
 }
 
 public record UserDetailResponse
