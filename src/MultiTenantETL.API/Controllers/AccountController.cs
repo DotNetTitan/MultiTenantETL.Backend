@@ -89,6 +89,32 @@ namespace MultiTenantETL.API.Controllers
 
             _logger.LogInformation("User {Email} registered successfully", request.Email);
 
+            // Create a default personal tenant for the user
+            var tenantSlug = $"user-{user.Id.ToString()[..8]}";
+            var tenantName = $"{user.FirstName}'s Workspace";
+            var tenantResult = await _tenantService.CreateTenantAsync(tenantName, tenantSlug);
+
+            if (tenantResult.Success)
+            {
+                // Add user to their new tenant with TenantAdmin role
+                await _tenantService.AddUserToTenantAsync(
+                    user.Id,
+                    tenantResult.Data!.Id,
+                    Domain.Constants.Roles.TenantAdmin);
+
+                _logger.LogInformation(
+                    "Created default tenant {TenantId} for user {Email}",
+                    tenantResult.Data.Id,
+                    request.Email);
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "Failed to create default tenant for user {Email}: {Error}",
+                    request.Email,
+                    tenantResult.ErrorMessage);
+            }
+
             // Generate and send confirmation email
             var confirmationToken = await _userManager.GenerateEmailConfirmationTokenAsync(user);
             var encodedToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(confirmationToken));

@@ -29,6 +29,9 @@
         // Tenant operations
         TenantAccessDenied,
         TenantNotFound,
+        TenantAlreadyExists,
+        UserAlreadyInTenant,
+        UserNotInTenant,
 
         // General
         UserNotFound,

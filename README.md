@@ -5,6 +5,10 @@ A production-ready, secure multi-tenant ASP.NET Core 8.0 Web API with OpenIddict
 ## 🚀 Features
 
 - **Multi-Tenancy**: Complete tenant isolation with per-user tenant switching
+  - Automatic personal workspace creation on registration
+  - Full tenant CRUD operations
+  - User-tenant relationship management
+  - Role-based access within tenants
 - **OAuth 2.0 & OpenID Connect**: Powered by OpenIddict 7.2.0
 - **Authentication Flows**:
   - Password Grant (for API testing/machine-to-machine)
