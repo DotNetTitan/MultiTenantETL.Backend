@@ -58,37 +58,48 @@ public class ClaimsService : IClaimsService
 
     private async Task AddTenantClaimsAsync(ClaimsIdentity identity, ApplicationUser user)
     {
-        if (!user.CurrentTenantId.HasValue)
+        // Always add global roles first (e.g., SuperAdmin)
+        var globalRoles = await _userManager.GetRolesAsync(user);
+        foreach (var role in globalRoles)
         {
-            // Fallback: Get user's global roles if no tenant is selected
-            var globalRoles = await _userManager.GetRolesAsync(user);
-            foreach (var role in globalRoles)
-            {
-                identity.AddClaim(new Claim(ClaimTypes.Role, role));
-                identity.AddClaim(new Claim(OpenIddictConstants.Claims.Role, role));
-            }
-            return;
+            identity.AddClaim(new Claim(ClaimTypes.Role, role));
+            identity.AddClaim(new Claim(OpenIddictConstants.Claims.Role, role));
         }
 
-        var userTenant = await _context.UserTenants
-            .Include(ut => ut.Tenant)
-            .FirstOrDefaultAsync(ut =>
-                ut.UserId == user.Id &&
-                ut.TenantId == user.CurrentTenantId.Value &&
-                ut.IsActive);
+        // If user has a current tenant, add tenant-specific role and permissions
+        if (user.CurrentTenantId.HasValue)
+        {
+            var userTenant = await _context.UserTenants
+                .Include(ut => ut.Tenant)
+                .FirstOrDefaultAsync(ut =>
+                    ut.UserId == user.Id &&
+                    ut.TenantId == user.CurrentTenantId.Value &&
+                    ut.IsActive);
 
-        if (userTenant == null)
-            return;
+            if (userTenant != null)
+            {
+                // Add tenant-specific role (if different from global role)
+                if (!globalRoles.Contains(userTenant.RoleCode))
+                {
+                    identity.AddClaim(new Claim(ClaimTypes.Role, userTenant.RoleCode));
+                    identity.AddClaim(new Claim(OpenIddictConstants.Claims.Role, userTenant.RoleCode));
+                }
 
-        // Add role claims for the current tenant (both claim types for compatibility)
-        identity.AddClaim(new Claim(ClaimTypes.Role, userTenant.RoleCode));
-        identity.AddClaim(new Claim(OpenIddictConstants.Claims.Role, userTenant.RoleCode));
+                // Add tenant name claim
+                identity.SetClaim(CustomClaims.TenantName, userTenant.Tenant.Name);
 
-        // Add tenant name claim
-        identity.SetClaim(CustomClaims.TenantName, userTenant.Tenant.Name);
-
-        // Add permission claims
-        await AddPermissionClaimsAsync(identity, userTenant.RoleCode);
+                // Add permission claims based on the highest role
+                var roleForPermissions = globalRoles.Contains(Domain.Constants.Roles.SuperAdmin) 
+                    ? Domain.Constants.Roles.SuperAdmin 
+                    : userTenant.RoleCode;
+                await AddPermissionClaimsAsync(identity, roleForPermissions);
+            }
+        }
+        else if (globalRoles.Any())
+        {
+            // No tenant selected, use global role for permissions
+            await AddPermissionClaimsAsync(identity, globalRoles.First());
+        }
     }
 
     private async Task AddPermissionClaimsAsync(ClaimsIdentity identity, string roleCode)
@@ -121,11 +132,14 @@ public class ClaimsService : IClaimsService
             or ClaimTypes.Role
                 => new[] { OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken },
 
-            // Permission claims go to access token only
+            // Tenant claims go to both tokens so frontend can read them from id_token
+            var type when type == CustomClaims.TenantId
+                       || type == CustomClaims.TenantName
+                => new[] { OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken },
+
+            // Permission claims go to access token only (not needed in id_token)
             var type when type == CustomClaims.Permission
                        || type == CustomClaims.Permissions
-                       || type == CustomClaims.TenantId
-                       || type == CustomClaims.TenantName
                 => new[] { OpenIddictConstants.Destinations.AccessToken },
 
             _ => new[] { OpenIddictConstants.Destinations.AccessToken }

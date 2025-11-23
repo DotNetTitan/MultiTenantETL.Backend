@@ -234,25 +234,7 @@ public class TenantService : ITenantService
 
     public async Task<TenantSwitchResult> SwitchUserTenantAsync(Guid userId, Guid tenantId)
     {
-        // Validate user has access to the tenant
-        var userTenant = await _context.UserTenants
-            .Include(ut => ut.Tenant)
-            .FirstOrDefaultAsync(ut =>
-                ut.UserId == userId &&
-                ut.TenantId == tenantId &&
-                ut.IsActive);
-
-        if (userTenant == null)
-        {
-            return new TenantSwitchResult
-            {
-                Success = false,
-                ErrorCode = AuthErrorCode.TenantAccessDenied,
-                ErrorMessage = "You don't have access to this tenant"
-            };
-        }
-
-        // Update user's current tenant
+        // Get user first to check if they're SuperAdmin
         var user = await _userManager.FindByIdAsync(userId.ToString());
         if (user == null)
         {
@@ -264,6 +246,62 @@ public class TenantService : ITenantService
             };
         }
 
+        // Check if user is SuperAdmin
+        var roles = await _userManager.GetRolesAsync(user);
+        var isSuperAdmin = roles.Contains(Domain.Constants.Roles.SuperAdmin);
+
+        // Validate tenant exists
+        var tenant = await _context.Tenants
+            .FirstOrDefaultAsync(t => t.Id == tenantId && t.IsActive);
+
+        if (tenant == null)
+        {
+            return new TenantSwitchResult
+            {
+                Success = false,
+                ErrorCode = AuthErrorCode.TenantNotFound,
+                ErrorMessage = "Tenant not found or inactive"
+            };
+        }
+
+        UserTenant? userTenant = null;
+
+        // SuperAdmin can switch to any tenant without being a member
+        if (!isSuperAdmin)
+        {
+            // Regular users must be a member of the tenant
+            userTenant = await _context.UserTenants
+                .Include(ut => ut.Tenant)
+                .FirstOrDefaultAsync(ut =>
+                    ut.UserId == userId &&
+                    ut.TenantId == tenantId &&
+                    ut.IsActive);
+
+            if (userTenant == null)
+            {
+                return new TenantSwitchResult
+                {
+                    Success = false,
+                    ErrorCode = AuthErrorCode.TenantAccessDenied,
+                    ErrorMessage = "You don't have access to this tenant"
+                };
+            }
+        }
+        else
+        {
+            // For SuperAdmin, create a virtual UserTenant for the response
+            userTenant = new UserTenant
+            {
+                UserId = userId,
+                TenantId = tenantId,
+                RoleCode = Domain.Constants.Roles.SuperAdmin,
+                IsActive = true,
+                Tenant = tenant,
+                User = user
+            };
+        }
+
+        // Update user's current tenant
         user.CurrentTenantId = tenantId;
         await _userManager.UpdateAsync(user);
 

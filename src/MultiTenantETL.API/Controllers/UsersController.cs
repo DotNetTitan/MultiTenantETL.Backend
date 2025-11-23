@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Common.Models;
+using MultiTenantETL.Application.Tenants.Models;
 using MultiTenantETL.Application.Users.Models;
 using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Infrastructure.Interfaces;
@@ -354,5 +355,131 @@ public class UsersController : ControllerBase
         _logger.LogInformation("Password reset for user {UserId} by admin", id);
 
         return Ok(new { message = "Password reset successfully" });
+    }
+
+    /// <summary>
+    /// Get user's tenant memberships
+    /// </summary>
+    [HttpGet("{id:guid}/tenants")]
+    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.TenantAdmin}")]
+    public async Task<IActionResult> GetUserTenants(Guid id)
+    {
+        var userRole = _currentUserService.GetRole();
+        
+        // TenantAdmin can only view users in their tenant
+        if (userRole == Roles.TenantAdmin)
+        {
+            var currentTenantId = _currentUserService.GetTenantId();
+            var userTenants = await _userService.GetUserTenantsAsync(id);
+
+            if (!userTenants.Any(ut => ut.TenantId == currentTenantId))
+            {
+                return Forbid();
+            }
+        }
+
+        var tenants = await _userService.GetUserTenantsAsync(id);
+
+        var response = tenants.Select(ut => new UserTenantInfo
+        {
+            TenantId = ut.TenantId,
+            TenantName = ut.Tenant.Name,
+            RoleCode = ut.RoleCode,
+            IsActive = ut.IsActive
+        }).ToList();
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Add user to tenant (SuperAdmin or TenantAdmin)
+    /// </summary>
+    [HttpPost("{id:guid}/tenants")]
+    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.TenantAdmin}")]
+    public async Task<IActionResult> AddUserToTenant(Guid id, [FromBody] AddUserToTenantRequest request)
+    {
+        // TenantAdmin can only add users to their own tenant
+        var userRole = _currentUserService.GetRole();
+        if (userRole == Roles.TenantAdmin)
+        {
+            var currentTenantId = _currentUserService.GetTenantId();
+            if (request.TenantId != currentTenantId)
+            {
+                return Forbid();
+            }
+        }
+
+        var result = await _tenantService.AddUserToTenantAsync(id, request.TenantId, request.RoleCode);
+
+        if (!result.Success)
+        {
+            return BadRequest(new ErrorResponse(result.ErrorCode!.Value, result.ErrorMessage!));
+        }
+
+        _logger.LogInformation("User {UserId} added to tenant {TenantId} with role {RoleCode}", 
+            id, request.TenantId, request.RoleCode);
+
+        return Ok(new { message = "User added to tenant successfully" });
+    }
+
+    /// <summary>
+    /// Remove user from tenant (SuperAdmin or TenantAdmin)
+    /// </summary>
+    [HttpDelete("{userId:guid}/tenants/{tenantId:guid}")]
+    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.TenantAdmin}")]
+    public async Task<IActionResult> RemoveUserFromTenant(Guid userId, Guid tenantId)
+    {
+        // TenantAdmin can only remove users from their own tenant
+        var userRole = _currentUserService.GetRole();
+        if (userRole == Roles.TenantAdmin)
+        {
+            var currentTenantId = _currentUserService.GetTenantId();
+            if (tenantId != currentTenantId)
+            {
+                return Forbid();
+            }
+        }
+
+        var result = await _tenantService.RemoveUserFromTenantAsync(userId, tenantId);
+
+        if (!result.Success)
+        {
+            return BadRequest(new ErrorResponse(result.ErrorCode!.Value, result.ErrorMessage!));
+        }
+
+        _logger.LogInformation("User {UserId} removed from tenant {TenantId}", userId, tenantId);
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Update user's role in tenant (SuperAdmin or TenantAdmin)
+    /// </summary>
+    [HttpPut("{userId:guid}/tenants/{tenantId:guid}/role")]
+    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.TenantAdmin}")]
+    public async Task<IActionResult> UpdateUserTenantRole(Guid userId, Guid tenantId, [FromBody] UpdateUserTenantRoleRequest request)
+    {
+        // TenantAdmin can only update roles in their own tenant
+        var userRole = _currentUserService.GetRole();
+        if (userRole == Roles.TenantAdmin)
+        {
+            var currentTenantId = _currentUserService.GetTenantId();
+            if (tenantId != currentTenantId)
+            {
+                return Forbid();
+            }
+        }
+
+        var result = await _tenantService.UpdateUserTenantRoleAsync(userId, tenantId, request.RoleCode);
+
+        if (!result.Success)
+        {
+            return BadRequest(new ErrorResponse(result.ErrorCode!.Value, result.ErrorMessage!));
+        }
+
+        _logger.LogInformation("User {UserId} role updated to {RoleCode} in tenant {TenantId}", 
+            userId, request.RoleCode, tenantId);
+
+        return Ok(new { message = "User role updated successfully" });
     }
 }
