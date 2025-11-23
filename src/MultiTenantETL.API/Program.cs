@@ -1,9 +1,17 @@
 using System.Security.Cryptography.X509Certificates;
+using AspNetCoreRateLimit;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using MultiTenantETL.API.Middleware;
+using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Interfaces;
+using MultiTenantETL.Domain.Constants;
+using MultiTenantETL.Infrastructure.Authorization.Handlers;
+using MultiTenantETL.Infrastructure.Authorization.Requirements;
 using MultiTenantETL.Infrastructure.Identity;
 using MultiTenantETL.Infrastructure.Persistence;
+using MultiTenantETL.Infrastructure.Security;
 using MultiTenantETL.Infrastructure.Services;
 using OpenIddict.Abstractions;
 
@@ -107,11 +115,118 @@ builder.Services.AddAuthentication(options =>
     options.DefaultAuthenticateScheme = OpenIddict.Validation.AspNetCore.OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme;
     options.DefaultChallengeScheme = OpenIddict.Validation.AspNetCore.OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme;
 });
-builder.Services.AddAuthorization();
+
+// Authorization with policies
+builder.Services.AddAuthorization(options =>
+{
+    // Tenant resource policy - ensures users only access their tenant's data
+    options.AddPolicy(Policies.TenantResource, policy =>
+    {
+        policy.Requirements.Add(new TenantResourceRequirement());
+    });
+
+    // Role-based policy shortcuts
+    options.AddPolicy(Policies.RequireSuperAdmin, policy =>
+    {
+        policy.RequireRole(Roles.SuperAdmin);
+    });
+
+    options.AddPolicy(Policies.RequireTenantAdmin, policy =>
+    {
+        policy.RequireRole(Roles.SuperAdmin, Roles.TenantAdmin);
+    });
+});
+
+// Register authorization handlers
+builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, TenantResourceAuthorizationHandler>();
 
 // Configure Azure Communication Services settings
 builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.AzureCommunicationSettings>(
     builder.Configuration.GetSection("AzureCommunicationServices"));
+
+// Rate Limiting
+builder.Services.AddMemoryCache();
+builder.Services.Configure<IpRateLimitOptions>(options =>
+{
+    options.EnableEndpointRateLimiting = true;
+    options.StackBlockedRequests = false;
+    options.HttpStatusCode = 429;
+    options.RealIpHeader = "X-Real-IP";
+    options.ClientIdHeader = "X-ClientId";
+
+    options.GeneralRules = new List<RateLimitRule>
+    {
+        // Authentication endpoints - very strict
+        new RateLimitRule
+        {
+            Endpoint = "POST:/connect/token",
+            Period = "1m",
+            Limit = 5  // 5 login attempts per minute
+        },
+        new RateLimitRule
+        {
+            Endpoint = "POST:/api/account/register",
+            Period = "1h",
+            Limit = 3  // 3 registrations per hour
+        },
+        new RateLimitRule
+        {
+            Endpoint = "POST:/api/account/forgot-password",
+            Period = "15m",
+            Limit = 3  // 3 password reset requests per 15 min
+        },
+
+        // Write operations - moderate
+        new RateLimitRule
+        {
+            Endpoint = "POST:*",
+            Period = "1m",
+            Limit = 30
+        },
+        new RateLimitRule
+        {
+            Endpoint = "PUT:*",
+            Period = "1m",
+            Limit = 30
+        },
+        new RateLimitRule
+        {
+            Endpoint = "DELETE:*",
+            Period = "1m",
+            Limit = 20
+        },
+
+        // Read operations - permissive
+        new RateLimitRule
+        {
+            Endpoint = "GET:*",
+            Period = "1m",
+            Limit = 100
+        }
+    };
+});
+
+builder.Services.AddSingleton<IIpPolicyStore, MemoryCacheIpPolicyStore>();
+builder.Services.AddSingleton<IRateLimitCounterStore, MemoryCacheRateLimitCounterStore>();
+builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
+builder.Services.AddSingleton<IProcessingStrategy, AsyncKeyLockProcessingStrategy>();
+
+// CORS Configuration
+var allowedOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>() ?? new[] { "http://localhost:5173" };
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.WithOrigins(allowedOrigins)
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            .AllowCredentials();
+    });
+});
 
 // Email Service
 var useStubEmailService = builder.Configuration.GetValue<bool>("EmailService:UseStub", true);
@@ -126,12 +241,12 @@ else
 
 // Custom Services
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<MultiTenantETL.Application.Common.Interfaces.ICurrentUserService, 
-    MultiTenantETL.Infrastructure.Identity.CurrentUserService>();
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.Interfaces.IClaimsService,
     MultiTenantETL.Infrastructure.Services.ClaimsService>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.Interfaces.ITenantService,
     MultiTenantETL.Infrastructure.Services.TenantService>();
+builder.Services.AddSingleton<IInputSanitizer, InputSanitizer>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -146,12 +261,20 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+// Security Headers - should be early in pipeline
+app.UseSecurityHeaders();
+
+// Rate limiting - before authentication
+app.UseIpRateLimiting();
+
+// CORS - must be before authentication/authorization
+app.UseCors("AllowFrontend");
+
 // Only use HTTPS redirection in production
 if (!app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
 }
-
 
 app.UseAuthentication();
 
