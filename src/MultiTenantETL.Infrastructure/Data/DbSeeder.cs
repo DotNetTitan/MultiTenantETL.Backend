@@ -19,7 +19,7 @@ public static class DbSeeder
         await SeedDefaultTenantAsync(services);
         await SeedAdminUserAsync(services);
         await SeedOAuthClientsAsync(services);
-        
+
         Console.WriteLine("✅ Database seeding completed");
     }
 
@@ -117,7 +117,7 @@ public static class DbSeeder
         var configuration = services.GetRequiredService<IConfiguration>();
 
         const string adminEmail = "admin@multitenant-etl.com";
-        var adminPassword = configuration["Seeding:AdminPassword"] ?? "Admin@123456";
+        const string adminPassword = "Admin@123456";
 
         var existingAdmin = await userManager.FindByEmailAsync(adminEmail);
         if (existingAdmin == null)
@@ -137,7 +137,7 @@ public static class DbSeeder
             };
 
             var result = await userManager.CreateAsync(adminUser, adminPassword);
-            
+
             if (result.Succeeded)
             {
                 await userManager.AddToRoleAsync(adminUser, Roles.SuperAdmin);
@@ -175,7 +175,7 @@ public static class DbSeeder
     {
         var applicationManager = services.GetRequiredService<IOpenIddictApplicationManager>();
         var configuration = services.GetRequiredService<IConfiguration>();
-        
+
         var oauthClientSecret = configuration["Seeding:OAuthClientSecret"] ?? "postman-secret-key-change-in-production";
 
         if (await applicationManager.FindByClientIdAsync("multitenant-etl-spa") == null)
