@@ -19,6 +19,7 @@ namespace MultiTenantETL.Infrastructure.Persistence
         // Domain entities
         public DbSet<Tenant> Tenants { get; set; }
         public DbSet<UserTenant> UserTenants { get; set; }
+        public DbSet<AuditLog> AuditLogs { get; set; }
 
         // OpenIddict entities
         public DbSet<OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreApplication> OpenIddictApplications { get; set; }
@@ -55,6 +56,28 @@ namespace MultiTenantETL.Infrastructure.Persistence
                 .HasOne(ut => ut.Tenant)
                 .WithMany()
                 .HasForeignKey(ut => ut.TenantId);
+
+            // Audit logs configuration
+            builder.Entity<AuditLog>()
+                .ToTable("audit_logs");
+
+            builder.Entity<AuditLog>()
+                .HasOne(a => a.Tenant)
+                .WithMany()
+                .HasForeignKey(a => a.TenantId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<AuditLog>()
+                .HasIndex(a => a.TenantId);
+
+            builder.Entity<AuditLog>()
+                .HasIndex(a => a.UserId);
+
+            builder.Entity<AuditLog>()
+                .HasIndex(a => a.Action);
+
+            builder.Entity<AuditLog>()
+                .HasIndex(a => a.CreatedAt);
         }
     }
 }

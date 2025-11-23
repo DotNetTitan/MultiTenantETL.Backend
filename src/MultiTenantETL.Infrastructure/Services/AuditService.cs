@@ -1,0 +1,171 @@
+using System.Text.Json;
+using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using MultiTenantETL.Application.Common.Interfaces;
+using MultiTenantETL.Application.Interfaces;
+using MultiTenantETL.Domain.Entities;
+using MultiTenantETL.Infrastructure.Persistence;
+
+namespace MultiTenantETL.Infrastructure.Services;
+
+public class AuditService : IAuditService
+{
+    private readonly ApplicationDbContext _context;
+    private readonly ICurrentUserService _currentUser;
+    private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly ILogger<AuditService> _logger;
+
+    public AuditService(
+        ApplicationDbContext context,
+        ICurrentUserService currentUser,
+        IHttpContextAccessor httpContextAccessor,
+        ILogger<AuditService> logger)
+    {
+        _context = context;
+        _currentUser = currentUser;
+        _httpContextAccessor = httpContextAccessor;
+        _logger = logger;
+    }
+
+    public async Task LogAsync(
+        string action,
+        string resourceType,
+        string? resourceId = null,
+        string? description = null,
+        object? metadata = null,
+        string severity = "Info",
+        bool success = true,
+        string? errorMessage = null)
+    {
+        try
+        {
+            var httpContext = _httpContextAccessor.HttpContext;
+            
+            var auditLog = new AuditLog
+            {
+                Id = Guid.NewGuid(),
+                TenantId = _currentUser.GetTenantId(),
+                UserId = _currentUser.GetUserId(),
+                UserEmail = _currentUser.GetEmail(),
+                Action = action,
+                ResourceType = resourceType,
+                ResourceId = resourceId,
+                Description = description ?? action,
+                IpAddress = httpContext?.Connection.RemoteIpAddress?.ToString(),
+                UserAgent = httpContext?.Request.Headers["User-Agent"].ToString(),
+                Metadata = metadata != null ? JsonSerializer.Serialize(metadata) : null,
+                Severity = severity,
+                Success = success,
+                ErrorMessage = errorMessage,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.AuditLogs.Add(auditLog);
+            await _context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            // Never let audit logging break the application
+            _logger.LogError(ex, "Failed to write audit log for action {Action}", action);
+        }
+    }
+
+    public async Task LogAuthenticationAsync(
+        string action,
+        string? userEmail = null,
+        bool success = true,
+        string? errorMessage = null)
+    {
+        try
+        {
+            var httpContext = _httpContextAccessor.HttpContext;
+            
+            var auditLog = new AuditLog
+            {
+                Id = Guid.NewGuid(),
+                TenantId = null, // Auth events are system-level
+                UserId = null,
+                UserEmail = userEmail,
+                Action = action,
+                ResourceType = "Authentication",
+                Description = $"{action} - {userEmail}",
+                IpAddress = httpContext?.Connection.RemoteIpAddress?.ToString(),
+                UserAgent = httpContext?.Request.Headers["User-Agent"].ToString(),
+                Severity = success ? "Info" : "Warning",
+                Success = success,
+                ErrorMessage = errorMessage,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.AuditLogs.Add(auditLog);
+            await _context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to write authentication audit log for action {Action}", action);
+        }
+    }
+
+    public async Task<(List<AuditLogDto> Logs, int TotalCount)> GetAuditLogsAsync(
+        Guid? tenantId = null,
+        Guid? userId = null,
+        string? action = null,
+        string? resourceType = null,
+        DateTime? startDate = null,
+        DateTime? endDate = null,
+        int page = 1,
+        int pageSize = 50)
+    {
+        var query = _context.AuditLogs
+            .Include(a => a.Tenant)
+            .AsQueryable();
+
+        // Apply filters
+        if (tenantId.HasValue)
+            query = query.Where(a => a.TenantId == tenantId.Value);
+
+        if (userId.HasValue)
+            query = query.Where(a => a.UserId == userId.Value);
+
+        if (!string.IsNullOrEmpty(action))
+            query = query.Where(a => a.Action == action);
+
+        if (!string.IsNullOrEmpty(resourceType))
+            query = query.Where(a => a.ResourceType == resourceType);
+
+        if (startDate.HasValue)
+            query = query.Where(a => a.CreatedAt >= startDate.Value);
+
+        if (endDate.HasValue)
+            query = query.Where(a => a.CreatedAt <= endDate.Value);
+
+        var totalCount = await query.CountAsync();
+
+        var logs = await query
+            .OrderByDescending(a => a.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(a => new AuditLogDto
+            {
+                Id = a.Id,
+                TenantId = a.TenantId,
+                TenantName = a.Tenant != null ? a.Tenant.Name : null,
+                UserId = a.UserId,
+                UserEmail = a.UserEmail,
+                Action = a.Action,
+                ResourceType = a.ResourceType,
+                ResourceId = a.ResourceId,
+                Description = a.Description,
+                IpAddress = a.IpAddress,
+                Metadata = a.Metadata,
+                Severity = a.Severity,
+                Success = a.Success,
+                ErrorMessage = a.ErrorMessage,
+                CreatedAt = a.CreatedAt
+            })
+            .ToListAsync();
+
+        return (logs, totalCount);
+    }
+}

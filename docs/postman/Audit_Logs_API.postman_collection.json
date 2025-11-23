@@ -1,0 +1,326 @@
+{
+	"info": {
+		"_postman_id": "audit-logs-collection-2024",
+		"name": "Audit Logs API",
+		"description": "API endpoints for viewing audit logs in the Multi-Tenant ETL platform",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{access_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"item": [
+		{
+			"name": "Get Audit Logs (Admin)",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/AuditLogs?page=1&pageSize=50",
+					"host": ["{{base_url}}"],
+					"path": ["api", "AuditLogs"],
+					"query": [
+						{
+							"key": "userId",
+							"value": "",
+							"description": "Filter by user ID (optional)",
+							"disabled": true
+						},
+						{
+							"key": "action",
+							"value": "",
+							"description": "Filter by action (e.g., User.Created, Auth.Login)",
+							"disabled": true
+						},
+						{
+							"key": "resourceType",
+							"value": "",
+							"description": "Filter by resource type (e.g., User, Tenant, Pipeline)",
+							"disabled": true
+						},
+						{
+							"key": "startDate",
+							"value": "",
+							"description": "Filter by start date (ISO 8601 format)",
+							"disabled": true
+						},
+						{
+							"key": "endDate",
+							"value": "",
+							"description": "Filter by end date (ISO 8601 format)",
+							"disabled": true
+						},
+						{
+							"key": "page",
+							"value": "1",
+							"description": "Page number"
+						},
+						{
+							"key": "pageSize",
+							"value": "50",
+							"description": "Items per page"
+						}
+					]
+				},
+				"description": "Get audit logs with filtering. SuperAdmin sees all logs, TenantAdmin sees only their tenant's logs."
+			},
+			"response": []
+		},
+		{
+			"name": "Get My Audit Logs",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/AuditLogs/my-logs?page=1&pageSize=50",
+					"host": ["{{base_url}}"],
+					"path": ["api", "AuditLogs", "my-logs"],
+					"query": [
+						{
+							"key": "action",
+							"value": "",
+							"description": "Filter by action",
+							"disabled": true
+						},
+						{
+							"key": "startDate",
+							"value": "",
+							"description": "Filter by start date",
+							"disabled": true
+						},
+						{
+							"key": "endDate",
+							"value": "",
+							"description": "Filter by end date",
+							"disabled": true
+						},
+						{
+							"key": "page",
+							"value": "1"
+						},
+						{
+							"key": "pageSize",
+							"value": "50"
+						}
+					]
+				},
+				"description": "Get audit logs for the current authenticated user"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Audit Log by ID",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/AuditLogs/{{audit_log_id}}",
+					"host": ["{{base_url}}"],
+					"path": ["api", "AuditLogs", "{{audit_log_id}}"]
+				},
+				"description": "Get a specific audit log by ID"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Login Attempts",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/AuditLogs?action=Auth.Login&page=1&pageSize=50",
+					"host": ["{{base_url}}"],
+					"path": ["api", "AuditLogs"],
+					"query": [
+						{
+							"key": "action",
+							"value": "Auth.Login"
+						},
+						{
+							"key": "page",
+							"value": "1"
+						},
+						{
+							"key": "pageSize",
+							"value": "50"
+						}
+					]
+				},
+				"description": "Get all successful login attempts"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Failed Login Attempts",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/AuditLogs?action=Auth.LoginFailed&page=1&pageSize=50",
+					"host": ["{{base_url}}"],
+					"path": ["api", "AuditLogs"],
+					"query": [
+						{
+							"key": "action",
+							"value": "Auth.LoginFailed"
+						},
+						{
+							"key": "page",
+							"value": "1"
+						},
+						{
+							"key": "pageSize",
+							"value": "50"
+						}
+					]
+				},
+				"description": "Get all failed login attempts (security monitoring)"
+			},
+			"response": []
+		},
+		{
+			"name": "Get User Management Logs",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/AuditLogs?resourceType=User&page=1&pageSize=50",
+					"host": ["{{base_url}}"],
+					"path": ["api", "AuditLogs"],
+					"query": [
+						{
+							"key": "resourceType",
+							"value": "User"
+						},
+						{
+							"key": "page",
+							"value": "1"
+						},
+						{
+							"key": "pageSize",
+							"value": "50"
+						}
+					]
+				},
+				"description": "Get all user management activities (created, updated, deleted, etc.)"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Tenant Management Logs",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/AuditLogs?resourceType=Tenant&page=1&pageSize=50",
+					"host": ["{{base_url}}"],
+					"path": ["api", "AuditLogs"],
+					"query": [
+						{
+							"key": "resourceType",
+							"value": "Tenant"
+						},
+						{
+							"key": "page",
+							"value": "1"
+						},
+						{
+							"key": "pageSize",
+							"value": "50"
+						}
+					]
+				},
+				"description": "Get all tenant management activities"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Logs by Date Range",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/AuditLogs?startDate=2024-01-01T00:00:00Z&endDate=2024-12-31T23:59:59Z&page=1&pageSize=50",
+					"host": ["{{base_url}}"],
+					"path": ["api", "AuditLogs"],
+					"query": [
+						{
+							"key": "startDate",
+							"value": "2024-01-01T00:00:00Z"
+						},
+						{
+							"key": "endDate",
+							"value": "2024-12-31T23:59:59Z"
+						},
+						{
+							"key": "page",
+							"value": "1"
+						},
+						{
+							"key": "pageSize",
+							"value": "50"
+						}
+					]
+				},
+				"description": "Get audit logs within a specific date range"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Specific User's Activity",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/AuditLogs?userId={{user_id}}&page=1&pageSize=50",
+					"host": ["{{base_url}}"],
+					"path": ["api", "AuditLogs"],
+					"query": [
+						{
+							"key": "userId",
+							"value": "{{user_id}}"
+						},
+						{
+							"key": "page",
+							"value": "1"
+						},
+						{
+							"key": "pageSize",
+							"value": "50"
+						}
+					]
+				},
+				"description": "Get all activities performed by a specific user"
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:5000",
+			"type": "string"
+		},
+		{
+			"key": "access_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "audit_log_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "user_id",
+			"value": "",
+			"type": "string"
+		}
+	]
+}

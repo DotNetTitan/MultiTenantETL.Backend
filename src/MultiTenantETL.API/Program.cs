@@ -263,6 +263,7 @@ builder.Services.AddScoped<MultiTenantETL.Infrastructure.Interfaces.ITenantServi
     MultiTenantETL.Infrastructure.Services.TenantService>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.Interfaces.IUserService,
     MultiTenantETL.Infrastructure.Services.UserService>();
+builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddSingleton<IInputSanitizer, InputSanitizer>();
 
 builder.Services.AddControllers();

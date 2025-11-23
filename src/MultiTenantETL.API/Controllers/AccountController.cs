@@ -30,6 +30,7 @@ namespace MultiTenantETL.API.Controllers
         private readonly IOpenIddictTokenManager _tokenManager;
         private readonly ITenantService _tenantService;
         private readonly IClaimsService _claimsService;
+        private readonly IAuditService _auditService;
 
         public AccountController(
             UserManager<ApplicationUser> userManager,
@@ -41,7 +42,8 @@ namespace MultiTenantETL.API.Controllers
             IOpenIddictScopeManager scopeManager,
             IOpenIddictTokenManager tokenManager,
             ITenantService tenantService,
-            IClaimsService claimsService)
+            IClaimsService claimsService,
+            IAuditService auditService)
         {
             _userManager = userManager;
             _signInManager = signInManager;
@@ -53,6 +55,7 @@ namespace MultiTenantETL.API.Controllers
             _tokenManager = tokenManager;
             _tenantService = tenantService;
             _claimsService = claimsService;
+            _auditService = auditService;
         }
 
         [HttpPost("register")]
@@ -88,6 +91,12 @@ namespace MultiTenantETL.API.Controllers
             }
 
             _logger.LogInformation("User {Email} registered successfully", request.Email);
+
+            // Audit log
+            await _auditService.LogAuthenticationAsync(
+                Domain.Constants.AuditActions.Authentication.Register,
+                request.Email,
+                success: true);
 
             // Create a default personal tenant for the user
             var tenantSlug = $"user-{user.Id.ToString()[..8]}";
@@ -172,6 +181,12 @@ namespace MultiTenantETL.API.Controllers
 
             _logger.LogInformation("User {Email} confirmed their email", user.Email);
 
+            // Audit log
+            await _auditService.LogAuthenticationAsync(
+                Domain.Constants.AuditActions.Authentication.EmailConfirmed,
+                user.Email,
+                success: true);
+
             try
             {
                 await _emailService.SendWelcomeEmailAsync(user.Email, user.FirstName);
@@ -238,6 +253,12 @@ namespace MultiTenantETL.API.Controllers
 
             _logger.LogInformation("User {Email} reset their password", user.Email);
 
+            // Audit log
+            await _auditService.LogAuthenticationAsync(
+                Domain.Constants.AuditActions.Authentication.PasswordReset,
+                user.Email,
+                success: true);
+
             try
             {
                 await _emailService.SendPasswordChangedNotificationAsync(user.Email, user.FirstName);
@@ -269,6 +290,12 @@ namespace MultiTenantETL.API.Controllers
             }
 
             _logger.LogInformation("User {Email} changed their password", user.Email);
+
+            // Audit log
+            await _auditService.LogAuthenticationAsync(
+                Domain.Constants.AuditActions.Authentication.PasswordChanged,
+                user.Email,
+                success: true);
             
             // Revoke all tokens for security - user must re-authenticate
             await RevokeUserTokensAsync(user.Id);
@@ -293,6 +320,12 @@ namespace MultiTenantETL.API.Controllers
             
             await _signInManager.SignOutAsync();
             _logger.LogInformation("User logged out");
+
+            // Audit log
+            await _auditService.LogAuthenticationAsync(
+                Domain.Constants.AuditActions.Authentication.Logout,
+                user.Email,
+                success: true);
             
             return Ok(new { success = true, message = "Logged out successfully. All refresh tokens have been revoked." });
         }
@@ -314,6 +347,13 @@ namespace MultiTenantETL.API.Controllers
             }
 
             _logger.LogInformation("User {Email} switched to tenant {TenantId}", user.Email, request.TenantId);
+
+            // Audit log
+            await _auditService.LogAsync(
+                Domain.Constants.AuditActions.Authentication.TenantSwitched,
+                "Tenant",
+                request.TenantId.ToString(),
+                $"User switched to tenant: {result.UserTenant!.Tenant.Name}");
 
             // Return success - client should use refresh token to get new access token with updated tenant claims
             return Ok(new

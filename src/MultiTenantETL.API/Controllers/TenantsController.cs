@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Common.Models;
+using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Application.Tenants.Models;
 using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Infrastructure.Interfaces;
@@ -16,15 +17,18 @@ public class TenantsController : ControllerBase
     private readonly ITenantService _tenantService;
     private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<TenantsController> _logger;
+    private readonly IAuditService _auditService;
 
     public TenantsController(
         ITenantService tenantService,
         ICurrentUserService currentUserService,
-        ILogger<TenantsController> logger)
+        ILogger<TenantsController> logger,
+        IAuditService auditService)
     {
         _tenantService = tenantService;
         _currentUserService = currentUserService;
         _logger = logger;
+        _auditService = auditService;
     }
 
     /// <summary>
@@ -127,6 +131,12 @@ public class TenantsController : ControllerBase
 
         _logger.LogInformation("Tenant {TenantName} created with slug {Slug}", request.Name, request.Slug);
 
+        await _auditService.LogAsync(
+            Domain.Constants.AuditActions.Tenants.Created,
+            "Tenant",
+            result.Data!.Id.ToString(),
+            $"Tenant created: {request.Name}");
+
         var response = new TenantResponse
         {
             Id = result.Data!.Id,
@@ -166,6 +176,12 @@ public class TenantsController : ControllerBase
 
         _logger.LogInformation("Tenant {TenantId} updated", id);
 
+        await _auditService.LogAsync(
+            Domain.Constants.AuditActions.Tenants.Updated,
+            "Tenant",
+            id.ToString(),
+            $"Tenant updated: {result.Data!.Name}");
+
         var response = new TenantResponse
         {
             Id = result.Data!.Id,
@@ -193,6 +209,12 @@ public class TenantsController : ControllerBase
         }
 
         _logger.LogInformation("Tenant {TenantId} deleted (soft delete)", id);
+
+        await _auditService.LogAsync(
+            Domain.Constants.AuditActions.Tenants.Deleted,
+            "Tenant",
+            id.ToString(),
+            "Tenant deleted");
 
         return NoContent();
     }
@@ -272,6 +294,12 @@ public class TenantsController : ControllerBase
             request.TenantId,
             request.RoleCode);
 
+        await _auditService.LogAsync(
+            Domain.Constants.AuditActions.Tenants.UserAdded,
+            "Tenant",
+            request.TenantId.ToString(),
+            $"User added to tenant with role {request.RoleCode}");
+
         return Ok(new
         {
             userId = result.Data!.UserId,
@@ -307,6 +335,12 @@ public class TenantsController : ControllerBase
         }
 
         _logger.LogInformation("User {UserId} removed from tenant {TenantId}", userId, tenantId);
+
+        await _auditService.LogAsync(
+            Domain.Constants.AuditActions.Tenants.UserRemoved,
+            "Tenant",
+            tenantId.ToString(),
+            "User removed from tenant");
 
         return NoContent();
     }
@@ -344,6 +378,12 @@ public class TenantsController : ControllerBase
             userId,
             request.RoleCode,
             tenantId);
+
+        await _auditService.LogAsync(
+            Domain.Constants.AuditActions.Tenants.UserRoleUpdated,
+            "Tenant",
+            tenantId.ToString(),
+            $"User role updated to {request.RoleCode}");
 
         return Ok(new
         {

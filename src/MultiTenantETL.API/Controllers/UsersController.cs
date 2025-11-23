@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Common.Models;
+using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Application.Tenants.Models;
 using MultiTenantETL.Application.Users.Models;
 using MultiTenantETL.Domain.Constants;
@@ -18,16 +19,20 @@ public class UsersController : ControllerBase
     private readonly ITenantService _tenantService;
     private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<UsersController> _logger;
+    private readonly IAuditService _auditService;
 
     public UsersController(
         IUserService userService,
         ITenantService tenantService,
         ICurrentUserService currentUserService,
-        ILogger<UsersController> logger)
+        ILogger<UsersController> logger,
+        IAuditService auditService)
     {
         _userService = userService;
         _tenantService = tenantService;
         _currentUserService = currentUserService;
+        _logger = logger;
+        _auditService = auditService;
         _logger = logger;
     }
 
@@ -246,6 +251,12 @@ public class UsersController : ControllerBase
 
         _logger.LogInformation("User {UserId} updated by admin", id);
 
+        await _auditService.LogAsync(
+            Domain.Constants.AuditActions.Users.Updated,
+            "User",
+            id.ToString(),
+            $"User updated: {result.Data!.Email}");
+
         var response = new UserResponse
         {
             Id = result.Data!.Id,
@@ -278,6 +289,12 @@ public class UsersController : ControllerBase
 
         _logger.LogInformation("User {UserId} status updated to {IsActive}", id, request.IsActive);
 
+        await _auditService.LogAsync(
+            request.IsActive ? Domain.Constants.AuditActions.Users.Activated : Domain.Constants.AuditActions.Users.Deactivated,
+            "User",
+            id.ToString(),
+            $"User {(request.IsActive ? "activated" : "deactivated")}");
+
         return Ok(new { message = $"User {(request.IsActive ? "activated" : "deactivated")} successfully" });
     }
 
@@ -296,6 +313,12 @@ public class UsersController : ControllerBase
         }
 
         _logger.LogInformation("User {UserId} deleted (soft delete)", id);
+
+        await _auditService.LogAsync(
+            Domain.Constants.AuditActions.Users.Deleted,
+            "User",
+            id.ToString(),
+            "User deleted");
 
         return NoContent();
     }
@@ -316,6 +339,12 @@ public class UsersController : ControllerBase
 
         _logger.LogInformation("Role {RoleName} assigned to user {UserId}", request.RoleName, id);
 
+        await _auditService.LogAsync(
+            Domain.Constants.AuditActions.Users.RoleAssigned,
+            "User",
+            id.ToString(),
+            $"Role '{request.RoleName}' assigned to user");
+
         return Ok(new { message = $"Role '{request.RoleName}' assigned successfully" });
     }
 
@@ -334,6 +363,12 @@ public class UsersController : ControllerBase
         }
 
         _logger.LogInformation("Role {RoleName} removed from user {UserId}", request.RoleName, id);
+
+        await _auditService.LogAsync(
+            Domain.Constants.AuditActions.Users.RoleRemoved,
+            "User",
+            id.ToString(),
+            $"Role '{request.RoleName}' removed from user");
 
         return Ok(new { message = $"Role '{request.RoleName}' removed successfully" });
     }
@@ -419,6 +454,12 @@ public class UsersController : ControllerBase
         _logger.LogInformation("User {UserId} added to tenant {TenantId} with role {RoleCode}", 
             id, request.TenantId, request.RoleCode);
 
+        await _auditService.LogAsync(
+            Domain.Constants.AuditActions.Users.AddedToTenant,
+            "User",
+            id.ToString(),
+            $"User added to tenant with role {request.RoleCode}");
+
         return Ok(new { message = "User added to tenant successfully" });
     }
 
@@ -448,6 +489,12 @@ public class UsersController : ControllerBase
         }
 
         _logger.LogInformation("User {UserId} removed from tenant {TenantId}", userId, tenantId);
+
+        await _auditService.LogAsync(
+            Domain.Constants.AuditActions.Users.RemovedFromTenant,
+            "User",
+            userId.ToString(),
+            $"User removed from tenant");
 
         return NoContent();
     }
@@ -479,6 +526,12 @@ public class UsersController : ControllerBase
 
         _logger.LogInformation("User {UserId} role updated to {RoleCode} in tenant {TenantId}", 
             userId, request.RoleCode, tenantId);
+
+        await _auditService.LogAsync(
+            Domain.Constants.AuditActions.Users.TenantRoleUpdated,
+            "User",
+            userId.ToString(),
+            $"User role updated to {request.RoleCode} in tenant");
 
         return Ok(new { message = "User role updated successfully" });
     }

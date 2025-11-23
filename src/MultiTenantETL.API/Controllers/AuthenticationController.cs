@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Infrastructure.Identity;
 using MultiTenantETL.Infrastructure.Persistence;
 using MultiTenantETL.Infrastructure.Interfaces;
@@ -26,6 +27,7 @@ namespace MultiTenantETL.API.Controllers
         private readonly ApplicationDbContext _context;
         private readonly IOpenIddictTokenManager _tokenManager;
         private readonly IClaimsService _claimsService;
+        private readonly IAuditService _auditService;
 
         public AuthenticationController(
             SignInManager<ApplicationUser> signInManager,
@@ -33,7 +35,8 @@ namespace MultiTenantETL.API.Controllers
             RoleManager<ApplicationRole> roleManager,
             ApplicationDbContext context,
             IOpenIddictTokenManager tokenManager,
-            IClaimsService claimsService)
+            IClaimsService claimsService,
+            IAuditService auditService)
         {
             _signInManager = signInManager;
             _userManager = userManager;
@@ -41,6 +44,7 @@ namespace MultiTenantETL.API.Controllers
             _context = context;
             _tokenManager = tokenManager;
             _claimsService = claimsService;
+            _auditService = auditService;
         }
 
         [HttpPost("token")]
@@ -146,6 +150,13 @@ namespace MultiTenantETL.API.Controllers
 
             if (user == null)
             {
+                // Audit failed login attempt
+                await _auditService.LogAuthenticationAsync(
+                    Domain.Constants.AuditActions.Authentication.LoginFailed,
+                    request.Username,
+                    success: false,
+                    errorMessage: "Invalid credentials");
+
                 return Forbid(
                     authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
                     properties: new AuthenticationProperties(new Dictionary<string, string>
@@ -181,6 +192,13 @@ namespace MultiTenantETL.API.Controllers
                     ? "Email not confirmed"
                     : "Invalid credentials";
 
+                // Audit failed login attempt
+                await _auditService.LogAuthenticationAsync(
+                    Domain.Constants.AuditActions.Authentication.LoginFailed,
+                    user.Email,
+                    success: false,
+                    errorMessage: errorDescription);
+
                 return Forbid(
                     authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
                     properties: new AuthenticationProperties(new Dictionary<string, string>
@@ -195,6 +213,12 @@ namespace MultiTenantETL.API.Controllers
             
             // Set the scopes in the authentication properties
             principal.SetScopes(request.GetScopes());
+
+            // Audit successful login
+            await _auditService.LogAuthenticationAsync(
+                Domain.Constants.AuditActions.Authentication.Login,
+                user.Email,
+                success: true);
             
             return SignIn(principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         }
