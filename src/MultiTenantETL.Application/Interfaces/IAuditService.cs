@@ -35,6 +35,7 @@ public interface IAuditService
         Guid? userId = null,
         string? action = null,
         string? resourceType = null,
+        string? severity = null,
         DateTime? startDate = null,
         DateTime? endDate = null,
         int page = 1,

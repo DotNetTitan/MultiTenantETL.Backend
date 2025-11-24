@@ -35,6 +35,7 @@ public class AuditLogsController : ControllerBase
         [FromQuery] Guid? userId = null,
         [FromQuery] string? action = null,
         [FromQuery] string? resourceType = null,
+        [FromQuery] string? severity = null,
         [FromQuery] DateTime? startDate = null,
         [FromQuery] DateTime? endDate = null,
         [FromQuery] int page = 1,
@@ -54,6 +55,7 @@ public class AuditLogsController : ControllerBase
             userId,
             action,
             resourceType,
+            severity,
             startDate,
             endDate,
             page,
@@ -100,6 +102,7 @@ public class AuditLogsController : ControllerBase
     [HttpGet("my-logs")]
     public async Task<IActionResult> GetMyAuditLogs(
         [FromQuery] string? action = null,
+        [FromQuery] string? severity = null,
         [FromQuery] DateTime? startDate = null,
         [FromQuery] DateTime? endDate = null,
         [FromQuery] int page = 1,
@@ -110,6 +113,7 @@ public class AuditLogsController : ControllerBase
         var (logs, totalCount) = await _auditService.GetAuditLogsAsync(
             userId: userId,
             action: action,
+            severity: severity,
             startDate: startDate,
             endDate: endDate,
             page: page,

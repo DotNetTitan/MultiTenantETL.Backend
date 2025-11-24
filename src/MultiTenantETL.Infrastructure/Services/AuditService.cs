@@ -112,6 +112,7 @@ public class AuditService : IAuditService
         Guid? userId = null,
         string? action = null,
         string? resourceType = null,
+        string? severity = null,
         DateTime? startDate = null,
         DateTime? endDate = null,
         int page = 1,
@@ -133,6 +134,9 @@ public class AuditService : IAuditService
 
         if (!string.IsNullOrEmpty(resourceType))
             query = query.Where(a => a.ResourceType == resourceType);
+
+        if (!string.IsNullOrEmpty(severity))
+            query = query.Where(a => a.Severity == severity);
 
         if (startDate.HasValue)
             query = query.Where(a => a.CreatedAt >= startDate.Value);
