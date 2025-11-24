@@ -302,6 +302,7 @@ else
 
 // Custom Services
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddHttpClient(); // For API connector testing
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.Interfaces.IClaimsService,
     MultiTenantETL.Infrastructure.Services.ClaimsService>();
@@ -313,7 +314,19 @@ builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddSingleton<IInputSanitizer, InputSanitizer>();
 builder.Services.AddSingleton<IMetadataService, MetadataService>();
 
-builder.Services.AddControllers();
+// Connector Services
+builder.Services.AddScoped<MultiTenantETL.Application.Connectors.IConnectorService,
+    MultiTenantETL.Infrastructure.Services.ConnectorService>();
+builder.Services.AddScoped<MultiTenantETL.Application.Connectors.IConnectionTester,
+    MultiTenantETL.Infrastructure.Services.ConnectionTester>();
+builder.Services.AddScoped<MultiTenantETL.Application.Connectors.ISchemaDetector,
+    MultiTenantETL.Infrastructure.Services.SchemaDetector>();
+
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 

@@ -1,0 +1,369 @@
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using MultiTenantETL.Application.Connectors;
+using MultiTenantETL.Application.Connectors.Models;
+using MultiTenantETL.Domain.Constants;
+using MultiTenantETL.Domain.Entities;
+using MultiTenantETL.Infrastructure.Persistence;
+
+namespace MultiTenantETL.Infrastructure.Services;
+
+public class ConnectorService : IConnectorService
+{
+    private readonly ApplicationDbContext _context;
+    private readonly ILogger<ConnectorService> _logger;
+    private readonly IConnectionTester _connectionTester;
+    private readonly ISchemaDetector _schemaDetector;
+
+    public ConnectorService(
+        ApplicationDbContext context,
+        ILogger<ConnectorService> logger,
+        IConnectionTester connectionTester,
+        ISchemaDetector schemaDetector)
+    {
+        _context = context;
+        _logger = logger;
+        _connectionTester = connectionTester;
+        _schemaDetector = schemaDetector;
+    }
+
+    public async Task<ConnectorResponse> CreateAsync(CreateConnectorRequest request, Guid tenantId, Guid userId)
+    {
+        _logger.LogInformation("Creating connector {Name} for tenant {TenantId}", request.Name, tenantId);
+
+        // Validate type and provider
+        ValidateTypeAndProvider(request.Type, request.Provider);
+
+        // Determine direction flags
+        var (isSource, isDestination) = ParseDirection(request.Direction);
+
+        var connector = new Connector
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = request.Name,
+            Description = request.Description,
+            Type = request.Type,
+            Provider = request.Provider,
+            Direction = request.Direction,
+            IsSource = isSource,
+            IsDestination = isDestination,
+            RequiresCredentials = DetermineRequiresCredentials(request.Type, request.Provider),
+            ConfigJson = JsonSerializer.Serialize(request.Config),
+            SchemaJson = request.Schema.HasValue ? JsonSerializer.Serialize(request.Schema.Value) : null,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        _context.Connectors.Add(connector);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Connector {ConnectorId} created successfully", connector.Id);
+
+        return MapToResponse(connector);
+    }
+
+    public async Task<ConnectorResponse> GetByIdAsync(Guid id, Guid tenantId)
+    {
+        var connector = await _context.Connectors
+            .Where(c => c.Id == id && c.TenantId == tenantId)
+            .FirstOrDefaultAsync();
+
+        if (connector == null)
+        {
+            throw new KeyNotFoundException($"Connector with ID {id} not found");
+        }
+
+        return MapToResponse(connector);
+    }
+
+    public async Task<PagedConnectorResponse> SearchAsync(ConnectorSearchRequest request, Guid tenantId)
+    {
+        var query = _context.Connectors
+            .Where(c => c.TenantId == tenantId);
+
+        // Apply filters
+        if (!string.IsNullOrWhiteSpace(request.Name))
+        {
+            query = query.Where(c => c.Name.Contains(request.Name));
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Type))
+        {
+            query = query.Where(c => c.Type == request.Type);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Provider))
+        {
+            query = query.Where(c => c.Provider == request.Provider);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Direction))
+        {
+            query = query.Where(c => c.Direction == request.Direction);
+        }
+
+        if (request.IsActive.HasValue)
+        {
+            query = query.Where(c => c.IsActive == request.IsActive.Value);
+        }
+
+        var totalCount = await query.CountAsync();
+        var totalPages = (int)Math.Ceiling(totalCount / (double)request.PageSize);
+
+        var connectors = await query
+            .OrderByDescending(c => c.CreatedAt)
+            .Skip((request.Page - 1) * request.PageSize)
+            .Take(request.PageSize)
+            .ToListAsync();
+
+        return new PagedConnectorResponse
+        {
+            Connectors = connectors.Select(MapToListResponse).ToList(),
+            TotalCount = totalCount,
+            Page = request.Page,
+            PageSize = request.PageSize,
+            TotalPages = totalPages
+        };
+    }
+
+    public async Task<ConnectorResponse> UpdateAsync(Guid id, UpdateConnectorRequest request, Guid tenantId, Guid userId)
+    {
+        var connector = await _context.Connectors
+            .Where(c => c.Id == id && c.TenantId == tenantId)
+            .FirstOrDefaultAsync();
+
+        if (connector == null)
+        {
+            throw new KeyNotFoundException($"Connector with ID {id} not found");
+        }
+
+        _logger.LogInformation("Updating connector {ConnectorId}", id);
+
+        connector.Name = request.Name;
+        connector.Description = request.Description;
+        connector.Direction = request.Direction;
+        
+        var (isSource, isDestination) = ParseDirection(request.Direction);
+        connector.IsSource = isSource;
+        connector.IsDestination = isDestination;
+        
+        connector.ConfigJson = JsonSerializer.Serialize(request.Config);
+        connector.SchemaJson = request.Schema.HasValue ? JsonSerializer.Serialize(request.Schema.Value) : connector.SchemaJson;
+        
+        if (request.IsActive.HasValue)
+        {
+            connector.IsActive = request.IsActive.Value;
+        }
+        
+        connector.UpdatedAt = DateTime.UtcNow;
+        connector.UpdatedBy = userId;
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Connector {ConnectorId} updated successfully", id);
+
+        return MapToResponse(connector);
+    }
+
+    public async Task DeleteAsync(Guid id, Guid tenantId)
+    {
+        var connector = await _context.Connectors
+            .Where(c => c.Id == id && c.TenantId == tenantId)
+            .FirstOrDefaultAsync();
+
+        if (connector == null)
+        {
+            throw new KeyNotFoundException($"Connector with ID {id} not found");
+        }
+
+        _logger.LogInformation("Deleting connector {ConnectorId}", id);
+
+        _context.Connectors.Remove(connector);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Connector {ConnectorId} deleted successfully", id);
+    }
+
+    public async Task<TestConnectionResponse> TestConnectionAsync(TestConnectionRequest request, Guid tenantId)
+    {
+        _logger.LogInformation("Testing connection for type {Type}, provider {Provider}", request.Type, request.Provider);
+
+        ValidateTypeAndProvider(request.Type, request.Provider);
+
+        var result = await _connectionTester.TestConnectionAsync(request.Type, request.Provider, request.Config);
+
+        return new TestConnectionResponse
+        {
+            Success = result.Success,
+            Message = result.Message,
+            TestedAt = DateTime.UtcNow,
+            Details = result.Details
+        };
+    }
+
+    public async Task<TestConnectionResponse> TestExistingConnectionAsync(Guid id, Guid tenantId)
+    {
+        var connector = await _context.Connectors
+            .Where(c => c.Id == id && c.TenantId == tenantId)
+            .FirstOrDefaultAsync();
+
+        if (connector == null)
+        {
+            throw new KeyNotFoundException($"Connector with ID {id} not found");
+        }
+
+        _logger.LogInformation("Testing existing connector {ConnectorId}", id);
+
+        var config = JsonSerializer.Deserialize<JsonElement>(connector.ConfigJson);
+        var result = await _connectionTester.TestConnectionAsync(connector.Type, connector.Provider, config);
+
+        // Update connector with test results
+        connector.LastTestedAt = DateTime.UtcNow;
+        connector.LastTestResult = result.Success ? TestResults.Success : TestResults.Failed;
+        connector.LastTestMessage = result.Message;
+        await _context.SaveChangesAsync();
+
+        return new TestConnectionResponse
+        {
+            Success = result.Success,
+            Message = result.Message,
+            TestedAt = DateTime.UtcNow,
+            Details = result.Details
+        };
+    }
+
+    public async Task<DetectSchemaResponse> DetectSchemaAsync(DetectSchemaRequest request, Guid tenantId)
+    {
+        var connector = await _context.Connectors
+            .Where(c => c.Id == request.ConnectorId && c.TenantId == tenantId)
+            .FirstOrDefaultAsync();
+
+        if (connector == null)
+        {
+            throw new KeyNotFoundException($"Connector with ID {request.ConnectorId} not found");
+        }
+
+        _logger.LogInformation("Detecting schema for connector {ConnectorId}", request.ConnectorId);
+
+        var config = JsonSerializer.Deserialize<JsonElement>(connector.ConfigJson);
+        var result = await _schemaDetector.DetectSchemaAsync(
+            connector.Type,
+            connector.Provider,
+            config,
+            request.TableOrResourceName);
+
+        if (result.Success && result.Schema != null)
+        {
+            // Update connector with detected schema
+            connector.SchemaJson = JsonSerializer.Serialize(result.Schema);
+            await _context.SaveChangesAsync();
+        }
+
+        return new DetectSchemaResponse
+        {
+            Success = result.Success,
+            Message = result.Message,
+            Schema = result.Schema,
+            DetectedAt = DateTime.UtcNow
+        };
+    }
+
+    public async Task<List<ConnectorListResponse>> GetAllAsync(Guid tenantId)
+    {
+        var connectors = await _context.Connectors
+            .Where(c => c.TenantId == tenantId && c.IsActive)
+            .OrderBy(c => c.Name)
+            .ToListAsync();
+
+        return connectors.Select(MapToListResponse).ToList();
+    }
+
+    // Helper methods
+    private static void ValidateTypeAndProvider(string type, string provider)
+    {
+        var validTypes = new[] { ConnectorTypes.Database, ConnectorTypes.File, ConnectorTypes.Api };
+        if (!validTypes.Contains(type))
+        {
+            throw new ArgumentException($"Invalid connector type: {type}");
+        }
+
+        var validProviders = type switch
+        {
+            ConnectorTypes.Database => new[] { ConnectorProviders.SqlServer, ConnectorProviders.PostgreSQL, ConnectorProviders.MySQL },
+            ConnectorTypes.File => new[] { ConnectorProviders.Local, ConnectorProviders.FTP, ConnectorProviders.S3, ConnectorProviders.AzureBlob },
+            ConnectorTypes.Api => new[] { ConnectorProviders.REST },
+            _ => Array.Empty<string>()
+        };
+
+        if (!validProviders.Contains(provider))
+        {
+            throw new ArgumentException($"Invalid provider '{provider}' for type '{type}'");
+        }
+    }
+
+    private static (bool isSource, bool isDestination) ParseDirection(string direction)
+    {
+        return direction.ToLower() switch
+        {
+            ConnectorDirections.Source => (true, false),
+            ConnectorDirections.Destination => (false, true),
+            ConnectorDirections.Both => (true, true),
+            _ => throw new ArgumentException($"Invalid direction: {direction}")
+        };
+    }
+
+    private static bool DetermineRequiresCredentials(string type, string provider)
+    {
+        // Most connectors require credentials except local files
+        return !(type == ConnectorTypes.File && provider == ConnectorProviders.Local);
+    }
+
+    private static ConnectorResponse MapToResponse(Connector connector)
+    {
+        return new ConnectorResponse
+        {
+            Id = connector.Id,
+            TenantId = connector.TenantId,
+            Name = connector.Name,
+            Description = connector.Description,
+            Type = connector.Type,
+            Provider = connector.Provider,
+            Direction = connector.Direction,
+            IsSource = connector.IsSource,
+            IsDestination = connector.IsDestination,
+            RequiresCredentials = connector.RequiresCredentials,
+            IsActive = connector.IsActive,
+            Config = JsonSerializer.Deserialize<JsonElement>(connector.ConfigJson),
+            Schema = !string.IsNullOrEmpty(connector.SchemaJson) 
+                ? JsonSerializer.Deserialize<JsonElement>(connector.SchemaJson) 
+                : null,
+            LastTestedAt = connector.LastTestedAt,
+            LastTestResult = connector.LastTestResult,
+            LastTestMessage = connector.LastTestMessage,
+            CreatedAt = connector.CreatedAt,
+            UpdatedAt = connector.UpdatedAt
+        };
+    }
+
+    private static ConnectorListResponse MapToListResponse(Connector connector)
+    {
+        return new ConnectorListResponse
+        {
+            Id = connector.Id,
+            Name = connector.Name,
+            Description = connector.Description,
+            Type = connector.Type,
+            Provider = connector.Provider,
+            Direction = connector.Direction,
+            IsSource = connector.IsSource,
+            IsDestination = connector.IsDestination,
+            IsActive = connector.IsActive,
+            LastTestedAt = connector.LastTestedAt,
+            LastTestResult = connector.LastTestResult,
+            CreatedAt = connector.CreatedAt
+        };
+    }
+}

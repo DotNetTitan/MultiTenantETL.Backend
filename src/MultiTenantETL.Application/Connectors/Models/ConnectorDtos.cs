@@ -1,0 +1,221 @@
+using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
+
+namespace MultiTenantETL.Application.Connectors.Models;
+
+public record CreateConnectorRequest
+{
+    [Required]
+    [StringLength(200, MinimumLength = 2)]
+    public required string Name { get; init; }
+
+    [StringLength(500)]
+    public string? Description { get; init; }
+
+    [Required]
+    [StringLength(50)]
+    public required string Type { get; init; } // Database, File, API
+
+    [Required]
+    [StringLength(100)]
+    public required string Provider { get; init; } // SqlServer, PostgreSQL, CSV, etc.
+
+    [Required]
+    [StringLength(20)]
+    public required string Direction { get; init; } // source, destination, both
+
+    [Required]
+    public required JsonElement Config { get; init; } // Type-specific configuration
+
+    public JsonElement? Schema { get; init; } // Optional schema definition
+}
+
+public record UpdateConnectorRequest
+{
+    [Required]
+    [StringLength(200, MinimumLength = 2)]
+    public required string Name { get; init; }
+
+    [StringLength(500)]
+    public string? Description { get; init; }
+
+    [Required]
+    [StringLength(20)]
+    public required string Direction { get; init; }
+
+    [Required]
+    public required JsonElement Config { get; init; }
+
+    public JsonElement? Schema { get; init; }
+
+    public bool? IsActive { get; init; }
+}
+
+public record ConnectorResponse
+{
+    public Guid Id { get; init; }
+    public Guid TenantId { get; init; }
+    public required string Name { get; init; }
+    public string? Description { get; init; }
+    public required string Type { get; init; }
+    public required string Provider { get; init; }
+    public required string Direction { get; init; }
+    public bool IsSource { get; init; }
+    public bool IsDestination { get; init; }
+    public bool RequiresCredentials { get; init; }
+    public bool IsActive { get; init; }
+    public required JsonElement Config { get; init; }
+    public JsonElement? Schema { get; init; }
+    public DateTime? LastTestedAt { get; init; }
+    public string? LastTestResult { get; init; }
+    public string? LastTestMessage { get; init; }
+    public DateTime CreatedAt { get; init; }
+    public DateTime? UpdatedAt { get; init; }
+}
+
+public record ConnectorListResponse
+{
+    public Guid Id { get; init; }
+    public required string Name { get; init; }
+    public string? Description { get; init; }
+    public required string Type { get; init; }
+    public required string Provider { get; init; }
+    public required string Direction { get; init; }
+    public bool IsSource { get; init; }
+    public bool IsDestination { get; init; }
+    public bool IsActive { get; init; }
+    public DateTime? LastTestedAt { get; init; }
+    public string? LastTestResult { get; init; }
+    public DateTime CreatedAt { get; init; }
+}
+
+public record TestConnectionRequest
+{
+    [Required]
+    [StringLength(50)]
+    public required string Type { get; init; }
+
+    [Required]
+    [StringLength(100)]
+    public required string Provider { get; init; }
+
+    [Required]
+    public required JsonElement Config { get; init; }
+}
+
+public record TestConnectionResponse
+{
+    public bool Success { get; init; }
+    public required string Message { get; init; }
+    public DateTime TestedAt { get; init; }
+    public Dictionary<string, object>? Details { get; init; }
+}
+
+public record DetectSchemaRequest
+{
+    [Required]
+    public Guid ConnectorId { get; init; }
+
+    [StringLength(200)]
+    public string? TableOrResourceName { get; init; } // For databases: table name, For APIs: endpoint
+}
+
+public record DetectSchemaResponse
+{
+    public bool Success { get; init; }
+    public required string Message { get; init; }
+    public JsonElement? Schema { get; init; }
+    public DateTime DetectedAt { get; init; }
+}
+
+public record SchemaField
+{
+    public required string Name { get; init; }
+    public required string DataType { get; init; }
+    public bool IsNullable { get; init; }
+    public bool IsPrimaryKey { get; init; }
+    public int? MaxLength { get; init; }
+    public int? Precision { get; init; }
+    public int? Scale { get; init; }
+    public string? DefaultValue { get; init; }
+}
+
+public record ConnectorSearchRequest
+{
+    public string? Name { get; init; }
+    public string? Type { get; init; }
+    public string? Provider { get; init; }
+    public string? Direction { get; init; }
+    public bool? IsActive { get; init; }
+    public int Page { get; init; } = 1;
+    public int PageSize { get; init; } = 20;
+}
+
+public record PagedConnectorResponse
+{
+    public List<ConnectorListResponse> Connectors { get; init; } = new();
+    public int TotalCount { get; init; }
+    public int Page { get; init; }
+    public int PageSize { get; init; }
+    public int TotalPages { get; init; }
+}
+
+// Configuration models for different connector types
+public record DatabaseConfig
+{
+    public required string Host { get; init; }
+    public int Port { get; init; }
+    public required string Database { get; init; }
+    public required string Username { get; init; }
+    public required string Password { get; init; }
+    public bool UseSsl { get; init; }
+    public string? ConnectionString { get; init; }
+    public Dictionary<string, string>? AdditionalParameters { get; init; }
+}
+
+public record FileConfig
+{
+    public required string Path { get; init; }
+    public required string Format { get; init; } // CSV, Excel, JSON
+    public string? Delimiter { get; init; } // For CSV
+    public bool HasHeader { get; init; } // For CSV/Excel
+    public string? SheetName { get; init; } // For Excel
+    public string? Encoding { get; init; }
+    // Storage provider specific fields
+    public string? FtpHost { get; init; }
+    public int? FtpPort { get; init; }
+    public string? FtpUsername { get; init; }
+    public string? FtpPassword { get; init; }
+    public string? S3Bucket { get; init; }
+    public string? S3Region { get; init; }
+    public string? S3AccessKey { get; init; }
+    public string? S3SecretKey { get; init; }
+    public string? AzureAccountName { get; init; }
+    public string? AzureContainer { get; init; }
+    public string? AzureAccountKey { get; init; }
+    public Dictionary<string, string>? AdditionalParameters { get; init; }
+}
+
+public record ApiConfig
+{
+    public required string BaseUrl { get; init; }
+    public string? AuthType { get; init; } // None, Basic, Bearer, ApiKey, OAuth2
+    public string? AuthToken { get; init; }
+    public string? ApiKeyHeader { get; init; } // Header name for API key (e.g., X-API-Key, Authorization)
+    public string? ApiKeyValue { get; init; } // API key value
+    public string? Username { get; init; }
+    public string? Password { get; init; }
+    public Dictionary<string, string>? Headers { get; init; }
+    public Dictionary<string, string>? QueryParameters { get; init; }
+    public int TimeoutSeconds { get; init; } = 30;
+    public List<ApiEndpoint>? Endpoints { get; init; }
+}
+
+public record ApiEndpoint
+{
+    public required string Method { get; init; } // GET, POST, PUT, PATCH, DELETE
+    public required string Path { get; init; } // e.g., /api/users
+    public string? Name { get; init; } // Friendly name
+    public string? ResponseDataPath { get; init; } // JSON path to extract data (e.g., data.results)
+    public string? RequestDataPath { get; init; } // JSON path for request body (for POST/PUT)
+}

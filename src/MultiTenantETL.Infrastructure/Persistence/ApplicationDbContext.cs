@@ -20,6 +20,7 @@ namespace MultiTenantETL.Infrastructure.Persistence
         public DbSet<Tenant> Tenants { get; set; }
         public DbSet<UserTenant> UserTenants { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
+        public DbSet<Connector> Connectors { get; set; }
 
         // OpenIddict entities
         public DbSet<OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreApplication> OpenIddictApplications { get; set; }
@@ -78,6 +79,37 @@ namespace MultiTenantETL.Infrastructure.Persistence
 
             builder.Entity<AuditLog>()
                 .HasIndex(a => a.CreatedAt);
+
+            // Connectors configuration
+            builder.Entity<Connector>()
+                .ToTable("connectors");
+
+            builder.Entity<Connector>()
+                .HasOne(c => c.Tenant)
+                .WithMany()
+                .HasForeignKey(c => c.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<Connector>()
+                .HasIndex(c => c.TenantId);
+
+            builder.Entity<Connector>()
+                .HasIndex(c => c.Type);
+
+            builder.Entity<Connector>()
+                .HasIndex(c => c.Provider);
+
+            builder.Entity<Connector>()
+                .HasIndex(c => new { c.TenantId, c.Name });
+
+            // Configure JSON columns for PostgreSQL JSONB
+            builder.Entity<Connector>()
+                .Property(c => c.ConfigJson)
+                .HasColumnType("jsonb");
+
+            builder.Entity<Connector>()
+                .Property(c => c.SchemaJson)
+                .HasColumnType("jsonb");
         }
     }
 }

@@ -20,9 +20,9 @@ public static class MetadataConstants
     {
         public static readonly Dictionary<string, string[]> ProvidersByType = new()
         {
-            { "Database", new[] { "SQL Server", "PostgreSQL", "MySQL", "Oracle", "SQLite" } },
-            { "API", new[] { "REST", "GraphQL", "SOAP" } },
-            { "File", new[] { "Local", "FTP", "S3", "Azure Blob", "Google Cloud Storage" } }
+            { "Database", new[] { "SqlServer", "PostgreSQL", "MySQL" } },
+            { "API", new[] { "REST" } },
+            { "File", new[] { "Local", "FTP", "S3", "AzureBlob" } }
         };
     }
 
