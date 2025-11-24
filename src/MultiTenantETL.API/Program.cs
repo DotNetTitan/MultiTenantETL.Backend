@@ -299,6 +299,7 @@ builder.Services.AddScoped<MultiTenantETL.Infrastructure.Interfaces.IUserService
     MultiTenantETL.Infrastructure.Services.UserService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddSingleton<IInputSanitizer, InputSanitizer>();
+builder.Services.AddSingleton<IMetadataService, MetadataService>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
