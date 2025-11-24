@@ -65,6 +65,31 @@ public class ConnectionTester : IConnectionTester
             };
         }
 
+        // Validate required fields
+        if (dbConfig.UseCustomConnectionString)
+        {
+            if (string.IsNullOrEmpty(dbConfig.ConnectionString))
+            {
+                return new ConnectionTestResult
+                {
+                    Success = false,
+                    Message = "Connection string is required when using custom connection string"
+                };
+            }
+        }
+        else
+        {
+            if (string.IsNullOrEmpty(dbConfig.Host) || string.IsNullOrEmpty(dbConfig.Database) ||
+                string.IsNullOrEmpty(dbConfig.Username) || string.IsNullOrEmpty(dbConfig.Password))
+            {
+                return new ConnectionTestResult
+                {
+                    Success = false,
+                    Message = "Host, database, username, and password are required"
+                };
+            }
+        }
+
         try
         {
             return provider switch
@@ -162,38 +187,67 @@ public class ConnectionTester : IConnectionTester
             };
         }
 
-        try
+        // Validate required fields
+        if (string.IsNullOrEmpty(fileConfig.Path))
         {
-            if (!File.Exists(fileConfig.Path) && !Directory.Exists(fileConfig.Path))
-            {
-                return new ConnectionTestResult
-                {
-                    Success = false,
-                    Message = $"File or directory not found: {fileConfig.Path}"
-                };
-            }
-
-            var isDirectory = Directory.Exists(fileConfig.Path);
-            var details = new Dictionary<string, object>
-            {
-                ["Path"] = fileConfig.Path,
-                ["Type"] = isDirectory ? "Directory" : "File",
-                ["Exists"] = true
-            };
-
-            if (!isDirectory)
-            {
-                var fileInfo = new FileInfo(fileConfig.Path);
-                details["Size"] = fileInfo.Length;
-                details["LastModified"] = fileInfo.LastWriteTimeUtc;
-            }
-
             return new ConnectionTestResult
             {
-                Success = true,
-                Message = $"Successfully validated {provider} file path",
-                Details = details
+                Success = false,
+                Message = "File path is required"
             };
+        }
+
+        try
+        {
+            // For local files, check if path exists
+            if (provider == "Local")
+            {
+                if (!File.Exists(fileConfig.Path) && !Directory.Exists(fileConfig.Path))
+                {
+                    return new ConnectionTestResult
+                    {
+                        Success = false,
+                        Message = $"File or directory not found: {fileConfig.Path}"
+                    };
+                }
+
+                var isDirectory = Directory.Exists(fileConfig.Path);
+                var details = new Dictionary<string, object>
+                {
+                    ["Path"] = fileConfig.Path,
+                    ["Type"] = isDirectory ? "Directory" : "File",
+                    ["Exists"] = true
+                };
+
+                if (!isDirectory)
+                {
+                    var fileInfo = new FileInfo(fileConfig.Path);
+                    details["Size"] = fileInfo.Length;
+                    details["LastModified"] = fileInfo.LastWriteTimeUtc;
+                }
+
+                return new ConnectionTestResult
+                {
+                    Success = true,
+                    Message = $"Successfully validated {provider} file path",
+                    Details = details
+                };
+            }
+            else
+            {
+                // For remote providers (FTP, S3, Azure), just validate configuration
+                return new ConnectionTestResult
+                {
+                    Success = true,
+                    Message = $"Configuration validated for {provider} provider. Full connection test will be performed during pipeline execution.",
+                    Details = new Dictionary<string, object>
+                    {
+                        ["Provider"] = provider,
+                        ["Path"] = fileConfig.Path,
+                        ["Format"] = fileConfig.Format ?? "Unknown"
+                    }
+                };
+            }
         }
         catch (Exception ex)
         {
@@ -215,6 +269,16 @@ public class ConnectionTester : IConnectionTester
             {
                 Success = false,
                 Message = "Invalid API configuration"
+            };
+        }
+
+        // Validate required fields
+        if (string.IsNullOrEmpty(apiConfig.BaseUrl))
+        {
+            return new ConnectionTestResult
+            {
+                Success = false,
+                Message = "Base URL is required"
             };
         }
 
@@ -311,12 +375,13 @@ public class ConnectionTester : IConnectionTester
             return config.ConnectionString;
         }
 
+        var port = config.Port > 0 ? config.Port : 1433;
         var builder = new SqlConnectionStringBuilder
         {
-            DataSource = $"{config.Host},{config.Port}",
-            InitialCatalog = config.Database,
-            UserID = config.Username,
-            Password = config.Password,
+            DataSource = $"{config.Host},{port}",
+            InitialCatalog = config.Database!,
+            UserID = config.Username!,
+            Password = config.Password!,
             TrustServerCertificate = !config.UseSsl,
             Encrypt = config.UseSsl
         };
@@ -331,13 +396,14 @@ public class ConnectionTester : IConnectionTester
             return config.ConnectionString;
         }
 
+        var port = config.Port > 0 ? config.Port : 5432;
         var builder = new NpgsqlConnectionStringBuilder
         {
-            Host = config.Host,
-            Port = config.Port,
-            Database = config.Database,
-            Username = config.Username,
-            Password = config.Password,
+            Host = config.Host!,
+            Port = port,
+            Database = config.Database!,
+            Username = config.Username!,
+            Password = config.Password!,
             SslMode = config.UseSsl ? SslMode.Require : SslMode.Prefer
         };
 
@@ -351,13 +417,14 @@ public class ConnectionTester : IConnectionTester
             return config.ConnectionString;
         }
 
+        var port = config.Port > 0 ? (uint)config.Port : 3306;
         var builder = new MySqlConnectionStringBuilder
         {
-            Server = config.Host,
-            Port = (uint)config.Port,
-            Database = config.Database,
-            UserID = config.Username,
-            Password = config.Password,
+            Server = config.Host!,
+            Port = port,
+            Database = config.Database!,
+            UserID = config.Username!,
+            Password = config.Password!,
             SslMode = config.UseSsl ? MySqlSslMode.Required : MySqlSslMode.Preferred
         };
 

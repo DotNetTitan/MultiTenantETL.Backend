@@ -163,20 +163,21 @@ public record PagedConnectorResponse
 // Configuration models for different connector types
 public record DatabaseConfig
 {
-    public required string Host { get; init; }
+    public string? Host { get; init; }
     public int Port { get; init; }
-    public required string Database { get; init; }
-    public required string Username { get; init; }
-    public required string Password { get; init; }
+    public string? Database { get; init; }
+    public string? Username { get; init; }
+    public string? Password { get; init; }
     public bool UseSsl { get; init; }
+    public bool UseCustomConnectionString { get; init; }
     public string? ConnectionString { get; init; }
     public Dictionary<string, string>? AdditionalParameters { get; init; }
 }
 
 public record FileConfig
 {
-    public required string Path { get; init; }
-    public required string Format { get; init; } // CSV, Excel, JSON
+    public string? Path { get; init; }
+    public string? Format { get; init; } // CSV, Excel, JSON
     public string? Delimiter { get; init; } // For CSV
     public bool HasHeader { get; init; } // For CSV/Excel
     public string? SheetName { get; init; } // For Excel
@@ -198,7 +199,7 @@ public record FileConfig
 
 public record ApiConfig
 {
-    public required string BaseUrl { get; init; }
+    public string? BaseUrl { get; init; }
     public string? AuthType { get; init; } // None, Basic, Bearer, ApiKey, OAuth2
     public string? AuthToken { get; init; }
     public string? ApiKeyHeader { get; init; } // Header name for API key (e.g., X-API-Key, Authorization)
