@@ -50,10 +50,14 @@ namespace MultiTenantETL.API.Controllers
         [HttpPost("token")]
         public async Task<IActionResult> Token()
         {
-            var request = HttpContext.GetOpenIddictServerRequest();
+            var request = HttpContext.GetOpenIddictServerRequest() ??
+                throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
 
             if (request.IsPasswordGrantType())
                 return await HandlePasswordFlow(request);
+
+            if (request.IsAuthorizationCodeGrantType())
+                return await HandleAuthorizationCodeFlow(request);
 
             if (request.IsRefreshTokenGrantType())
                 return await HandleRefreshTokenFlow(request);
@@ -91,55 +95,118 @@ namespace MultiTenantETL.API.Controllers
         }
 
         [HttpGet("authorize"), HttpPost("authorize")]
+        [IgnoreAntiforgeryToken]
         public async Task<IActionResult> Authorize()
         {
-            var request = HttpContext.GetOpenIddictServerRequest();
+            var request = HttpContext.GetOpenIddictServerRequest() ??
+                throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
 
-            // Retrieve the user principal from the authentication context
-            var result = await HttpContext.AuthenticateAsync(IdentityConstants.ApplicationScheme);
-
-            // If the user is not authenticated, redirect to the login page
-            if (!result.Succeeded)
+            // For SPAs with PKCE, we accept credentials directly in the authorization request
+            // This is a pragmatic approach that avoids needing a separate login UI
+            if (!string.IsNullOrEmpty(request.Username) && !string.IsNullOrEmpty(request.Password))
             {
-                return Challenge(
-                    authenticationSchemes: IdentityConstants.ApplicationScheme,
-                    properties: new AuthenticationProperties
-                    {
-                        RedirectUri = Request.PathBase + Request.Path + QueryString.Create(
-                            Request.HasFormContentType ? Request.Form.ToList() : Request.Query.ToList())
-                    });
+                return await HandleAuthorizationWithCredentials(request);
             }
 
-            // Get the user from the database
-            var user = await _userManager.GetUserAsync(result.Principal);
+            // Standard flow: check if user is already authenticated via cookie
+            var result = await HttpContext.AuthenticateAsync(IdentityConstants.ApplicationScheme);
+            if (result.Succeeded)
+            {
+                var user = await _userManager.GetUserAsync(result.Principal);
+                if (user != null && await _signInManager.CanSignInAsync(user) && user.IsActive)
+                {
+                    var principal = await CreateClaimsPrincipalAsync(user, request.GetScopes());
+                    principal.SetScopes(request.GetScopes());
+                    return SignIn(principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+                }
+            }
+
+            // No credentials and not authenticated - return error
+            return Forbid(
+                authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
+                properties: new AuthenticationProperties(new Dictionary<string, string>
+                {
+                    [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.LoginRequired,
+                    [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = 
+                        "User authentication is required"
+                }));
+        }
+
+        private async Task<IActionResult> HandleAuthorizationWithCredentials(OpenIddictRequest request)
+        {
+            // Find the user by username or email
+            var user = await _userManager.FindByNameAsync(request.Username) ??
+                       await _userManager.FindByEmailAsync(request.Username);
+
             if (user == null)
             {
+                await _auditService.LogAuthenticationAsync(
+                    Domain.Constants.AuditActions.Authentication.LoginFailed,
+                    request.Username,
+                    success: false,
+                    errorMessage: "Invalid credentials");
+
                 return Forbid(
                     authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
                     properties: new AuthenticationProperties(new Dictionary<string, string>
                     {
                         [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.InvalidGrant,
-                        [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "The user is no longer valid"
+                        [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "Invalid credentials"
                     }));
             }
 
-            // Ensure the user can sign in
-            if (!await _signInManager.CanSignInAsync(user))
+            // Check if user account is active
+            if (!user.IsActive)
             {
                 return Forbid(
                     authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
                     properties: new AuthenticationProperties(new Dictionary<string, string>
                     {
                         [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.InvalidGrant,
-                        [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "The user is not allowed to sign in"
+                        [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = 
+                            "Account is inactive. Please contact your administrator."
                     }));
             }
 
-            // Create a new ClaimsPrincipal containing the claims that will be used to create the authorization code or access token
+            // Verify the password
+            var result = await _signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
+
+            if (!result.Succeeded)
+            {
+                var errorDescription = result.IsLockedOut
+                    ? "Account is locked due to multiple failed login attempts"
+                    : result.IsNotAllowed
+                    ? "Email confirmation is required"
+                    : "Invalid credentials";
+
+                await _auditService.LogAuthenticationAsync(
+                    Domain.Constants.AuditActions.Authentication.LoginFailed,
+                    user.Email,
+                    success: false,
+                    errorMessage: errorDescription);
+
+                return Forbid(
+                    authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
+                    properties: new AuthenticationProperties(new Dictionary<string, string>
+                    {
+                        [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.InvalidGrant,
+                        [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = errorDescription
+                    }));
+            }
+
+            // Create the claims principal
             var principal = await CreateClaimsPrincipalAsync(user, request.GetScopes());
 
-            // Automatically approve the authorization request (for implicit consent)
-            // In production, you might want to show a consent screen here
+            // Set the scopes
+            principal.SetScopes(request.GetScopes());
+
+            // Audit successful login
+            await _auditService.LogAuthenticationAsync(
+                Domain.Constants.AuditActions.Authentication.Login,
+                user.Email,
+                success: true);
+
+            // Sign in and return the authorization code (will redirect to redirect_uri)
             return SignIn(principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         }
 
@@ -220,6 +287,55 @@ namespace MultiTenantETL.API.Controllers
                 user.Email,
                 success: true);
             
+            return SignIn(principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+        }
+
+        private async Task<IActionResult> HandleAuthorizationCodeFlow(OpenIddictRequest request)
+        {
+            // Retrieve the claims principal stored in the authorization code
+            var info = await HttpContext.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+
+            // Retrieve the user from the database
+            var user = await _userManager.GetUserAsync(info.Principal);
+            if (user == null)
+            {
+                return Forbid(
+                    authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
+                    properties: new AuthenticationProperties(new Dictionary<string, string>
+                    {
+                        [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.InvalidGrant,
+                        [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "The authorization code is no longer valid"
+                    }));
+            }
+
+            // Ensure the user is still allowed to sign in
+            if (!await _signInManager.CanSignInAsync(user))
+            {
+                return Forbid(
+                    authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
+                    properties: new AuthenticationProperties(new Dictionary<string, string>
+                    {
+                        [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.InvalidGrant,
+                        [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "The user is not allowed to sign in"
+                    }));
+            }
+
+            // Check if user account is still active
+            if (!user.IsActive)
+            {
+                return Forbid(
+                    authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
+                    properties: new AuthenticationProperties(new Dictionary<string, string>
+                    {
+                        [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.InvalidGrant,
+                        [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "Account is inactive"
+                    }));
+            }
+
+            // Create a new claims principal with fresh claims
+            var principal = await CreateClaimsPrincipalAsync(user, request.GetScopes());
+
+            // Return the access token
             return SignIn(principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         }
 

@@ -79,6 +79,9 @@ builder.Services.AddOpenIddict()
             OpenIddictConstants.Scopes.OfflineAccess,  // Required for refresh tokens
             "api"
         );
+        
+        // Allow offline_access scope to be granted without explicit consent
+        options.AllowRefreshTokenFlow();
 
         // Register claims to include in tokens
         options.RegisterClaims(
