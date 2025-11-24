@@ -9,7 +9,7 @@ MultiTenant ETL is a production-ready, secure multi-tenant ASP.NET Core Web API 
 ## Core Features
 
 - **Multi-tenant Architecture**: Complete tenant isolation with per-user tenant switching, automatic personal workspace creation on registration
-- **OAuth 2.0 & OpenID Connect**: Powered by OpenIddict 7.2.0 with Password Grant and Authorization Code + PKCE flows
+- **OAuth 2.0 & OpenID Connect**: Powered by OpenIddict 7.2.0 with Authorization Code + PKCE (recommended for SPAs) and Password Grant flows
 - **Authorization System**: Role-based (SuperAdmin, Admin, User) and permission-based authorization with custom handlers
 - **User Management**: Full CRUD operations, email confirmation, password reset, account activation/deactivation
 - **Tenant Management**: Tenant CRUD, user-tenant relationships, role assignment within tenants
@@ -29,6 +29,10 @@ The platform enables organizations to manage ETL pipelines, connectors, and data
 ## Security Focus
 
 Security is a primary concern with features including:
+- **OAuth 2.0 PKCE**: Proof Key for Code Exchange prevents authorization code interception attacks in SPAs
+- **Public Client Support**: No client secret required for frontend applications
+- **Single-use Authorization Codes**: Codes can only be exchanged once for tokens
+- **State Parameter**: CSRF protection for OAuth flows
 - Account lockout (5 failed attempts, 15-minute lockout)
 - Rate limiting on authentication endpoints
 - CORS configuration for frontend origins

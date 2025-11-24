@@ -11,8 +11,8 @@ A production-ready, secure multi-tenant ASP.NET Core 8.0 Web API for managing ET
   - Role-based access within tenants (Admin, User)
 - **OAuth 2.0 & OpenID Connect**: Powered by OpenIddict 7.2.0
 - **Authentication Flows**:
+  - **Authorization Code + PKCE** (recommended for SPAs) - Secure public client flow with Proof Key for Code Exchange
   - Password Grant (for API testing/machine-to-machine)
-  - Authorization Code + PKCE (for SPAs)
   - Refresh Token support with rotation
 - **Token Management**: Token refresh and revocation endpoints
 - **ASP.NET Core Identity**: User and role management with custom claims
@@ -124,13 +124,15 @@ MultiTenantETL/
 
 Two OAuth clients are seeded by default:
 
-#### 1. SPA Client (Public)
+#### 1. SPA Client (Public) - **Recommended**
 - **Client ID**: `multitenant-etl-spa`
-- **Type**: Public client (no secret)
-- **Flow**: Authorization Code + PKCE
+- **Type**: Public client (no client secret required)
+- **Flow**: Authorization Code + PKCE (RFC 7636)
+- **Security**: PKCE prevents authorization code interception attacks
+- **Use Case**: Vue.js frontend, React apps, Angular apps, any SPA
 - **Redirect URIs**: 
-  - `http://localhost:5173/auth/callback`
-  - `https://app.example.com/auth/callback`
+  - `http://localhost:5173/auth/callback` (development)
+  - `https://app.example.com/auth/callback` (production)
 
 #### 2. Postman/Testing Client (Confidential)
 - **Client ID**: `multitenant-etl-postman`
@@ -199,9 +201,24 @@ Two OAuth clients are seeded by default:
 | `/api/tenants/{tenantId}/users/{userId}` | DELETE | Admin | Remove user from tenant |
 | `/api/tenants/{tenantId}/users/{userId}/role` | PUT | Admin | Update user role in tenant |
 
-## 🧪 Testing with Postman
+## 🧪 Testing
 
-### 1. Login (Password Grant)
+### Testing with SPA (Authorization Code + PKCE)
+
+The recommended way to test is through the Vue.js frontend:
+
+1. Start the API: `dotnet run` (from `src/MultiTenantETL.API`)
+2. Start the frontend: `npm run dev` (from `MultiTenantETL.Vue`)
+3. Navigate to `http://localhost:5173/login`
+4. Login with: `admin@multitenant-etl.com` / `YOUR_ADMIN_PASSWORD`
+
+The frontend implements the full OAuth 2.0 Authorization Code Flow with PKCE. See `MultiTenantETL.Vue/docs/OAUTH_PKCE.md` for implementation details.
+
+### Testing with Postman (Password Grant)
+
+For API testing and development, use the password grant flow:
+
+#### 1. Login (Password Grant)
 
 ```http
 POST https://localhost:7288/connect/token
@@ -215,7 +232,7 @@ grant_type=password
 &scope=openid email profile roles api offline_access
 ```
 
-### 2. Refresh Token
+#### 2. Refresh Token
 
 ```http
 POST https://localhost:7288/connect/token
@@ -227,7 +244,7 @@ grant_type=refresh_token
 &refresh_token=YOUR_REFRESH_TOKEN
 ```
 
-### 3. Revoke Token
+#### 3. Revoke Token
 
 ```http
 POST https://localhost:7288/connect/revoke
@@ -237,6 +254,10 @@ Authorization: Bearer YOUR_ACCESS_TOKEN
 token=YOUR_REFRESH_TOKEN
 &token_type_hint=refresh_token
 ```
+
+### Testing Authorization Code + PKCE with cURL
+
+See `MultiTenantETL.Vue/docs/OAUTH_PKCE.md` for manual testing instructions with cURL.
 
 ## 🔒 Security Features
 

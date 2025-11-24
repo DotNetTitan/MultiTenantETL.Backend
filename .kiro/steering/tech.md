@@ -19,10 +19,17 @@ inclusion: always
 
 ## Authentication & Authorization
 
-- OpenIddict 7.2.0 (OAuth 2.0 & OpenID Connect)
-- ASP.NET Core Identity (user/role management)
-- Custom permission-based authorization handlers (PermissionAuthorizationHandler, TenantResourceAuthorizationHandler)
-- BCrypt.Net-Next 4.0.3 (password hashing)
+- **OpenIddict 7.2.0** (OAuth 2.0 & OpenID Connect server)
+- **OAuth 2.0 Flows**:
+  - **Authorization Code + PKCE** (recommended for SPAs) - RFC 7636 compliant
+  - Password Grant (for API testing/machine-to-machine)
+  - Refresh Token with rotation
+- **OAuth Clients**:
+  - `multitenant-etl-spa` - Public client for Vue.js frontend (no secret, PKCE required)
+  - `multitenant-etl-postman` - Confidential client for API testing (with secret)
+- **ASP.NET Core Identity** (user/role management)
+- **Custom Authorization**: Permission-based handlers (PermissionAuthorizationHandler, TenantResourceAuthorizationHandler)
+- **BCrypt.Net-Next 4.0.3** (password hashing)
 
 ## Key Libraries
 
