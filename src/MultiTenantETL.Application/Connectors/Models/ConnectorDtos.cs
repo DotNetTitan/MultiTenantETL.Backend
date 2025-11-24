@@ -220,3 +220,32 @@ public record ApiEndpoint
     public string? ResponseDataPath { get; init; } // JSON path to extract data (e.g., data.results)
     public string? RequestDataPath { get; init; } // JSON path for request body (for POST/PUT)
 }
+
+// Write configuration models for destination connectors
+public record DatabaseWriteConfig
+{
+    public string? TableName { get; init; }
+    public string? Operation { get; init; } // INSERT, UPDATE, UPSERT, BULK_INSERT
+    public List<string>? PrimaryKeys { get; init; }
+    public int BatchSize { get; init; } = 1000;
+}
+
+public record FileWriteConfig
+{
+    public string? WriteMode { get; init; } // OVERWRITE, APPEND
+    public bool IncludeHeaders { get; init; } = true;
+    public List<string>? ColumnOrder { get; init; }
+    public string? FilenamePattern { get; init; }
+    public string? SheetName { get; init; } // For Excel
+    public string? StartCell { get; init; } // For Excel
+    public string? Structure { get; init; } // For JSON: ARRAY, OBJECT
+    public string? RootKey { get; init; } // For JSON
+}
+
+public record ApiWriteConfig
+{
+    public string? RequestFormat { get; init; } // JSON, XML, Form Data
+    public bool WrapInArray { get; init; }
+    public string? RootKey { get; init; }
+    public int BatchSize { get; init; } = 100;
+}
