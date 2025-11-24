@@ -17,6 +17,37 @@ using OpenIddict.Abstractions;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Configure Kestrel limits for DDoS protection
+builder.WebHost.ConfigureKestrel(serverOptions =>
+{
+    // Limit request body size to 30MB (adjust based on your file upload needs)
+    serverOptions.Limits.MaxRequestBodySize = 30 * 1024 * 1024;
+    
+    // Limit maximum concurrent connections
+    serverOptions.Limits.MaxConcurrentConnections = 100;
+    serverOptions.Limits.MaxConcurrentUpgradedConnections = 100;
+    
+    // Request line and header limits
+    serverOptions.Limits.MaxRequestLineSize = 8 * 1024; // 8KB
+    serverOptions.Limits.MaxRequestHeadersTotalSize = 32 * 1024; // 32KB
+    serverOptions.Limits.MaxRequestHeaderCount = 100;
+    
+    // Timeout configurations
+    serverOptions.Limits.KeepAliveTimeout = TimeSpan.FromMinutes(2);
+    serverOptions.Limits.RequestHeadersTimeout = TimeSpan.FromSeconds(30);
+    
+    // Minimum data rate to prevent slow-read attacks (Slowloris)
+    serverOptions.Limits.MinRequestBodyDataRate = new Microsoft.AspNetCore.Server.Kestrel.Core.MinDataRate(
+        bytesPerSecond: 240, // 240 bytes/sec minimum
+        gracePeriod: TimeSpan.FromSeconds(10)
+    );
+    
+    serverOptions.Limits.MinResponseDataRate = new Microsoft.AspNetCore.Server.Kestrel.Core.MinDataRate(
+        bytesPerSecond: 240,
+        gracePeriod: TimeSpan.FromSeconds(10)
+    );
+});
+
 // Database
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
