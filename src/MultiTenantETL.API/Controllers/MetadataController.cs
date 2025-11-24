@@ -6,7 +6,7 @@ namespace MultiTenantETL.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+[AllowAnonymous]
 public class MetadataController : ControllerBase
 {
     private readonly IMetadataService _metadataService;
@@ -20,6 +20,7 @@ public class MetadataController : ControllerBase
     /// Get all metadata at once (for initial app load)
     /// </summary>
     [HttpGet("all")]
+    [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Any, VaryByHeader = "Accept-Language")]
     public IActionResult GetAllMetadata()
     {
         var metadata = _metadataService.GetAllMetadata();
@@ -30,6 +31,7 @@ public class MetadataController : ControllerBase
     /// Get connector configuration metadata
     /// </summary>
     [HttpGet("connector-config")]
+    [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Any, VaryByHeader = "Accept-Language")]
     public IActionResult GetConnectorConfig()
     {
         var config = _metadataService.GetConnectorConfig();
@@ -40,6 +42,7 @@ public class MetadataController : ControllerBase
     /// Get transformation types metadata
     /// </summary>
     [HttpGet("transformation-types")]
+    [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Any, VaryByHeader = "Accept-Language")]
     public IActionResult GetTransformationTypes()
     {
         var types = _metadataService.GetTransformationTypes();
@@ -50,6 +53,7 @@ public class MetadataController : ControllerBase
     /// Get data types metadata
     /// </summary>
     [HttpGet("data-types")]
+    [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Any, VaryByHeader = "Accept-Language")]
     public IActionResult GetDataTypes()
     {
         var types = _metadataService.GetDataTypes();
@@ -60,6 +64,7 @@ public class MetadataController : ControllerBase
     /// Get schedule frequencies metadata
     /// </summary>
     [HttpGet("schedule-frequencies")]
+    [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Any, VaryByHeader = "Accept-Language")]
     public IActionResult GetScheduleFrequencies()
     {
         var frequencies = _metadataService.GetScheduleFrequencies();
@@ -70,6 +75,7 @@ public class MetadataController : ControllerBase
     /// Get days of week metadata
     /// </summary>
     [HttpGet("days-of-week")]
+    [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Any, VaryByHeader = "Accept-Language")]
     public IActionResult GetDaysOfWeek()
     {
         var days = _metadataService.GetDaysOfWeek();

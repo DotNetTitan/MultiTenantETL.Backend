@@ -17,6 +17,9 @@ using OpenIddict.Abstractions;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Response Caching
+builder.Services.AddResponseCaching();
+
 // Configure Kestrel limits for DDoS protection
 builder.WebHost.ConfigureKestrel(serverOptions =>
 {
@@ -206,6 +209,14 @@ builder.Services.Configure<IpRateLimitOptions>(options =>
 
     options.GeneralRules = new List<RateLimitRule>
     {
+        // Metadata endpoint - permissive but protected (public configuration data)
+        new RateLimitRule
+        {
+            Endpoint = "GET:/api/metadata/*",
+            Period = "1m",
+            Limit = 200  // Per IP: allows legitimate use, blocks abuse
+        },
+
         // Authentication endpoints - very strict
         new RateLimitRule
         {
@@ -273,7 +284,8 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(allowedOrigins)
             .AllowAnyMethod()
             .AllowAnyHeader()
-            .AllowCredentials();
+            .AllowCredentials()
+            .WithExposedHeaders("Cache-Control", "Expires", "Pragma", "Age");
     });
 });
 
@@ -317,11 +329,14 @@ if (app.Environment.IsDevelopment())
 // Security Headers - should be early in pipeline
 app.UseSecurityHeaders();
 
+// CORS - must be before response caching to ensure headers are always present
+app.UseCors("AllowFrontend");
+
+// Response caching - after CORS to cache responses with CORS headers
+app.UseResponseCaching();
+
 // Rate limiting - before authentication
 app.UseIpRateLimiting();
-
-// CORS - must be before authentication/authorization
-app.UseCors("AllowFrontend");
 
 // Only use HTTPS redirection in production
 if (!app.Environment.IsDevelopment())
