@@ -10,9 +10,9 @@ using MultiTenantETL.Application.Authentication.Models;
 using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Domain.Enums;
 using MultiTenantETL.Infrastructure.Identity;
+using MultiTenantETL.Infrastructure.Interfaces;
 using MultiTenantETL.Infrastructure.Persistence;
 using OpenIddict.Abstractions;
-using MultiTenantETL.Infrastructure.Interfaces;
 
 namespace MultiTenantETL.API.Controllers
 {
@@ -353,13 +353,13 @@ namespace MultiTenantETL.API.Controllers
                 Domain.Constants.AuditActions.Authentication.TenantSwitched,
                 "Tenant",
                 request.TenantId.ToString(),
-                $"User switched to tenant: {result.UserTenant!.Tenant.Name}");
+                $"User switched to tenant: {result.UserTenant!.TenantName}");
 
             // Return success - client should use refresh token to get new access token with updated tenant claims
             return Ok(new
             {
                 currentTenantId = request.TenantId,
-                tenantName = result.UserTenant!.Tenant.Name,
+                tenantName = result.UserTenant!.TenantName,
                 message = "Tenant switched successfully. Please refresh your token to get updated claims.",
                 requiresTokenRefresh = true
             });

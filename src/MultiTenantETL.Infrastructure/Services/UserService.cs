@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using MultiTenantETL.Application.Common.Models;
 using MultiTenantETL.Domain.Enums;
 using MultiTenantETL.Infrastructure.Identity;
 using MultiTenantETL.Infrastructure.Interfaces;

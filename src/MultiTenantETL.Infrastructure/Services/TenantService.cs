@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using MultiTenantETL.Application.Common.Models;
+using MultiTenantETL.Application.Tenants.Models;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Domain.Enums;
 using MultiTenantETL.Infrastructure.Identity;
@@ -308,7 +310,15 @@ public class TenantService : ITenantService
         return new TenantSwitchResult
         {
             Success = true,
-            UserTenant = userTenant
+            UserTenant = new UserTenantResponse
+            {
+                TenantId = userTenant.TenantId,
+                TenantName = userTenant.Tenant.Name,
+                TenantSlug = userTenant.Tenant.Slug,
+                RoleCode = userTenant.RoleCode,
+                IsActive = userTenant.IsActive,
+                IsCurrent = true
+            }
         };
     }
 }

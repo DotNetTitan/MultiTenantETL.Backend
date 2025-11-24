@@ -1,3 +1,4 @@
+using MultiTenantETL.Application.Common.Models;
 using MultiTenantETL.Infrastructure.Identity;
 
 namespace MultiTenantETL.Infrastructure.Interfaces;

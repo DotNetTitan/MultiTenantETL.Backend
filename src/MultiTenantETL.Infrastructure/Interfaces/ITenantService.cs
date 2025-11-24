@@ -1,5 +1,6 @@
+using MultiTenantETL.Application.Common.Models;
+using MultiTenantETL.Application.Tenants.Models;
 using MultiTenantETL.Domain.Entities;
-using MultiTenantETL.Domain.Enums;
 using MultiTenantETL.Infrastructure.Identity;
 
 namespace MultiTenantETL.Infrastructure.Interfaces;
@@ -68,41 +69,4 @@ public interface ITenantService
     /// Switches the user to a different tenant
     /// </summary>
     Task<TenantSwitchResult> SwitchUserTenantAsync(Guid userId, Guid tenantId);
-}
-
-/// <summary>
-/// Generic service result
-/// </summary>
-public class ServiceResult
-{
-    public bool Success { get; set; }
-    public AuthErrorCode? ErrorCode { get; set; }
-    public string? ErrorMessage { get; set; }
-
-    public static ServiceResult SuccessResult() => new() { Success = true };
-    public static ServiceResult FailureResult(AuthErrorCode errorCode, string errorMessage) =>
-        new() { Success = false, ErrorCode = errorCode, ErrorMessage = errorMessage };
-}
-
-/// <summary>
-/// Generic service result with data
-/// </summary>
-public class ServiceResult<T> : ServiceResult
-{
-    public T? Data { get; set; }
-
-    public static ServiceResult<T> SuccessResult(T data) => new() { Success = true, Data = data };
-    public static new ServiceResult<T> FailureResult(AuthErrorCode errorCode, string errorMessage) =>
-        new() { Success = false, ErrorCode = errorCode, ErrorMessage = errorMessage };
-}
-
-/// <summary>
-/// Result of a tenant switch operation
-/// </summary>
-public class TenantSwitchResult
-{
-    public bool Success { get; set; }
-    public UserTenant? UserTenant { get; set; }
-    public AuthErrorCode? ErrorCode { get; set; }
-    public string? ErrorMessage { get; set; }
 }
