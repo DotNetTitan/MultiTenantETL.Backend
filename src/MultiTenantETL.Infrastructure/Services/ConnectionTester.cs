@@ -7,6 +7,12 @@ using MultiTenantETL.Application.Connectors.Models;
 using MultiTenantETL.Domain.Constants;
 using Npgsql;
 using MySqlConnector;
+using Azure.Storage.Blobs;
+using Amazon.S3;
+using Amazon.S3.Model;
+using Amazon.Runtime;
+using FluentFTP;
+using Renci.SshNet;
 
 namespace MultiTenantETL.Infrastructure.Services;
 
@@ -33,7 +39,7 @@ public class ConnectionTester : IConnectionTester
             return type switch
             {
                 ConnectorTypes.Database => await TestDatabaseConnectionAsync(provider, config),
-                ConnectorTypes.File => TestFileConnectionAsync(provider, config),
+                ConnectorTypes.File => await TestFileConnectionAsync(provider, config),
                 ConnectorTypes.Api => await TestApiConnectionAsync(provider, config),
                 _ => new ConnectionTestResult
                 {
@@ -175,7 +181,7 @@ public class ConnectionTester : IConnectionTester
         };
     }
 
-    private ConnectionTestResult TestFileConnectionAsync(string provider, JsonElement config)
+    private async Task<ConnectionTestResult> TestFileConnectionAsync(string provider, JsonElement config)
     {
         var fileConfig = JsonSerializer.Deserialize<FileConfig>(config, JsonOptions);
         if (fileConfig == null)
@@ -199,55 +205,19 @@ public class ConnectionTester : IConnectionTester
 
         try
         {
-            // For local files, check if path exists
-            if (provider == "Local")
+            return provider switch
             {
-                if (!File.Exists(fileConfig.Path) && !Directory.Exists(fileConfig.Path))
+                "Local" => TestLocalFileConnection(fileConfig),
+                "FTP" => await TestFtpConnectionAsync(fileConfig),
+                "SFTP" => await TestSftpConnectionAsync(fileConfig),
+                "S3" => await TestS3ConnectionAsync(fileConfig),
+                "AzureBlob" => await TestAzureBlobConnectionAsync(fileConfig),
+                _ => new ConnectionTestResult
                 {
-                    return new ConnectionTestResult
-                    {
-                        Success = false,
-                        Message = $"File or directory not found: {fileConfig.Path}"
-                    };
+                    Success = false,
+                    Message = $"Unsupported file provider: {provider}"
                 }
-
-                var isDirectory = Directory.Exists(fileConfig.Path);
-                var details = new Dictionary<string, object>
-                {
-                    ["Path"] = fileConfig.Path,
-                    ["Type"] = isDirectory ? "Directory" : "File",
-                    ["Exists"] = true
-                };
-
-                if (!isDirectory)
-                {
-                    var fileInfo = new FileInfo(fileConfig.Path);
-                    details["Size"] = fileInfo.Length;
-                    details["LastModified"] = fileInfo.LastWriteTimeUtc;
-                }
-
-                return new ConnectionTestResult
-                {
-                    Success = true,
-                    Message = $"Successfully validated {provider} file path",
-                    Details = details
-                };
-            }
-            else
-            {
-                // For remote providers (FTP, S3, Azure), just validate configuration
-                return new ConnectionTestResult
-                {
-                    Success = true,
-                    Message = $"Configuration validated for {provider} provider. Full connection test will be performed during pipeline execution.",
-                    Details = new Dictionary<string, object>
-                    {
-                        ["Provider"] = provider,
-                        ["Path"] = fileConfig.Path,
-                        ["Format"] = fileConfig.Format ?? "Unknown"
-                    }
-                };
-            }
+            };
         }
         catch (Exception ex)
         {
@@ -256,6 +226,456 @@ public class ConnectionTester : IConnectionTester
             {
                 Success = false,
                 Message = $"File validation failed: {ex.Message}"
+            };
+        }
+    }
+
+    private ConnectionTestResult TestLocalFileConnection(FileConfig config)
+    {
+        if (!File.Exists(config.Path) && !Directory.Exists(config.Path))
+        {
+            return new ConnectionTestResult
+            {
+                Success = false,
+                Message = $"File or directory not found: {config.Path}"
+            };
+        }
+
+        var isDirectory = Directory.Exists(config.Path);
+        var details = new Dictionary<string, object>
+        {
+            ["Path"] = config.Path,
+            ["Type"] = isDirectory ? "Directory" : "File",
+            ["Exists"] = true
+        };
+
+        if (!isDirectory)
+        {
+            var fileInfo = new FileInfo(config.Path);
+            details["Size"] = fileInfo.Length;
+            details["LastModified"] = fileInfo.LastWriteTimeUtc;
+        }
+
+        return new ConnectionTestResult
+        {
+            Success = true,
+            Message = "Successfully validated local file path",
+            Details = details
+        };
+    }
+
+    private async Task<ConnectionTestResult> TestAzureBlobConnectionAsync(FileConfig config)
+    {
+        // Validate required Azure fields
+        if (string.IsNullOrEmpty(config.AzureAccountName))
+        {
+            return new ConnectionTestResult
+            {
+                Success = false,
+                Message = "Azure Storage Account Name is required"
+            };
+        }
+
+        if (string.IsNullOrEmpty(config.AzureAccountKey))
+        {
+            return new ConnectionTestResult
+            {
+                Success = false,
+                Message = "Azure Storage Account Key is required"
+            };
+        }
+
+        if (string.IsNullOrEmpty(config.AzureContainer))
+        {
+            return new ConnectionTestResult
+            {
+                Success = false,
+                Message = "Azure Container Name is required"
+            };
+        }
+
+        try
+        {
+            // Build connection string
+            var connectionString = $"DefaultEndpointsProtocol=https;AccountName={config.AzureAccountName};AccountKey={config.AzureAccountKey};EndpointSuffix=core.windows.net";
+            
+            // Configure retry options - reduce from default 6 to 3 attempts
+            var blobClientOptions = new Azure.Storage.Blobs.BlobClientOptions
+            {
+                Retry = {
+                    MaxRetries = 3,
+                    Delay = TimeSpan.FromSeconds(1),
+                    MaxDelay = TimeSpan.FromSeconds(3),
+                    Mode = Azure.Core.RetryMode.Fixed
+                }
+            };
+            
+            // Create blob service client with custom retry policy
+            var blobServiceClient = new BlobServiceClient(connectionString, blobClientOptions);
+            
+            // Get container client
+            var containerClient = blobServiceClient.GetBlobContainerClient(config.AzureContainer);
+            
+            // Test connection by checking if container exists
+            var exists = await containerClient.ExistsAsync();
+            
+            if (!exists.Value)
+            {
+                return new ConnectionTestResult
+                {
+                    Success = false,
+                    Message = $"Container '{config.AzureContainer}' does not exist in storage account '{config.AzureAccountName}'"
+                };
+            }
+
+            // Get container properties to verify access
+            var properties = await containerClient.GetPropertiesAsync();
+            
+            var details = new Dictionary<string, object>
+            {
+                ["AccountName"] = config.AzureAccountName,
+                ["Container"] = config.AzureContainer,
+                ["BlobPath"] = config.Path,
+                ["LastModified"] = properties.Value.LastModified,
+                ["HasImmutabilityPolicy"] = properties.Value.HasImmutabilityPolicy
+            };
+
+            return new ConnectionTestResult
+            {
+                Success = true,
+                Message = $"Successfully connected to Azure Blob Storage container '{config.AzureContainer}'",
+                Details = details
+            };
+        }
+        catch (Azure.RequestFailedException ex) when (ex.Status == 403)
+        {
+            return new ConnectionTestResult
+            {
+                Success = false,
+                Message = "Access denied. Please verify your Azure Storage Account Key is correct and has proper permissions."
+            };
+        }
+        catch (Azure.RequestFailedException ex) when (ex.Status == 404)
+        {
+            return new ConnectionTestResult
+            {
+                Success = false,
+                Message = $"Storage account '{config.AzureAccountName}' or container '{config.AzureContainer}' not found."
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Azure Blob connection test failed");
+            
+            // Extract the most relevant error message
+            var errorMessage = GetRootErrorMessage(ex);
+            
+            return new ConnectionTestResult
+            {
+                Success = false,
+                Message = $"Azure Blob connection failed: {errorMessage}"
+            };
+        }
+    }
+
+    private async Task<ConnectionTestResult> TestS3ConnectionAsync(FileConfig config)
+    {
+        // Validate required S3 fields
+        if (string.IsNullOrEmpty(config.S3AccessKey))
+        {
+            return new ConnectionTestResult
+            {
+                Success = false,
+                Message = "AWS Access Key ID is required"
+            };
+        }
+
+        if (string.IsNullOrEmpty(config.S3SecretKey))
+        {
+            return new ConnectionTestResult
+            {
+                Success = false,
+                Message = "AWS Secret Access Key is required"
+            };
+        }
+
+        if (string.IsNullOrEmpty(config.S3Bucket))
+        {
+            return new ConnectionTestResult
+            {
+                Success = false,
+                Message = "S3 Bucket Name is required"
+            };
+        }
+
+        if (string.IsNullOrEmpty(config.S3Region))
+        {
+            return new ConnectionTestResult
+            {
+                Success = false,
+                Message = "AWS Region is required"
+            };
+        }
+
+        try
+        {
+            // Create S3 client with custom retry policy - reduce from default to 3 attempts
+            var s3Config = new Amazon.S3.AmazonS3Config
+            {
+                RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(config.S3Region),
+                MaxErrorRetry = 3,
+                Timeout = TimeSpan.FromSeconds(10)
+            };
+            
+            var s3Client = new AmazonS3Client(config.S3AccessKey, config.S3SecretKey, s3Config);
+            
+            // Test connection by checking if bucket exists and is accessible
+            var bucketRequest = new GetBucketLocationRequest
+            {
+                BucketName = config.S3Bucket
+            };
+            
+            var bucketResponse = await s3Client.GetBucketLocationAsync(bucketRequest);
+            
+            var details = new Dictionary<string, object>
+            {
+                ["Bucket"] = config.S3Bucket,
+                ["Region"] = config.S3Region,
+                ["BucketLocation"] = bucketResponse.Location.Value,
+                ["ObjectKey"] = config.Path
+            };
+
+            return new ConnectionTestResult
+            {
+                Success = true,
+                Message = $"Successfully connected to S3 bucket '{config.S3Bucket}' in region '{config.S3Region}'",
+                Details = details
+            };
+        }
+        catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            return new ConnectionTestResult
+            {
+                Success = false,
+                Message = "Access denied. Please verify your AWS credentials have proper permissions for this bucket."
+            };
+        }
+        catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return new ConnectionTestResult
+            {
+                Success = false,
+                Message = $"S3 bucket '{config.S3Bucket}' not found in region '{config.S3Region}'."
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "S3 connection test failed");
+            
+            // Extract the most relevant error message
+            var errorMessage = GetRootErrorMessage(ex);
+            
+            return new ConnectionTestResult
+            {
+                Success = false,
+                Message = $"S3 connection failed: {errorMessage}"
+            };
+        }
+    }
+
+    private async Task<ConnectionTestResult> TestFtpConnectionAsync(FileConfig config)
+    {
+        // Validate required FTP fields
+        if (string.IsNullOrEmpty(config.FtpHost))
+        {
+            return new ConnectionTestResult
+            {
+                Success = false,
+                Message = "FTP Host is required"
+            };
+        }
+
+        if (string.IsNullOrEmpty(config.FtpUsername))
+        {
+            return new ConnectionTestResult
+            {
+                Success = false,
+                Message = "FTP Username is required"
+            };
+        }
+
+        if (string.IsNullOrEmpty(config.FtpPassword))
+        {
+            return new ConnectionTestResult
+            {
+                Success = false,
+                Message = "FTP Password is required"
+            };
+        }
+
+        try
+        {
+            var port = config.FtpPort ?? 21;
+            
+            using var ftpClient = new AsyncFtpClient(config.FtpHost, config.FtpUsername, config.FtpPassword, port);
+            
+            // Connect to FTP server
+            await ftpClient.Connect();
+            
+            if (!ftpClient.IsConnected)
+            {
+                return new ConnectionTestResult
+                {
+                    Success = false,
+                    Message = "Failed to connect to FTP server"
+                };
+            }
+
+            // Test if path exists (if provided)
+            bool pathExists = false;
+            string pathType = "Unknown";
+            
+            if (!string.IsNullOrEmpty(config.Path))
+            {
+                var fileExists = await ftpClient.FileExists(config.Path);
+                var dirExists = await ftpClient.DirectoryExists(config.Path);
+                pathExists = fileExists || dirExists;
+                pathType = fileExists ? "File" : dirExists ? "Directory" : "Not Found";
+            }
+
+            var details = new Dictionary<string, object>
+            {
+                ["Host"] = config.FtpHost ?? "Unknown",
+                ["Port"] = port,
+                ["IsConnected"] = ftpClient.IsConnected,
+                ["ServerType"] = ftpClient.ServerType.ToString(),
+                ["Path"] = config.Path ?? "Not specified",
+                ["PathExists"] = pathExists,
+                ["PathType"] = pathType
+            };
+
+            await ftpClient.Disconnect();
+
+            return new ConnectionTestResult
+            {
+                Success = true,
+                Message = $"Successfully connected to FTP server at {config.FtpHost}:{port}",
+                Details = details
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "FTP connection test failed");
+            
+            // Extract the most relevant error message
+            var errorMessage = GetRootErrorMessage(ex);
+            
+            return new ConnectionTestResult
+            {
+                Success = false,
+                Message = $"FTP connection failed: {errorMessage}"
+            };
+        }
+    }
+
+    private async Task<ConnectionTestResult> TestSftpConnectionAsync(FileConfig config)
+    {
+        // Validate required SFTP fields
+        if (string.IsNullOrEmpty(config.SftpHost))
+        {
+            return new ConnectionTestResult
+            {
+                Success = false,
+                Message = "SFTP Host is required"
+            };
+        }
+
+        if (string.IsNullOrEmpty(config.SftpUsername))
+        {
+            return new ConnectionTestResult
+            {
+                Success = false,
+                Message = "SFTP Username is required"
+            };
+        }
+
+        if (string.IsNullOrEmpty(config.SftpPassword))
+        {
+            return new ConnectionTestResult
+            {
+                Success = false,
+                Message = "SFTP Password is required"
+            };
+        }
+
+        try
+        {
+            var port = config.SftpPort ?? 22;
+            
+            using var sftpClient = new SftpClient(config.SftpHost, port, config.SftpUsername, config.SftpPassword);
+            
+            // Connect to SFTP server
+            await Task.Run(() => sftpClient.Connect());
+            
+            if (!sftpClient.IsConnected)
+            {
+                return new ConnectionTestResult
+                {
+                    Success = false,
+                    Message = "Failed to connect to SFTP server"
+                };
+            }
+
+            // Test if path exists (if provided)
+            bool pathExists = false;
+            string pathType = "Unknown";
+            
+            if (!string.IsNullOrEmpty(config.Path))
+            {
+                pathExists = sftpClient.Exists(config.Path);
+                if (pathExists)
+                {
+                    var attrs = sftpClient.GetAttributes(config.Path);
+                    pathType = attrs.IsDirectory ? "Directory" : "File";
+                }
+                else
+                {
+                    pathType = "Not Found";
+                }
+            }
+
+            var details = new Dictionary<string, object>
+            {
+                ["Host"] = config.SftpHost,
+                ["Port"] = port,
+                ["IsConnected"] = sftpClient.IsConnected,
+                ["ProtocolVersion"] = sftpClient.ProtocolVersion,
+                ["ServerVersion"] = sftpClient.ConnectionInfo.ServerVersion,
+                ["Path"] = config.Path ?? "Not specified",
+                ["PathExists"] = pathExists,
+                ["PathType"] = pathType
+            };
+
+            sftpClient.Disconnect();
+
+            return new ConnectionTestResult
+            {
+                Success = true,
+                Message = $"Successfully connected to SFTP server at {config.SftpHost}:{port}",
+                Details = details
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "SFTP connection test failed");
+            
+            // Extract the most relevant error message
+            var errorMessage = GetRootErrorMessage(ex);
+            
+            return new ConnectionTestResult
+            {
+                Success = false,
+                Message = $"SFTP connection failed: {errorMessage}"
             };
         }
     }
@@ -429,5 +849,21 @@ public class ConnectionTester : IConnectionTester
         };
 
         return builder.ConnectionString;
+    }
+
+    /// <summary>
+    /// Extracts the root cause error message from an exception, avoiding repetitive nested messages
+    /// </summary>
+    private static string GetRootErrorMessage(Exception ex)
+    {
+        // Get the innermost exception
+        var innermost = ex;
+        while (innermost.InnerException != null)
+        {
+            innermost = innermost.InnerException;
+        }
+
+        // Return the innermost message, which is usually the most specific
+        return innermost.Message;
     }
 }

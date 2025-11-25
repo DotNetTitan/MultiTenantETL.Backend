@@ -200,14 +200,22 @@ public record FileConfig
     public string? SheetName { get; init; } // For Excel
     public string? Encoding { get; init; }
     // Storage provider specific fields
+    // FTP
     public string? FtpHost { get; init; }
     public int? FtpPort { get; init; }
     public string? FtpUsername { get; init; }
     public string? FtpPassword { get; init; }
+    // SFTP
+    public string? SftpHost { get; init; }
+    public int? SftpPort { get; init; }
+    public string? SftpUsername { get; init; }
+    public string? SftpPassword { get; init; }
+    // S3
     public string? S3Bucket { get; init; }
     public string? S3Region { get; init; }
     public string? S3AccessKey { get; init; }
     public string? S3SecretKey { get; init; }
+    // Azure Blob
     public string? AzureAccountName { get; init; }
     public string? AzureContainer { get; init; }
     public string? AzureAccountKey { get; init; }
