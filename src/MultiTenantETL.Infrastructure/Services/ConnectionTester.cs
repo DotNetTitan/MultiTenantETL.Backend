@@ -422,10 +422,20 @@ public class ConnectionTester : IConnectionTester
             // Create S3 client with custom retry policy - reduce from default to 3 attempts
             var s3Config = new Amazon.S3.AmazonS3Config
             {
-                RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(config.S3Region),
                 MaxErrorRetry = 3,
-                Timeout = TimeSpan.FromSeconds(10)
+                Timeout = TimeSpan.FromSeconds(10),
+                ForcePathStyle = !string.IsNullOrEmpty(config.S3Endpoint) // MinIO requires path-style
             };
+            
+            // Use custom endpoint if provided (for MinIO, etc.), otherwise use AWS
+            if (!string.IsNullOrEmpty(config.S3Endpoint))
+            {
+                s3Config.ServiceURL = config.S3Endpoint;
+            }
+            else
+            {
+                s3Config.RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(config.S3Region);
+            }
             
             var s3Client = new AmazonS3Client(config.S3AccessKey, config.S3SecretKey, s3Config);
             

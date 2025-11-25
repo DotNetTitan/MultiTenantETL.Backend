@@ -215,6 +215,7 @@ public record FileConfig
     public string? S3Region { get; init; }
     public string? S3AccessKey { get; init; }
     public string? S3SecretKey { get; init; }
+    public string? S3Endpoint { get; init; } // Optional custom endpoint (for MinIO, etc.)
     // Azure Blob
     public string? AzureAccountName { get; init; }
     public string? AzureContainer { get; init; }
