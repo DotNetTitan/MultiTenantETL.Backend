@@ -10,9 +10,9 @@ public static class MetadataConstants
     {
         public static readonly (string Value, string LabelKey, string Icon)[] Types = new[]
         {
-            ("Database", "connectors.database", "mdi-database"),
-            ("API", "connectors.api", "mdi-api"),
-            ("File", "connectors.file", "mdi-file-document")
+            (Constants.ConnectorTypes.Database, "connectors.database", "mdi-database"),
+            (Constants.ConnectorTypes.Api, "connectors.api", "mdi-api"),
+            (Constants.ConnectorTypes.File, "connectors.file", "mdi-file-document")
         };
     }
 
@@ -20,9 +20,30 @@ public static class MetadataConstants
     {
         public static readonly Dictionary<string, string[]> ProvidersByType = new()
         {
-            { "Database", new[] { "SqlServer", "PostgreSQL", "MySQL" } },
-            { "API", new[] { "REST" } },
-            { "File", new[] { "Local", "FTP", "S3", "AzureBlob" } }
+            { 
+                Constants.ConnectorTypes.Database, 
+                new[] { 
+                    Constants.ConnectorProviders.SqlServer, 
+                    Constants.ConnectorProviders.PostgreSQL, 
+                    Constants.ConnectorProviders.MySQL 
+                } 
+            },
+            { 
+                Constants.ConnectorTypes.Api, 
+                new[] { 
+                    Constants.ConnectorProviders.REST 
+                } 
+            },
+            { 
+                Constants.ConnectorTypes.File, 
+                new[] { 
+                    Constants.ConnectorProviders.Local, 
+                    Constants.ConnectorProviders.FTP, 
+                    Constants.ConnectorProviders.SFTP, 
+                    Constants.ConnectorProviders.S3, 
+                    Constants.ConnectorProviders.AzureBlob 
+                } 
+            }
         };
     }
 
@@ -30,9 +51,9 @@ public static class MetadataConstants
     {
         public static readonly (string Value, string LabelKey, string Icon)[] Directions = new[]
         {
-            ("source", "connectors.sourceOnly", "mdi-export"),
-            ("destination", "connectors.destinationOnly", "mdi-import"),
-            ("both", "connectors.both", "mdi-swap-horizontal")
+            (Constants.ConnectorDirections.Source, "connectors.sourceOnly", "mdi-export"),
+            (Constants.ConnectorDirections.Destination, "connectors.destinationOnly", "mdi-import"),
+            (Constants.ConnectorDirections.Both, "connectors.both", "mdi-swap-horizontal")
         };
     }
 
