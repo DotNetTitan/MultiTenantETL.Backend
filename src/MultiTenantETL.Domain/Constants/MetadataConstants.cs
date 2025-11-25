@@ -64,7 +64,6 @@ public static class MetadataConstants
             ("None", "connectors.authNone"),
             ("Basic", "connectors.authBasic"),
             ("Bearer", "connectors.authBearer"),
-            ("OAuth2", "connectors.authOAuth2"),
             ("API Key", "connectors.authApiKey")
         };
     }
