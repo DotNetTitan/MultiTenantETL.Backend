@@ -74,7 +74,13 @@ public class MetadataService : IMetadataService
     public List<DataTypeDto> GetDataTypes()
     {
         return MetadataConstants.DataTypes.Types
-            .Select(d => new DataTypeDto { Value = d.Value, LabelKey = d.LabelKey, Icon = d.Icon })
+            .Select(d => new DataTypeDto 
+            { 
+                Value = d.Value, 
+                Label = d.Label, 
+                Icon = d.Icon, 
+                Category = d.Category 
+            })
             .ToList();
     }
 

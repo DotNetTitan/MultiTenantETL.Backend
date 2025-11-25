@@ -377,6 +377,37 @@ public class ConnectorService : IConnectorService
         };
     }
 
+    public async Task<DetectSchemaResponse> DetectSchemaPreviewAsync(DetectSchemaPreviewRequest request, Guid tenantId)
+    {
+        _logger.LogInformation("Detecting schema preview for type {Type}, provider {Provider}", request.Type, request.Provider);
+
+        ValidateTypeAndProvider(request.Type, request.Provider);
+
+        // Decrypt sensitive fields before schema detection
+        var decryptedConfig = _encryptionService.DecryptJsonFields(request.Config, SensitiveFields);
+        var result = await _schemaDetector.DetectSchemaAsync(
+            request.Type,
+            request.Provider,
+            decryptedConfig,
+            request.TableOrResourceName);
+
+        // Audit log
+        await _auditService.LogAsync(
+            action: AuditActions.ConnectorSchemaDetected,
+            resourceType: "Connector",
+            description: $"Detected schema preview ({request.Type}/{request.Provider})",
+            metadata: new { request.Type, request.Provider, TableOrResource = request.TableOrResourceName, result.Success }
+        );
+
+        return new DetectSchemaResponse
+        {
+            Success = result.Success,
+            Message = result.Message,
+            Schema = result.Schema,
+            DetectedAt = DateTime.UtcNow
+        };
+    }
+
     public async Task<List<ConnectorListResponse>> GetAllAsync(Guid tenantId)
     {
         var connectors = await _context.Connectors

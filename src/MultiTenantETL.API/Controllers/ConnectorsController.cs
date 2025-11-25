@@ -294,7 +294,7 @@ public class ConnectorsController : ControllerBase
     }
 
     /// <summary>
-    /// Detect schema from a connector
+    /// Detect schema from a connector (for existing connectors)
     /// </summary>
     [HttpPost("detect-schema")]
     [ProducesResponseType(typeof(DetectSchemaResponse), StatusCodes.Status200OK)]
@@ -323,5 +323,29 @@ public class ConnectorsController : ControllerBase
         {
             return NotFound(new { message = $"Connector with ID {request.ConnectorId} not found" });
         }
+    }
+
+    /// <summary>
+    /// Detect schema from connection configuration (for new connectors before saving)
+    /// </summary>
+    [HttpPost("detect-schema-preview")]
+    [ProducesResponseType(typeof(DetectSchemaResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> DetectSchemaPreview([FromBody] DetectSchemaPreviewRequest request)
+    {
+        // Check permission
+        var authResult = await _authorizationService.AuthorizeAsync(
+            User, 
+            null, 
+            new PermissionRequirement(Permissions.Connectors.Create));
+        
+        if (!authResult.Succeeded)
+        {
+            return Forbid();
+        }
+
+        var tenantId = _currentUserService.GetTenantId();
+        var result = await _connectorService.DetectSchemaPreviewAsync(request, tenantId);
+        return Ok(result);
     }
 }

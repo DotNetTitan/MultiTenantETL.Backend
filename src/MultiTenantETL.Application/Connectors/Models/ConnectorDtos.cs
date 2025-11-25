@@ -120,6 +120,23 @@ public record DetectSchemaRequest
     public string? TableOrResourceName { get; init; } // For databases: table name, For APIs: endpoint
 }
 
+public record DetectSchemaPreviewRequest
+{
+    [Required]
+    [StringLength(50)]
+    public required string Type { get; init; } // Database, File, API
+
+    [Required]
+    [StringLength(100)]
+    public required string Provider { get; init; } // SqlServer, PostgreSQL, MySQL, etc.
+
+    [Required]
+    public required JsonElement Config { get; init; } // Connection configuration
+
+    [StringLength(200)]
+    public string? TableOrResourceName { get; init; } // For databases: table name
+}
+
 public record DetectSchemaResponse
 {
     public bool Success { get; init; }

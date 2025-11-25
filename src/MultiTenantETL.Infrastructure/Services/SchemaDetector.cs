@@ -68,7 +68,12 @@ public class SchemaDetector : ISchemaDetector
             };
         }
 
-        var dbConfig = JsonSerializer.Deserialize<DatabaseConfig>(config);
+        var options = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        };
+        
+        var dbConfig = JsonSerializer.Deserialize<DatabaseConfig>(config, options);
         if (dbConfig == null)
         {
             return new SchemaDetectionResult

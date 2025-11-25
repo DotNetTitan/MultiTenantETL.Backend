@@ -74,8 +74,9 @@ public class TransformationTypeDto
 public class DataTypeDto
 {
     public string Value { get; set; } = string.Empty;
-    public string LabelKey { get; set; } = string.Empty;
+    public string Label { get; set; } = string.Empty;
     public string Icon { get; set; } = string.Empty;
+    public string Category { get; set; } = string.Empty;
 }
 
 public class ScheduleFrequencyDto

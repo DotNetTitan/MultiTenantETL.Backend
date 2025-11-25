@@ -12,5 +12,6 @@ public interface IConnectorService
     Task<TestConnectionResponse> TestConnectionAsync(TestConnectionRequest request, Guid tenantId);
     Task<TestConnectionResponse> TestExistingConnectionAsync(Guid id, Guid tenantId);
     Task<DetectSchemaResponse> DetectSchemaAsync(DetectSchemaRequest request, Guid tenantId);
+    Task<DetectSchemaResponse> DetectSchemaPreviewAsync(DetectSchemaPreviewRequest request, Guid tenantId);
     Task<List<ConnectorListResponse>> GetAllAsync(Guid tenantId);
 }

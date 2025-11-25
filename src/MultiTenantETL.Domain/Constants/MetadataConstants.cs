@@ -99,18 +99,66 @@ public static class MetadataConstants
 
     public static class DataTypes
     {
-        public static readonly (string Value, string LabelKey, string Icon)[] Types = new[]
+        public static readonly (string Value, string Label, string Icon, string Category)[] Types = new[]
         {
-            ("string", "schema.dataTypes.string", "mdi-format-text"),
-            ("integer", "schema.dataTypes.integer", "mdi-numeric"),
-            ("bigInteger", "schema.dataTypes.bigInteger", "mdi-numeric"),
-            ("decimal", "schema.dataTypes.decimal", "mdi-decimal"),
-            ("boolean", "schema.dataTypes.boolean", "mdi-checkbox-marked"),
-            ("date", "schema.dataTypes.date", "mdi-calendar"),
-            ("dateTime", "schema.dataTypes.dateTime", "mdi-calendar-clock"),
-            ("timestamp", "schema.dataTypes.timestamp", "mdi-clock-outline"),
-            ("json", "schema.dataTypes.json", "mdi-code-json"),
-            ("textLong", "schema.dataTypes.textLong", "mdi-text-long")
+            // String types
+            ("varchar", "String (Varchar)", "mdi-text", "string"),
+            ("char", "Char", "mdi-text", "string"),
+            ("text", "Text (Long)", "mdi-text-long", "string"),
+            ("nvarchar", "NVarchar (Unicode)", "mdi-text", "string"),
+            ("nchar", "NChar (Unicode)", "mdi-text", "string"),
+            ("ntext", "NText (Unicode)", "mdi-text-long", "string"),
+            
+            // Numeric types
+            ("int", "Integer", "mdi-numeric", "numeric"),
+            ("bigint", "Big Integer", "mdi-numeric", "numeric"),
+            ("smallint", "Small Integer", "mdi-numeric", "numeric"),
+            ("tinyint", "Tiny Integer", "mdi-numeric", "numeric"),
+            ("decimal", "Decimal", "mdi-decimal", "numeric"),
+            ("numeric", "Numeric", "mdi-decimal", "numeric"),
+            ("float", "Float", "mdi-decimal", "numeric"),
+            ("real", "Real", "mdi-decimal", "numeric"),
+            ("money", "Money", "mdi-currency-usd", "numeric"),
+            ("smallmoney", "Small Money", "mdi-currency-usd", "numeric"),
+            
+            // Boolean
+            ("boolean", "Boolean", "mdi-checkbox-marked", "boolean"),
+            ("bit", "Bit", "mdi-checkbox-marked", "boolean"),
+            
+            // Date/Time types
+            ("date", "Date", "mdi-calendar", "datetime"),
+            ("datetime", "Date Time", "mdi-calendar-clock", "datetime"),
+            ("datetime2", "DateTime2", "mdi-calendar-clock", "datetime"),
+            ("smalldatetime", "Small DateTime", "mdi-calendar-clock", "datetime"),
+            ("time", "Time", "mdi-clock", "datetime"),
+            ("timestamp", "Timestamp", "mdi-clock", "datetime"),
+            ("datetimeoffset", "DateTime Offset", "mdi-calendar-clock", "datetime"),
+            
+            // UUID/GUID
+            ("uuid", "UUID/GUID", "mdi-identifier", "identifier"),
+            ("uniqueidentifier", "Unique Identifier", "mdi-identifier", "identifier"),
+            
+            // Binary types
+            ("binary", "Binary", "mdi-file-code", "binary"),
+            ("varbinary", "VarBinary", "mdi-file-code", "binary"),
+            ("image", "Image", "mdi-image", "binary"),
+            
+            // JSON/XML
+            ("json", "JSON", "mdi-code-json", "structured"),
+            ("jsonb", "JSONB (Binary)", "mdi-code-json", "structured"),
+            ("xml", "XML", "mdi-xml", "structured"),
+            
+            // PostgreSQL specific
+            ("serial", "Serial (Auto-increment)", "mdi-numeric", "numeric"),
+            ("bigserial", "Big Serial", "mdi-numeric", "numeric"),
+            ("inet", "IP Address", "mdi-ip-network", "network"),
+            ("cidr", "CIDR", "mdi-ip-network", "network"),
+            ("macaddr", "MAC Address", "mdi-network", "network"),
+            ("array", "Array", "mdi-code-brackets", "structured"),
+            
+            // Spatial
+            ("geometry", "Geometry", "mdi-vector-polygon", "spatial"),
+            ("geography", "Geography", "mdi-earth", "spatial")
         };
     }
 
