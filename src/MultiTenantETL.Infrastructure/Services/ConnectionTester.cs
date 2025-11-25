@@ -725,11 +725,33 @@ public class ConnectionTester : IConnectionTester
                 switch (authType)
                 {
                     case "bearer":
-                        if (!string.IsNullOrEmpty(apiConfig.AuthToken))
+                        string? token = null;
+                        
+                        // Check if dynamic token generation is enabled
+                        if (apiConfig.UseDynamicToken)
                         {
-                            httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiConfig.AuthToken}");
+                            var tokenResult = await GenerateDynamicTokenAsync(apiConfig);
+                            if (!tokenResult.Success)
+                            {
+                                return new ConnectionTestResult
+                                {
+                                    Success = false,
+                                    Message = $"Failed to generate dynamic token: {tokenResult.Message}"
+                                };
+                            }
+                            token = tokenResult.Token;
+                        }
+                        else
+                        {
+                            token = apiConfig.AuthToken;
+                        }
+                        
+                        if (!string.IsNullOrEmpty(token))
+                        {
+                            httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
                         }
                         break;
+                        
                     case "basic":
                         if (!string.IsNullOrEmpty(apiConfig.Username) && !string.IsNullOrEmpty(apiConfig.Password))
                         {
@@ -738,6 +760,7 @@ public class ConnectionTester : IConnectionTester
                             httpClient.DefaultRequestHeaders.Add("Authorization", $"Basic {credentials}");
                         }
                         break;
+                        
                     case "apikey":
                         if (!string.IsNullOrEmpty(apiConfig.ApiKeyHeader) && !string.IsNullOrEmpty(apiConfig.ApiKeyValue))
                         {
@@ -774,7 +797,8 @@ public class ConnectionTester : IConnectionTester
                 ["StatusCode"] = (int)response.StatusCode,
                 ["IsSuccessStatusCode"] = response.IsSuccessStatusCode,
                 ["BaseUrl"] = apiConfig.BaseUrl,
-                ["TestPath"] = testPath
+                ["TestPath"] = testPath,
+                ["UsedDynamicToken"] = apiConfig.UseDynamicToken
             };
 
             return new ConnectionTestResult
@@ -794,6 +818,117 @@ public class ConnectionTester : IConnectionTester
                 Success = false,
                 Message = $"API connection failed: {ex.Message}"
             };
+        }
+    }
+
+    private async Task<(bool Success, string? Token, string Message)> GenerateDynamicTokenAsync(ApiConfig apiConfig)
+    {
+        if (string.IsNullOrEmpty(apiConfig.TokenEndpointUrl))
+        {
+            return (false, null, "Token endpoint URL is required for dynamic token generation");
+        }
+
+        try
+        {
+            var tokenClient = _httpClientFactory.CreateClient();
+            tokenClient.Timeout = TimeSpan.FromSeconds(30);
+            
+            // Set default headers
+            tokenClient.DefaultRequestHeaders.Add("User-Agent", "MultiTenantETL/1.0");
+            tokenClient.DefaultRequestHeaders.Add("Accept", "*/*");
+
+            var request = new HttpRequestMessage
+            {
+                Method = apiConfig.TokenEndpointMethod?.ToUpper() == "GET" ? HttpMethod.Get : HttpMethod.Post,
+                RequestUri = new Uri(apiConfig.TokenEndpointUrl)
+            };
+
+            // Add body for POST requests
+            if (request.Method == HttpMethod.Post && !string.IsNullOrEmpty(apiConfig.TokenEndpointBody))
+            {
+                request.Content = new StringContent(
+                    apiConfig.TokenEndpointBody,
+                    System.Text.Encoding.UTF8,
+                    "application/json");
+            }
+
+            // Add headers for token request (after content to avoid Content-Type conflicts)
+            if (apiConfig.TokenEndpointHeaders != null)
+            {
+                foreach (var header in apiConfig.TokenEndpointHeaders)
+                {
+                    // Skip Content-Type as it's already set by StringContent
+                    if (header.Key.Equals("Content-Type", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                        
+                    request.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                }
+            }
+
+            var response = await tokenClient.SendAsync(request);
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                return (false, null, $"Token endpoint returned {response.StatusCode}: {errorContent}");
+            }
+
+            var responseContent = await response.Content.ReadAsStringAsync();
+            var tokenJson = JsonSerializer.Deserialize<JsonElement>(responseContent);
+
+            // Extract token using the specified path (e.g., "access_token" or "data.token")
+            var tokenPath = apiConfig.TokenResponsePath ?? "access_token";
+            var token = ExtractTokenFromResponse(tokenJson, tokenPath);
+
+            if (string.IsNullOrEmpty(token))
+            {
+                return (false, null, $"Could not extract token from response using path '{tokenPath}'");
+            }
+
+            return (true, token, "Token generated successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to generate dynamic token from {TokenEndpoint}", apiConfig.TokenEndpointUrl);
+            return (false, null, $"Token generation failed: {ex.Message}");
+        }
+    }
+
+    private static string? ExtractTokenFromResponse(JsonElement json, string path)
+    {
+        try
+        {
+            // Handle simple path (e.g., "access_token")
+            if (!path.Contains('.'))
+            {
+                if (json.TryGetProperty(path, out var value))
+                {
+                    return value.GetString();
+                }
+                return null;
+            }
+
+            // Handle nested path (e.g., "data.token")
+            var parts = path.Split('.');
+            var current = json;
+            
+            foreach (var part in parts)
+            {
+                if (current.TryGetProperty(part, out var next))
+                {
+                    current = next;
+                }
+                else
+                {
+                    return null;
+                }
+            }
+
+            return current.GetString();
+        }
+        catch
+        {
+            return null;
         }
     }
 

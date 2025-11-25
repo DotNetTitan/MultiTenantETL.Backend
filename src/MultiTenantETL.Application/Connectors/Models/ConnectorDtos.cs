@@ -226,12 +226,22 @@ public record FileConfig
 public record ApiConfig
 {
     public string? BaseUrl { get; init; }
-    public string? AuthType { get; init; } // None, Basic, Bearer, ApiKey, OAuth2
+    public string? AuthType { get; init; } // None, Basic, Bearer, ApiKey
     public string? AuthToken { get; init; }
     public string? ApiKeyHeader { get; init; } // Header name for API key (e.g., X-API-Key, Authorization)
     public string? ApiKeyValue { get; init; } // API key value
     public string? Username { get; init; }
     public string? Password { get; init; }
+    
+    // Dynamic token generation (for Bearer auth)
+    public bool UseDynamicToken { get; init; }
+    public string? TokenEndpointUrl { get; init; }
+    public string? TokenEndpointMethod { get; init; } = "POST"; // POST, GET
+    public Dictionary<string, string>? TokenEndpointHeaders { get; init; }
+    public string? TokenEndpointBody { get; init; } // JSON body for token request
+    public string? TokenResponsePath { get; init; } // JSON path to extract token (e.g., "access_token" or "data.token")
+    public int? TokenExpirySeconds { get; init; } // Optional: cache token for this duration
+    
     public Dictionary<string, string>? Headers { get; init; }
     public Dictionary<string, string>? QueryParameters { get; init; }
     public int TimeoutSeconds { get; init; } = 30;
