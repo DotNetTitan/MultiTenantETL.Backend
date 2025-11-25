@@ -31,11 +31,7 @@ public class SchemaDetector : ISchemaDetector
             {
                 ConnectorTypes.Database => await DetectDatabaseSchemaAsync(provider, config, tableOrResourceName),
                 ConnectorTypes.File => DetectFileSchemaAsync(provider, config),
-                ConnectorTypes.Api => new SchemaDetectionResult
-                {
-                    Success = false,
-                    Message = "Schema detection for API connectors requires manual definition"
-                },
+                ConnectorTypes.Api => await DetectApiSchemaAsync(provider, config, tableOrResourceName),
                 _ => new SchemaDetectionResult
                 {
                     Success = false,
@@ -291,6 +287,349 @@ public class SchemaDetector : ISchemaDetector
         {
             Success = false,
             Message = "File schema detection requires file upload and parsing. Please define schema manually."
+        };
+    }
+
+    private async Task<SchemaDetectionResult> DetectApiSchemaAsync(string provider, JsonElement config, string? endpointPath)
+    {
+        if (string.IsNullOrWhiteSpace(endpointPath))
+        {
+            return new SchemaDetectionResult
+            {
+                Success = false,
+                Message = "Endpoint path is required for API schema detection"
+            };
+        }
+
+        var options = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        };
+        
+        var apiConfig = JsonSerializer.Deserialize<ApiConfig>(config, options);
+        if (apiConfig == null)
+        {
+            return new SchemaDetectionResult
+            {
+                Success = false,
+                Message = "Invalid API configuration"
+            };
+        }
+
+        try
+        {
+            // Create HTTP client
+            var httpClient = new HttpClient
+            {
+                BaseAddress = new Uri(apiConfig.BaseUrl!),
+                Timeout = TimeSpan.FromSeconds(apiConfig.TimeoutSeconds)
+            };
+
+            // Set default headers
+            httpClient.DefaultRequestHeaders.Add("User-Agent", "MultiTenantETL/1.0");
+            httpClient.DefaultRequestHeaders.Add("Accept", "*/*");
+
+            // Add authentication
+            if (!string.IsNullOrEmpty(apiConfig.AuthType))
+            {
+                var authType = apiConfig.AuthType.ToLower().Replace(" ", "");
+                switch (authType)
+                {
+                    case "bearer":
+                        string? token = null;
+                        
+                        // Check if dynamic token generation is enabled
+                        if (apiConfig.UseDynamicToken)
+                        {
+                            var tokenResult = await GenerateDynamicTokenForSchemaAsync(apiConfig);
+                            if (!tokenResult.Success)
+                            {
+                                return new SchemaDetectionResult
+                                {
+                                    Success = false,
+                                    Message = $"Failed to generate token: {tokenResult.Message}"
+                                };
+                            }
+                            token = tokenResult.Token;
+                        }
+                        else
+                        {
+                            token = apiConfig.AuthToken;
+                        }
+                        
+                        if (!string.IsNullOrEmpty(token))
+                        {
+                            httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+                        }
+                        break;
+                        
+                    case "basic":
+                        if (!string.IsNullOrEmpty(apiConfig.Username) && !string.IsNullOrEmpty(apiConfig.Password))
+                        {
+                            var credentials = Convert.ToBase64String(
+                                System.Text.Encoding.ASCII.GetBytes($"{apiConfig.Username}:{apiConfig.Password}"));
+                            httpClient.DefaultRequestHeaders.Add("Authorization", $"Basic {credentials}");
+                        }
+                        break;
+                        
+                    case "apikey":
+                        if (!string.IsNullOrEmpty(apiConfig.ApiKeyHeader) && !string.IsNullOrEmpty(apiConfig.ApiKeyValue))
+                        {
+                            httpClient.DefaultRequestHeaders.Add(apiConfig.ApiKeyHeader, apiConfig.ApiKeyValue);
+                        }
+                        break;
+                }
+            }
+
+            // Add custom headers
+            if (apiConfig.Headers != null)
+            {
+                foreach (var header in apiConfig.Headers)
+                {
+                    httpClient.DefaultRequestHeaders.TryAddWithoutValidation(header.Key, header.Value);
+                }
+            }
+
+            // Call the API endpoint
+            var response = await httpClient.GetAsync(endpointPath);
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                return new SchemaDetectionResult
+                {
+                    Success = false,
+                    Message = $"API returned status code {response.StatusCode}"
+                };
+            }
+
+            var responseContent = await response.Content.ReadAsStringAsync();
+            var responseJson = JsonSerializer.Deserialize<JsonElement>(responseContent);
+
+            // Find the endpoint configuration to get the response data path
+            var endpoint = apiConfig.Endpoints?.FirstOrDefault(e => e.Path == endpointPath);
+            var dataPath = endpoint?.ResponseDataPath ?? "data";
+
+            // Extract data from response using the path
+            var dataElement = ExtractDataFromResponse(responseJson, dataPath);
+            
+            // Infer schema from the data
+            var fields = InferSchemaFromJson(dataElement);
+
+            if (fields.Count == 0)
+            {
+                return new SchemaDetectionResult
+                {
+                    Success = false,
+                    Message = "No fields could be detected from the API response"
+                };
+            }
+
+            var schema = new
+            {
+                fields = fields,
+                version = 1,
+                detectedAt = DateTime.UtcNow
+            };
+
+            return new SchemaDetectionResult
+            {
+                Success = true,
+                Message = $"Successfully detected {fields.Count} fields from API response",
+                Schema = JsonSerializer.Deserialize<JsonElement>(JsonSerializer.Serialize(schema))
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "API schema detection failed for endpoint {Endpoint}", endpointPath);
+            return new SchemaDetectionResult
+            {
+                Success = false,
+                Message = $"Schema detection failed: {ex.Message}"
+            };
+        }
+    }
+
+    private async Task<(bool Success, string? Token, string Message)> GenerateDynamicTokenForSchemaAsync(ApiConfig apiConfig)
+    {
+        if (string.IsNullOrEmpty(apiConfig.TokenEndpointUrl))
+        {
+            return (false, null, "Token endpoint URL is required");
+        }
+
+        try
+        {
+            var tokenClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+            tokenClient.DefaultRequestHeaders.Add("User-Agent", "MultiTenantETL/1.0");
+            tokenClient.DefaultRequestHeaders.Add("Accept", "*/*");
+
+            var request = new HttpRequestMessage
+            {
+                Method = apiConfig.TokenEndpointMethod?.ToUpper() == "GET" ? HttpMethod.Get : HttpMethod.Post,
+                RequestUri = new Uri(apiConfig.TokenEndpointUrl)
+            };
+
+            if (request.Method == HttpMethod.Post && !string.IsNullOrEmpty(apiConfig.TokenEndpointBody))
+            {
+                request.Content = new StringContent(
+                    apiConfig.TokenEndpointBody,
+                    System.Text.Encoding.UTF8,
+                    "application/json");
+            }
+
+            if (apiConfig.TokenEndpointHeaders != null)
+            {
+                foreach (var header in apiConfig.TokenEndpointHeaders)
+                {
+                    if (header.Key.Equals("Content-Type", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    request.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                }
+            }
+
+            var response = await tokenClient.SendAsync(request);
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                return (false, null, $"Token endpoint returned {response.StatusCode}");
+            }
+
+            var responseContent = await response.Content.ReadAsStringAsync();
+            var tokenJson = JsonSerializer.Deserialize<JsonElement>(responseContent);
+            var tokenPath = apiConfig.TokenResponsePath ?? "access_token";
+            var token = ExtractTokenFromResponse(tokenJson, tokenPath);
+
+            if (string.IsNullOrEmpty(token))
+            {
+                return (false, null, $"Could not extract token from response using path '{tokenPath}'");
+            }
+
+            return (true, token, "Token generated successfully");
+        }
+        catch (Exception ex)
+        {
+            return (false, null, $"Token generation failed: {ex.Message}");
+        }
+    }
+
+    private static string? ExtractTokenFromResponse(JsonElement json, string path)
+    {
+        try
+        {
+            if (!path.Contains('.'))
+            {
+                if (json.TryGetProperty(path, out var value))
+                {
+                    return value.GetString();
+                }
+                return null;
+            }
+
+            var parts = path.Split('.');
+            var current = json;
+            
+            foreach (var part in parts)
+            {
+                if (current.TryGetProperty(part, out var next))
+                {
+                    current = next;
+                }
+                else
+                {
+                    return null;
+                }
+            }
+
+            return current.GetString();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static JsonElement ExtractDataFromResponse(JsonElement json, string path)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(path) || path == ".")
+            {
+                return json;
+            }
+
+            if (!path.Contains('.'))
+            {
+                if (json.TryGetProperty(path, out var value))
+                {
+                    return value;
+                }
+                return json;
+            }
+
+            var parts = path.Split('.');
+            var current = json;
+            
+            foreach (var part in parts)
+            {
+                if (current.TryGetProperty(part, out var next))
+                {
+                    current = next;
+                }
+                else
+                {
+                    return json;
+                }
+            }
+
+            return current;
+        }
+        catch
+        {
+            return json;
+        }
+    }
+
+    private static List<SchemaField> InferSchemaFromJson(JsonElement data)
+    {
+        var fields = new List<SchemaField>();
+
+        // If it's an array, use the first element
+        if (data.ValueKind == JsonValueKind.Array && data.GetArrayLength() > 0)
+        {
+            data = data[0];
+        }
+
+        // If it's an object, extract properties
+        if (data.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in data.EnumerateObject())
+            {
+                var field = new SchemaField
+                {
+                    Name = property.Name,
+                    DataType = InferDataType(property.Value),
+                    IsNullable = property.Value.ValueKind == JsonValueKind.Null,
+                    IsPrimaryKey = property.Name.Equals("id", StringComparison.OrdinalIgnoreCase) ||
+                                   property.Name.EndsWith("Id", StringComparison.OrdinalIgnoreCase)
+                };
+
+                fields.Add(field);
+            }
+        }
+
+        return fields;
+    }
+
+    private static string InferDataType(JsonElement value)
+    {
+        return value.ValueKind switch
+        {
+            JsonValueKind.String => "varchar",
+            JsonValueKind.Number => value.TryGetInt32(out _) ? "int" : "decimal",
+            JsonValueKind.True or JsonValueKind.False => "boolean",
+            JsonValueKind.Array => "json",
+            JsonValueKind.Object => "json",
+            JsonValueKind.Null => "varchar",
+            _ => "varchar"
         };
     }
 
