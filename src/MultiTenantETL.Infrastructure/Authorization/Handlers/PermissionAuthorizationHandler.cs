@@ -31,30 +31,32 @@ public class PermissionAuthorizationHandler : AuthorizationHandler<PermissionReq
             return Task.CompletedTask;
         }
 
-        // Parse permission for wildcard checking
-        var parts = requirement.Permission.Split(':');
-        if (parts.Length == 2)
+        // Parse permission for wildcard checking (support both : and . separators)
+        var separator = requirement.Permission.Contains(':') ? ':' : '.';
+        var parts = requirement.Permission.Split(separator);
+        
+        if (parts.Length >= 2)
         {
             var resource = parts[0];
-            var action = parts[1];
+            var action = parts[^1]; // Last part is the action
 
-            // Check {resource}:* (e.g., "pipelines:*" grants all pipeline permissions)
-            if (userPermissions.Contains($"{resource}:*"))
+            // Check {resource}.* or {resource}:* (e.g., "pipelines.*" grants all pipeline permissions)
+            if (userPermissions.Contains($"{resource}.*") || userPermissions.Contains($"{resource}:*"))
             {
                 context.Succeed(requirement);
                 return Task.CompletedTask;
             }
 
-            // Check *:{action} (e.g., "*:read" grants read on all resources)
-            if (userPermissions.Contains($"*:{action}"))
+            // Check *.{action} or *:{action} (e.g., "*.read" grants read on all resources)
+            if (userPermissions.Contains($"*.{action}") || userPermissions.Contains($"*:{action}"))
             {
                 context.Succeed(requirement);
                 return Task.CompletedTask;
             }
         }
 
-        // Check for super admin permission (*:*)
-        if (userPermissions.Contains("*:*"))
+        // Check for super admin permission (*:* or *.*)
+        if (userPermissions.Contains("*:*") || userPermissions.Contains("*.*"))
         {
             context.Succeed(requirement);
             return Task.CompletedTask;

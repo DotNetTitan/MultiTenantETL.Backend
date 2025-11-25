@@ -35,12 +35,16 @@ public static class DbSeeder
                 Description = "System administrator with full access to all tenants and system configuration",
                 Permissions = new List<string>
                 {
+                    "*.*", // Wildcard - grants all permissions
                     Permissions.System.Manage,
-                    Permissions.Tenants.Create,
-                    Permissions.Tenants.Delete,
-                    Permissions.Tenants.Manage,
-                    Permissions.Users.Manage,
-                    Permissions.Roles.Manage
+                    Permissions.Tenants.All,
+                    Permissions.Users.All,
+                    Permissions.Roles.All,
+                    Permissions.Connectors.All,
+                    Permissions.Pipelines.All,
+                    Permissions.Transformations.All,
+                    Permissions.Executions.All,
+                    Permissions.Dashboard.All
                 }
             },
             new ApplicationRole
@@ -52,6 +56,11 @@ public static class DbSeeder
                     Permissions.Users.Manage,
                     Permissions.TenantSettings.Manage,
                     Permissions.TenantData.Manage,
+                    Permissions.Connectors.All,
+                    Permissions.Pipelines.All,
+                    Permissions.Transformations.All,
+                    Permissions.Executions.All,
+                    Permissions.Dashboard.Read,
                     Permissions.ETL.Manage
                 }
             },
@@ -63,6 +72,13 @@ public static class DbSeeder
                 {
                     Permissions.TenantData.Read,
                     Permissions.TenantData.Write,
+                    Permissions.Connectors.Read,
+                    Permissions.Connectors.Test,
+                    Permissions.Pipelines.Read,
+                    Permissions.Pipelines.Execute,
+                    Permissions.Transformations.Read,
+                    Permissions.Executions.View,
+                    Permissions.Dashboard.Read,
                     Permissions.ETL.View,
                     Permissions.ETL.Execute
                 }
@@ -74,6 +90,11 @@ public static class DbSeeder
                 Permissions = new List<string>
                 {
                     Permissions.TenantData.Read,
+                    Permissions.Connectors.Read,
+                    Permissions.Pipelines.Read,
+                    Permissions.Transformations.Read,
+                    Permissions.Executions.View,
+                    Permissions.Dashboard.Read,
                     Permissions.ETL.View
                 }
             }

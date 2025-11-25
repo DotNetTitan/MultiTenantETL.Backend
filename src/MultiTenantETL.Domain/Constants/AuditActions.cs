@@ -59,7 +59,17 @@ public static class AuditActions
         public const string Deleted = "Connector.Deleted";
         public const string Tested = "Connector.Tested";
         public const string TestFailed = "Connector.TestFailed";
+        public const string SchemaDetected = "Connector.SchemaDetected";
+        public const string Viewed = "Connector.Viewed";
     }
+    
+    // Backward compatibility constants
+    public const string ConnectorCreated = "Connector.Created";
+    public const string ConnectorUpdated = "Connector.Updated";
+    public const string ConnectorDeleted = "Connector.Deleted";
+    public const string ConnectorTested = "Connector.Tested";
+    public const string ConnectorSchemaDetected = "Connector.SchemaDetected";
+    public const string ConnectorViewed = "Connector.Viewed";
     
     public static class Transformations
     {

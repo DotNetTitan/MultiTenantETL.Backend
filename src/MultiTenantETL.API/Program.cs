@@ -313,6 +313,7 @@ builder.Services.AddScoped<MultiTenantETL.Infrastructure.Interfaces.IUserService
 builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddSingleton<IInputSanitizer, InputSanitizer>();
 builder.Services.AddSingleton<IMetadataService, MetadataService>();
+builder.Services.AddSingleton<IEncryptionService, MultiTenantETL.Infrastructure.Security.EncryptionService>();
 
 // Connector Services
 builder.Services.AddScoped<MultiTenantETL.Application.Connectors.IConnectorService,

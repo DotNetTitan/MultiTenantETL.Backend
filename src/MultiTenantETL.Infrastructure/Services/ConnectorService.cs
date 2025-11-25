@@ -1,8 +1,10 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Connectors;
 using MultiTenantETL.Application.Connectors.Models;
+using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Persistence;
@@ -15,17 +17,35 @@ public class ConnectorService : IConnectorService
     private readonly ILogger<ConnectorService> _logger;
     private readonly IConnectionTester _connectionTester;
     private readonly ISchemaDetector _schemaDetector;
+    private readonly IEncryptionService _encryptionService;
+    private readonly IAuditService _auditService;
+
+    // Fields that should be encrypted in connector configurations
+    private static readonly string[] SensitiveFields = new[]
+    {
+        "password", "Password",
+        "apiKey", "ApiKey", "apiKeyValue", "ApiKeyValue",
+        "token", "Token", "authToken", "AuthToken",
+        "secretKey", "SecretKey", "s3SecretKey", "S3SecretKey",
+        "accountKey", "AccountKey", "azureAccountKey", "AzureAccountKey",
+        "ftpPassword", "FtpPassword",
+        "connectionString", "ConnectionString"
+    };
 
     public ConnectorService(
         ApplicationDbContext context,
         ILogger<ConnectorService> logger,
         IConnectionTester connectionTester,
-        ISchemaDetector schemaDetector)
+        ISchemaDetector schemaDetector,
+        IEncryptionService encryptionService,
+        IAuditService auditService)
     {
         _context = context;
         _logger = logger;
         _connectionTester = connectionTester;
         _schemaDetector = schemaDetector;
+        _encryptionService = encryptionService;
+        _auditService = auditService;
     }
 
     public async Task<ConnectorResponse> CreateAsync(CreateConnectorRequest request, Guid tenantId, Guid userId)
@@ -37,6 +57,9 @@ public class ConnectorService : IConnectorService
 
         // Determine direction flags
         var (isSource, isDestination) = ParseDirection(request.Direction);
+
+        // Encrypt sensitive fields in config
+        var encryptedConfig = _encryptionService.EncryptJsonFields(request.Config, SensitiveFields);
 
         var connector = new Connector
         {
@@ -50,7 +73,7 @@ public class ConnectorService : IConnectorService
             IsSource = isSource,
             IsDestination = isDestination,
             RequiresCredentials = DetermineRequiresCredentials(request.Type, request.Provider),
-            ConfigJson = JsonSerializer.Serialize(request.Config),
+            ConfigJson = JsonSerializer.Serialize(encryptedConfig),
             SchemaJson = request.Schema.HasValue ? JsonSerializer.Serialize(request.Schema.Value) : null,
             IsActive = true,
             CreatedAt = DateTime.UtcNow,
@@ -61,6 +84,15 @@ public class ConnectorService : IConnectorService
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Connector {ConnectorId} created successfully", connector.Id);
+
+        // Audit log
+        await _auditService.LogAsync(
+            action: AuditActions.ConnectorCreated,
+            resourceType: "Connector",
+            resourceId: connector.Id.ToString(),
+            description: $"Created connector '{connector.Name}' ({connector.Type}/{connector.Provider})",
+            metadata: new { connector.Type, connector.Provider, connector.Direction }
+        );
 
         return MapToResponse(connector);
     }
@@ -119,14 +151,22 @@ public class ConnectorService : IConnectorService
             .Take(request.PageSize)
             .ToListAsync();
 
-        return new PagedConnectorResponse
+        try
         {
-            Connectors = connectors.Select(MapToListResponse).ToList(),
-            TotalCount = totalCount,
-            Page = request.Page,
-            PageSize = request.PageSize,
-            TotalPages = totalPages
-        };
+            return new PagedConnectorResponse
+            {
+                Connectors = connectors.Select(MapToListResponse).ToList(),
+                TotalCount = totalCount,
+                Page = request.Page,
+                PageSize = request.PageSize,
+                TotalPages = totalPages
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error mapping connectors to response");
+            throw;
+        }
     }
 
     public async Task<ConnectorResponse> UpdateAsync(Guid id, UpdateConnectorRequest request, Guid tenantId, Guid userId)
@@ -142,6 +182,9 @@ public class ConnectorService : IConnectorService
 
         _logger.LogInformation("Updating connector {ConnectorId}", id);
 
+        var oldName = connector.Name;
+        var oldIsActive = connector.IsActive;
+
         connector.Name = request.Name;
         connector.Description = request.Description;
         connector.Direction = request.Direction;
@@ -150,7 +193,9 @@ public class ConnectorService : IConnectorService
         connector.IsSource = isSource;
         connector.IsDestination = isDestination;
         
-        connector.ConfigJson = JsonSerializer.Serialize(request.Config);
+        // Encrypt sensitive fields in config
+        var encryptedConfig = _encryptionService.EncryptJsonFields(request.Config, SensitiveFields);
+        connector.ConfigJson = JsonSerializer.Serialize(encryptedConfig);
         connector.SchemaJson = request.Schema.HasValue ? JsonSerializer.Serialize(request.Schema.Value) : connector.SchemaJson;
         
         if (request.IsActive.HasValue)
@@ -164,6 +209,19 @@ public class ConnectorService : IConnectorService
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Connector {ConnectorId} updated successfully", id);
+
+        // Audit log
+        var changes = new List<string>();
+        if (oldName != connector.Name) changes.Add($"name: '{oldName}' → '{connector.Name}'");
+        if (oldIsActive != connector.IsActive) changes.Add($"active: {oldIsActive} → {connector.IsActive}");
+        
+        await _auditService.LogAsync(
+            action: AuditActions.ConnectorUpdated,
+            resourceType: "Connector",
+            resourceId: connector.Id.ToString(),
+            description: $"Updated connector '{connector.Name}'",
+            metadata: new { Changes = changes }
+        );
 
         return MapToResponse(connector);
     }
@@ -181,10 +239,22 @@ public class ConnectorService : IConnectorService
 
         _logger.LogInformation("Deleting connector {ConnectorId}", id);
 
+        var connectorName = connector.Name;
+        var connectorType = connector.Type;
+
         _context.Connectors.Remove(connector);
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Connector {ConnectorId} deleted successfully", id);
+
+        // Audit log
+        await _auditService.LogAsync(
+            action: AuditActions.ConnectorDeleted,
+            resourceType: "Connector",
+            resourceId: id.ToString(),
+            description: $"Deleted connector '{connectorName}' ({connectorType})",
+            metadata: new { Name = connectorName, Type = connectorType }
+        );
     }
 
     public async Task<TestConnectionResponse> TestConnectionAsync(TestConnectionRequest request, Guid tenantId)
@@ -193,7 +263,18 @@ public class ConnectorService : IConnectorService
 
         ValidateTypeAndProvider(request.Type, request.Provider);
 
-        var result = await _connectionTester.TestConnectionAsync(request.Type, request.Provider, request.Config);
+        // Decrypt sensitive fields before testing
+        var decryptedConfig = _encryptionService.DecryptJsonFields(request.Config, SensitiveFields);
+        var result = await _connectionTester.TestConnectionAsync(request.Type, request.Provider, decryptedConfig);
+
+        // Audit log
+        await _auditService.LogAsync(
+            action: AuditActions.ConnectorTested,
+            resourceType: "Connector",
+            description: $"Tested new connection ({request.Type}/{request.Provider})",
+            metadata: new { request.Type, request.Provider, result.Success },
+            success: result.Success
+        );
 
         return new TestConnectionResponse
         {
@@ -218,13 +299,26 @@ public class ConnectorService : IConnectorService
         _logger.LogInformation("Testing existing connector {ConnectorId}", id);
 
         var config = JsonSerializer.Deserialize<JsonElement>(connector.ConfigJson);
-        var result = await _connectionTester.TestConnectionAsync(connector.Type, connector.Provider, config);
+        
+        // Decrypt sensitive fields before testing
+        var decryptedConfig = _encryptionService.DecryptJsonFields(config, SensitiveFields);
+        var result = await _connectionTester.TestConnectionAsync(connector.Type, connector.Provider, decryptedConfig);
 
         // Update connector with test results
         connector.LastTestedAt = DateTime.UtcNow;
         connector.LastTestResult = result.Success ? TestResults.Success : TestResults.Failed;
         connector.LastTestMessage = result.Message;
         await _context.SaveChangesAsync();
+
+        // Audit log
+        await _auditService.LogAsync(
+            action: AuditActions.ConnectorTested,
+            resourceType: "Connector",
+            resourceId: connector.Id.ToString(),
+            description: $"Tested connector '{connector.Name}'",
+            metadata: new { connector.Name, result.Success },
+            success: result.Success
+        );
 
         return new TestConnectionResponse
         {
@@ -249,10 +343,13 @@ public class ConnectorService : IConnectorService
         _logger.LogInformation("Detecting schema for connector {ConnectorId}", request.ConnectorId);
 
         var config = JsonSerializer.Deserialize<JsonElement>(connector.ConfigJson);
+        
+        // Decrypt sensitive fields before schema detection
+        var decryptedConfig = _encryptionService.DecryptJsonFields(config, SensitiveFields);
         var result = await _schemaDetector.DetectSchemaAsync(
             connector.Type,
             connector.Provider,
-            config,
+            decryptedConfig,
             request.TableOrResourceName);
 
         if (result.Success && result.Schema != null)
@@ -260,6 +357,15 @@ public class ConnectorService : IConnectorService
             // Update connector with detected schema
             connector.SchemaJson = JsonSerializer.Serialize(result.Schema);
             await _context.SaveChangesAsync();
+
+            // Audit log
+            await _auditService.LogAsync(
+                action: AuditActions.ConnectorSchemaDetected,
+                resourceType: "Connector",
+                resourceId: connector.Id.ToString(),
+                description: $"Detected schema for connector '{connector.Name}'",
+                metadata: new { connector.Name, TableOrResource = request.TableOrResourceName }
+            );
         }
 
         return new DetectSchemaResponse
@@ -321,8 +427,13 @@ public class ConnectorService : IConnectorService
         return !(type == ConnectorTypes.File && provider == ConnectorProviders.Local);
     }
 
-    private static ConnectorResponse MapToResponse(Connector connector)
+    private ConnectorResponse MapToResponse(Connector connector)
     {
+        var config = JsonSerializer.Deserialize<JsonElement>(connector.ConfigJson);
+        
+        // Decrypt sensitive fields for response
+        var decryptedConfig = _encryptionService.DecryptJsonFields(config, SensitiveFields);
+        
         return new ConnectorResponse
         {
             Id = connector.Id,
@@ -336,7 +447,7 @@ public class ConnectorService : IConnectorService
             IsDestination = connector.IsDestination,
             RequiresCredentials = connector.RequiresCredentials,
             IsActive = connector.IsActive,
-            Config = JsonSerializer.Deserialize<JsonElement>(connector.ConfigJson),
+            Config = decryptedConfig,
             Schema = !string.IsNullOrEmpty(connector.SchemaJson) 
                 ? JsonSerializer.Deserialize<JsonElement>(connector.SchemaJson) 
                 : null,
