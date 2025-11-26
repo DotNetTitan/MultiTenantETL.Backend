@@ -1,25 +1,39 @@
 # MultiTenant ETL - Multi-Tenant ASP.NET Core Web API
 
-A production-ready, secure multi-tenant ASP.NET Core 8.0 Web API for managing ETL (Extract, Transform, Load) pipelines with OpenIddict OAuth 2.0/OpenID Connect authentication.
+A production-ready, secure multi-tenant ASP.NET Core 8.0 Web API designed for ETL (Extract, Transform, Load) operations with complete tenant isolation, OAuth 2.0/OpenID Connect authentication powered by OpenIddict, and permission-based authorization.
 
 ## 🚀 Features
 
 - **Multi-Tenancy**: Complete tenant isolation with per-user tenant switching
   - Automatic personal workspace creation on registration
-  - Full tenant CRUD operations
+  - Full tenant CRUD operations with SuperAdmin/Admin controls
   - User-tenant relationship management
-  - Role-based access within tenants (Admin, User)
+  - Role-based access within tenants (SuperAdmin, Admin, User)
 - **OAuth 2.0 & OpenID Connect**: Powered by OpenIddict 7.2.0
-- **Authentication Flows**:
-  - **Authorization Code + PKCE** (recommended for SPAs) - Secure public client flow with Proof Key for Code Exchange
+  - **Authorization Code + PKCE** (recommended for SPAs) - RFC 7636 compliant
   - Password Grant (for API testing/machine-to-machine)
   - Refresh Token support with rotation
-- **Token Management**: Token refresh and revocation endpoints
+  - Single-use authorization codes with state parameter for CSRF protection
+- **Token Management**: 
+  - Short-lived access tokens (15 minutes)
+  - Long-lived refresh tokens (7 days)
+  - Token refresh and revocation endpoints
+  - Automatic token cleanup with Quartz background jobs
 - **ASP.NET Core Identity**: User and role management with custom claims
 - **Permission-Based Authorization**: Fine-grained access control with custom authorization handlers
-- **PostgreSQL**: Entity Framework Core with database migrations
+  - PermissionAuthorizationHandler for permission-based policies
+  - TenantResourceAuthorizationHandler for resource-based authorization
+- **PostgreSQL**: Entity Framework Core 8.0 with database migrations and snake_case naming
 - **Email Integration**: Azure Communication Services for welcome emails, password reset, email confirmation
-- **Security**: Account lockout, rate limiting, CORS, security headers, token revocation on password change
+- **Security**: 
+  - BCrypt password hashing
+  - Account lockout (5 failed attempts, 15-minute lockout)
+  - Rate limiting on authentication endpoints (AspNetCoreRateLimit)
+  - CORS configuration for frontend origins
+  - Security headers middleware
+  - Token revocation on password change and logout
+  - Input sanitization utilities
+  - Email enumeration prevention
 - **Clean Architecture**: Strict separation of concerns with Domain, Application, Infrastructure, and API layers
 
 ## 📋 Prerequisites
@@ -47,13 +61,28 @@ CREATE DATABASE "MultiTenantETL";
 
 ### 3. Configure Application Settings
 
-Copy the example configuration file:
+Use **user secrets** for sensitive configuration (recommended for development):
 
 ```bash
-cp src/MultiTenantETL.API/appsettings.Development.json.example src/MultiTenantETL.API/appsettings.Development.json
+cd src/MultiTenantETL.API
+
+# Set database connection string
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5432;Database=MultiTenantETL;Username=YOUR_USERNAME;Password=YOUR_PASSWORD"
+
+# Set admin password for seeding
+dotnet user-secrets set "Seeding:AdminPassword" "YOUR_SECURE_ADMIN_PASSWORD"
+
+# Set OAuth client secret for testing
+dotnet user-secrets set "Seeding:OAuthClientSecret" "YOUR_OAUTH_CLIENT_SECRET"
+
+# Set Azure Communication Services (for email)
+dotnet user-secrets set "AzureCommunication:ConnectionString" "your-azure-connection-string"
+dotnet user-secrets set "AzureCommunication:SenderEmail" "noreply@yourdomain.com"
 ```
 
-Edit `appsettings.Development.json` with your settings:
+**User Secrets ID**: `96149a75-7a4b-4db0-89c3-93fc63bf95e8`
+
+Alternatively, edit `appsettings.Development.json` (not recommended for sensitive data):
 
 ```json
 {
@@ -63,6 +92,10 @@ Edit `appsettings.Development.json` with your settings:
   "Seeding": {
     "AdminPassword": "YOUR_SECURE_ADMIN_PASSWORD",
     "OAuthClientSecret": "YOUR_OAUTH_CLIENT_SECRET"
+  },
+  "AzureCommunication": {
+    "ConnectionString": "your-azure-connection-string",
+    "SenderEmail": "noreply@yourdomain.com"
   }
 }
 ```
@@ -70,25 +103,38 @@ Edit `appsettings.Development.json` with your settings:
 ### 4. Run Database Migrations
 
 ```bash
+# From the project root
+dotnet ef database update --project src/MultiTenantETL.Infrastructure --startup-project src/MultiTenantETL.API
+
+# Or from src/MultiTenantETL.API
 cd src/MultiTenantETL.API
-dotnet ef database update --project ../MultiTenantETL.Infrastructure/MultiTenantETL.Infrastructure.csproj
+dotnet ef database update --project ../MultiTenantETL.Infrastructure
 ```
+
+This will create all necessary tables and seed initial data (roles, permissions, admin user, OAuth clients).
 
 ### 5. Run the Application
 
 ```bash
+# From src/MultiTenantETL.API
+cd src/MultiTenantETL.API
 dotnet run
+
+# Or with auto-reload during development
+dotnet watch run
 ```
 
 The API will be available at:
-- HTTPS: `https://localhost:7288`
-- HTTP: `http://localhost:5244`
+- **HTTPS**: `https://localhost:7288`
+- **HTTP**: `http://localhost:5244`
+- **Swagger UI**: `https://localhost:7288/swagger` (development only)
 
 ### 6. Default Admin Account
 
 After seeding, you can log in with:
 - **Email**: `admin@multitenant-etl.com`
-- **Password**: The password you set in `appsettings.Development.json` under `Seeding:AdminPassword`
+- **Password**: The password you set in user secrets under `Seeding:AdminPassword`
+- **Role**: SuperAdmin (full system access)
 
 ## 🏗️ Architecture
 
@@ -113,41 +159,62 @@ MultiTenantETL/
 
 ### Key Design Decisions
 
-- Authentication entities (ApplicationUser, ApplicationRole) live in Infrastructure rather than Domain due to tight coupling with ASP.NET Core Identity and Entity Framework
-- Permission-based authorization with custom handlers (PermissionAuthorizationHandler, TenantResourceAuthorizationHandler)
-- Tenant context managed through claims (TenantId claim in JWT tokens)
-- Database uses snake_case naming convention for tables
+- **Pragmatic Architecture**: Authentication entities (ApplicationUser, ApplicationRole, UserTenant) live in Infrastructure rather than Domain due to tight coupling with ASP.NET Core Identity and Entity Framework. This reduces complexity while maintaining clean separation for pure business entities like Tenant.
+- **Permission-Based Authorization**: Custom handlers (PermissionAuthorizationHandler, TenantResourceAuthorizationHandler) for fine-grained access control
+- **Tenant Context**: Managed through claims (TenantId claim in JWT tokens) for seamless tenant switching
+- **Database Naming**: snake_case convention for tables (e.g., `users`, `roles`, `user_tenants`, `tenants`)
+- **Token Cleanup**: Quartz background jobs (OpenIddict.Quartz) for automatic token cleanup
 
 ## 🔐 Authentication & Authorization
 
 ### OAuth Clients
 
-Two OAuth clients are seeded by default:
+Two OAuth clients are seeded automatically by DbSeeder:
 
-#### 1. SPA Client (Public) - **Recommended**
+#### 1. SPA Client (Public) - **Recommended for Frontend**
 - **Client ID**: `multitenant-etl-spa`
 - **Type**: Public client (no client secret required)
-- **Flow**: Authorization Code + PKCE (RFC 7636)
-- **Security**: PKCE prevents authorization code interception attacks
+- **Flow**: Authorization Code + PKCE (RFC 7636 compliant)
+- **Security**: 
+  - PKCE prevents authorization code interception attacks
+  - Single-use authorization codes
+  - State parameter for CSRF protection
+  - Code verifier proves authorization request origin
 - **Use Case**: Vue.js frontend, React apps, Angular apps, any SPA
 - **Redirect URIs**: 
   - `http://localhost:5173/auth/callback` (development)
-  - `https://app.example.com/auth/callback` (production)
+  - `https://app.example.com/auth/callback` (production - update in DbSeeder)
 
 #### 2. Postman/Testing Client (Confidential)
 - **Client ID**: `multitenant-etl-postman`
-- **Client Secret**: Set in `appsettings` under `Seeding:OAuthClientSecret`
+- **Client Secret**: Set in user secrets under `Seeding:OAuthClientSecret`
 - **Flow**: Password Grant, Refresh Token
-- **Use Case**: API testing, machine-to-machine
+- **Use Case**: API testing with Postman, machine-to-machine communication
 
 ### Available Scopes
 
-- `openid` - OpenID Connect authentication
+- `openid` - OpenID Connect authentication (required)
 - `email` - User's email address
 - `profile` - User's profile info (name, etc.)
-- `roles` - User's roles
+- `roles` - User's roles (SuperAdmin, Admin, User)
 - `api` - Access to API resources
-- `offline_access` - Refresh token support
+- `offline_access` - Refresh token support (7-day lifetime)
+
+### User Roles & Permissions
+
+#### Roles
+- **SuperAdmin**: System-wide administration, tenant management, user management across all tenants
+- **Admin**: Tenant-level administration, user management within tenant, full pipeline operations
+- **User**: Access to pipelines, connectors, transformations, and executions within their tenant
+
+#### Permissions (defined in `Domain/Constants/Permissions.cs`)
+- **Users**: `UsersCreate`, `UsersRead`, `UsersUpdate`, `UsersDelete`
+- **Tenants**: `TenantsCreate`, `TenantsRead`, `TenantsUpdate`, `TenantsDelete`
+- Additional permissions can be added for pipelines, connectors, etc.
+
+#### Policies (defined in `Domain/Constants/Policies.cs`)
+- `RequirePermission` - Permission-based authorization
+- `RequireTenantAccess` - Resource-based authorization for tenant access
 
 ## 📡 API Endpoints
 
@@ -203,16 +270,32 @@ Two OAuth clients are seeded by default:
 
 ## 🧪 Testing
 
-### Testing with SPA (Authorization Code + PKCE)
+### Testing with SPA (Authorization Code + PKCE) - **Recommended**
 
 The recommended way to test is through the Vue.js frontend:
 
-1. Start the API: `dotnet run` (from `src/MultiTenantETL.API`)
-2. Start the frontend: `npm run dev` (from `MultiTenantETL.Vue`)
-3. Navigate to `http://localhost:5173/login`
-4. Login with: `admin@multitenant-etl.com` / `YOUR_ADMIN_PASSWORD`
+1. Start the API: 
+   ```bash
+   cd src/MultiTenantETL.API
+   dotnet run
+   ```
 
-The frontend implements the full OAuth 2.0 Authorization Code Flow with PKCE. See `MultiTenantETL.Vue/docs/OAUTH_PKCE.md` for implementation details.
+2. Start the frontend (in a separate terminal):
+   ```bash
+   cd MultiTenantETL.Vue
+   npm run dev
+   ```
+
+3. Navigate to `http://localhost:5173/login`
+
+4. Login with:
+   - **Email**: `admin@multitenant-etl.com`
+   - **Password**: Your `Seeding:AdminPassword` from user secrets
+
+The frontend implements the full OAuth 2.0 Authorization Code Flow with PKCE:
+- Login → Browser redirect → Authorization → Callback → Token exchange → Dashboard
+- PKCE utilities in `src/utils/pkce.js` generate code verifier/challenge
+- See `MultiTenantETL.Vue/docs/OAUTH_PKCE.md` for detailed implementation
 
 ### Testing with Postman (Password Grant)
 
@@ -261,33 +344,49 @@ See `MultiTenantETL.Vue/docs/OAUTH_PKCE.md` for manual testing instructions with
 
 ## 🔒 Security Features
 
-- ✅ Password hashing with BCrypt.Net (ASP.NET Core Identity)
-- ✅ Email confirmation required for new accounts
-- ✅ Refresh token rotation and revocation
-- ✅ Token revocation on password change and logout
-- ✅ Account lockout after failed login attempts (5 attempts, 15-minute lockout)
-- ✅ Password validation (min 8 chars, uppercase, lowercase, digit, special char)
-- ✅ Short-lived access tokens (15 minutes)
-- ✅ Long-lived refresh tokens (7 days)
-- ✅ Rate limiting on authentication endpoints (AspNetCoreRateLimit)
-- ✅ CORS configuration for frontend origins
-- ✅ Security headers middleware (X-Content-Type-Options, X-Frame-Options, etc.)
-- ✅ Input sanitization utilities
-- ✅ Email enumeration prevention
-- ✅ Permission-based authorization with custom policies
+### Authentication & Authorization
+- ✅ **OAuth 2.0 PKCE**: Proof Key for Code Exchange prevents authorization code interception (RFC 7636)
+- ✅ **Public Client Support**: No client secret required for SPAs
+- ✅ **Single-use Authorization Codes**: Codes can only be exchanged once for tokens
+- ✅ **State Parameter**: CSRF protection for OAuth flows
+- ✅ **BCrypt Password Hashing**: Secure password storage with BCrypt.Net-Next 4.0.3
+- ✅ **Permission-Based Authorization**: Custom handlers for fine-grained access control
+- ✅ **Resource-Based Authorization**: TenantResourceAuthorizationHandler for tenant access
+
+### Token Management
+- ✅ **Short-lived Access Tokens**: 15-minute lifetime
+- ✅ **Long-lived Refresh Tokens**: 7-day lifetime with rotation
+- ✅ **Token Revocation**: Automatic revocation on password change and logout
+- ✅ **Background Cleanup**: Quartz jobs for expired token cleanup
+
+### Account Security
+- ✅ **Email Confirmation**: Required for new accounts
+- ✅ **Account Lockout**: 5 failed attempts, 15-minute lockout duration
+- ✅ **Password Requirements**: Min 8 chars, uppercase, lowercase, digit, special character
+- ✅ **Email Enumeration Prevention**: Consistent responses for security
+
+### API Security
+- ✅ **Rate Limiting**: AspNetCoreRateLimit 5.0.0 on authentication endpoints
+- ✅ **CORS Configuration**: Configured for `http://localhost:5173` (Vue dev server)
+- ✅ **Security Headers**: X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy
+- ✅ **Input Sanitization**: Utilities for preventing injection attacks
 
 ## 🗄️ Database Schema
 
-### Key Tables
+### Key Tables (snake_case naming convention)
 
-- `users` - ASP.NET Identity users with multi-tenant support
-- `roles` - Application roles with custom permissions
-- `Tenants` - Tenant organizations
-- `UserTenants` - Many-to-many relationship between users and tenants
-- `OpenIddictApplications` - OAuth clients
-- `OpenIddictTokens` - Issued tokens (for refresh token storage)
+- `users` - ASP.NET Identity users with multi-tenant support (ApplicationUser)
+- `roles` - Application roles (ApplicationRole) with custom permissions
+- `tenants` - Tenant organizations (Tenant entity in Domain layer)
+- `user_tenants` - Many-to-many relationship between users and tenants (UserTenant)
+- `OpenIddictApplications` - OAuth clients (multitenant-etl-spa, multitenant-etl-postman)
+- `OpenIddictTokens` - Issued tokens (access tokens, refresh tokens)
 - `OpenIddictAuthorizations` - Authorization grants
-- `OpenIddictScopes` - Available OAuth scopes
+- `OpenIddictScopes` - Available OAuth scopes (openid, email, profile, roles, api, offline_access)
+
+### Migrations
+
+All migrations are located in `src/MultiTenantETL.Infrastructure/Migrations/` and managed by Entity Framework Core 8.0.
 
 ## 📧 Email Configuration
 
@@ -342,30 +441,85 @@ Seeding__OAuthClientSecret="your-oauth-secret"
 
 ## 🛠️ Development
 
-### Running Migrations
-
-Create a new migration:
+### Common Commands
 
 ```bash
+# Restore dependencies
+dotnet restore
+
+# Build solution
+dotnet build
+
+# Run API (from src/MultiTenantETL.API)
+dotnet run
+
+# Run with watch (auto-reload)
+dotnet watch run
+
+# Run all tests
+dotnet test
+```
+
+### Database Migrations
+
+```bash
+# Create new migration
 dotnet ef migrations add MigrationName --project src/MultiTenantETL.Infrastructure --startup-project src/MultiTenantETL.API
+
+# Apply migrations
+dotnet ef database update --project src/MultiTenantETL.Infrastructure --startup-project src/MultiTenantETL.API
+
+# Remove last migration (if not applied)
+dotnet ef migrations remove --project src/MultiTenantETL.Infrastructure --startup-project src/MultiTenantETL.API
+
+# List migrations
+dotnet ef migrations list --project src/MultiTenantETL.Infrastructure --startup-project src/MultiTenantETL.API
 ```
 
-Apply migrations:
+### User Secrets Management
 
 ```bash
-dotnet ef database update --project src/MultiTenantETL.Infrastructure --startup-project src/MultiTenantETL.API
+# Set user secrets (from src/MultiTenantETL.API)
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "your-connection-string"
+dotnet user-secrets set "Seeding:AdminPassword" "your-admin-password"
+dotnet user-secrets set "Seeding:OAuthClientSecret" "your-oauth-secret"
+dotnet user-secrets set "AzureCommunication:ConnectionString" "your-azure-connection"
+dotnet user-secrets set "AzureCommunication:SenderEmail" "noreply@yourdomain.com"
+
+# List user secrets
+dotnet user-secrets list
 ```
 
-### Project Structure
+### Project Components
 
-- **Controllers**: AuthenticationController (OAuth), AccountController (registration, password), UsersController, TenantsController
-- **Migrations**: EF Core database migrations in Infrastructure layer
-- **DbSeeder**: Initial data seeding (roles, permissions, admin user, OAuth clients, scopes)
-- **Identity**: ApplicationUser, ApplicationRole, UserTenant models in Infrastructure
-- **Domain**: Tenant entity, ITenantResource interface, constants (Roles, Permissions, Policies, ClaimTypes)
-- **Authorization**: PermissionAuthorizationHandler, TenantResourceAuthorizationHandler
-- **Services**: EmailService (Azure Communication), ClaimsService, TenantService, CurrentUserService
-- **Middleware**: SecurityHeadersMiddleware for HTTP security headers
+#### API Layer (`src/MultiTenantETL.API`)
+- **Controllers**: 
+  - `AuthenticationController` - OAuth 2.0 endpoints (not used directly, handled by OpenIddict)
+  - `AccountController` - Registration, password reset, email confirmation, logout, tenant switching
+  - `UsersController` - User management CRUD operations
+  - `TenantsController` - Tenant management CRUD operations
+- **Middleware**: `SecurityHeadersMiddleware` for HTTP security headers
+- **Configuration**: `Program.cs` with OpenIddict setup, DI, rate limiting, CORS
+
+#### Infrastructure Layer (`src/MultiTenantETL.Infrastructure`)
+- **Persistence**: `ApplicationDbContext` with EF Core and PostgreSQL
+- **Identity**: `ApplicationUser`, `ApplicationRole`, `UserTenant` models
+- **Services**: `EmailService`, `ClaimsService`, `TenantService`, `CurrentUserService`
+- **Authorization**: `PermissionAuthorizationHandler`, `TenantResourceAuthorizationHandler`
+- **Data**: `DbSeeder` for initial data (roles, permissions, admin user, OAuth clients, scopes)
+- **Migrations**: EF Core migrations
+- **Security**: `InputSanitizer` utilities
+
+#### Application Layer (`src/MultiTenantETL.Application`)
+- **Interfaces**: `IEmailService`, `ICurrentUserService`, `IClaimsService`, `ITenantService`
+- **DTOs**: `LoginRequest`, `RegisterRequest`, `AuthResponse`, `UserDto`, `TenantDto`
+- **Models**: `ErrorResponse`, `ErrorDetail`
+
+#### Domain Layer (`src/MultiTenantETL.Domain`)
+- **Entities**: `Tenant` (pure business entity)
+- **Interfaces**: `ITenantResource` (for authorization)
+- **Constants**: `Roles`, `Permissions`, `Policies`, `ClaimTypes`
+- **Enums**: `AuthErrorCode`
 
 ## 📝 License
 
