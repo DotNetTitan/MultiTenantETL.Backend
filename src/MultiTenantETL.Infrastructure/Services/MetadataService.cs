@@ -1,11 +1,18 @@
 using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Application.Metadata;
 using MultiTenantETL.Domain.Constants;
+using Microsoft.Extensions.Configuration;
 
 namespace MultiTenantETL.Infrastructure.Services;
 
 public class MetadataService : IMetadataService
 {
+    private readonly IConfiguration _configuration;
+
+    public MetadataService(IConfiguration configuration)
+    {
+        _configuration = configuration;
+    }
     public MetadataDto GetAllMetadata()
     {
         return new MetadataDto
@@ -14,7 +21,8 @@ public class MetadataService : IMetadataService
             TransformationTypes = GetTransformationTypes(),
             DataTypes = GetDataTypes(),
             ScheduleFrequencies = GetScheduleFrequencies(),
-            DaysOfWeek = GetDaysOfWeek()
+            DaysOfWeek = GetDaysOfWeek(),
+            AppConstants = GetAppConstants()
         };
     }
 
@@ -96,5 +104,38 @@ public class MetadataService : IMetadataService
         return MetadataConstants.DaysOfWeek.Days
             .Select(d => new DayOfWeekDto { Value = d.Value, LabelKey = d.LabelKey, ShortKey = d.ShortKey })
             .ToList();
+    }
+
+    public AppConstantsDto GetAppConstants()
+    {
+        // Get OAuth client ID from configuration (fallback to default)
+        var clientId = _configuration["OpenIddict:Clients:Spa:ClientId"] ?? "multitenant-etl-spa";
+
+        return new AppConstantsDto
+        {
+            Roles = new RolesDto
+            {
+                SuperAdmin = Roles.SuperAdmin,
+                TenantAdmin = Roles.TenantAdmin,
+                User = Roles.User,
+                Viewer = Roles.Viewer
+            },
+            OAuthConfig = new OAuthConfigDto
+            {
+                ClientId = clientId,
+                Scopes = MetadataConstants.OAuth.DefaultScopes.ToList(),
+                AuthorizeEndpoint = MetadataConstants.OAuth.AuthorizeEndpoint,
+                TokenEndpoint = MetadataConstants.OAuth.TokenEndpoint,
+                RevokeEndpoint = MetadataConstants.OAuth.RevokeEndpoint
+            },
+            SupportedLanguages = MetadataConstants.SupportedLanguages.Languages
+                .Select(l => new SupportedLanguageDto 
+                { 
+                    Code = l.Code, 
+                    Name = l.Name, 
+                    NativeName = l.NativeName 
+                })
+                .ToList()
+        };
     }
 }

@@ -81,4 +81,15 @@ public class MetadataController : ControllerBase
         var days = _metadataService.GetDaysOfWeek();
         return Ok(days);
     }
+
+    /// <summary>
+    /// Get application constants (roles, OAuth config, supported languages)
+    /// </summary>
+    [HttpGet("app-constants")]
+    [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Any)]
+    public IActionResult GetAppConstants()
+    {
+        var constants = _metadataService.GetAppConstants();
+        return Ok(constants);
+    }
 }

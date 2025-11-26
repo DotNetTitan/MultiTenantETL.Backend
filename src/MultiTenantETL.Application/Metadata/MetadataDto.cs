@@ -7,6 +7,7 @@ public class MetadataDto
     public List<DataTypeDto> DataTypes { get; set; } = new();
     public List<ScheduleFrequencyDto> ScheduleFrequencies { get; set; } = new();
     public List<DayOfWeekDto> DaysOfWeek { get; set; } = new();
+    public AppConstantsDto AppConstants { get; set; } = new();
 }
 
 public class ConnectorConfigDto

@@ -206,4 +206,40 @@ public static class MetadataConstants
             ("sunday", "pipelines.sunday", "common.sun")
         };
     }
+
+    public static class OAuth
+    {
+        /// <summary>
+        /// Default OAuth scopes for the application
+        /// </summary>
+        public static readonly string[] DefaultScopes = new[]
+        {
+            "openid",
+            "email",
+            "profile",
+            "roles",
+            "api",
+            "offline_access"
+        };
+
+        /// <summary>
+        /// OAuth endpoint paths (relative to base URL)
+        /// </summary>
+        public const string AuthorizeEndpoint = "/connect/authorize";
+        public const string TokenEndpoint = "/connect/token";
+        public const string RevokeEndpoint = "/connect/revoke";
+    }
+
+    public static class SupportedLanguages
+    {
+        public static readonly (string Code, string Name, string NativeName)[] Languages = new[]
+        {
+            ("en", "English", "English"),
+            ("es", "Spanish", "Español"),
+            ("fr", "French", "Français"),
+            ("de", "German", "Deutsch"),
+            ("it", "Italian", "Italiano"),
+            ("pt", "Portuguese", "Português")
+        };
+    }
 }

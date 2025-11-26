@@ -10,4 +10,5 @@ public interface IMetadataService
     List<DataTypeDto> GetDataTypes();
     List<ScheduleFrequencyDto> GetScheduleFrequencies();
     List<DayOfWeekDto> GetDaysOfWeek();
+    AppConstantsDto GetAppConstants();
 }
