@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using MultiTenantETL.Application.Interfaces;
 
@@ -7,6 +8,7 @@ namespace MultiTenantETL.API.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [AllowAnonymous]
+[EnableCors("AllowFrontend")]
 public class MetadataController : ControllerBase
 {
     private readonly IMetadataService _metadataService;

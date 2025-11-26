@@ -45,6 +45,27 @@ public static class MetadataConstants
                 } 
             }
         };
+
+        /// <summary>
+        /// Provider icons and colors for UI display
+        /// </summary>
+        public static readonly Dictionary<string, (string Icon, string Color)> ProviderMetadata = new()
+        {
+            // Database providers
+            { Constants.ConnectorProviders.SqlServer, ("mdi-database", "blue-darken-2") },
+            { Constants.ConnectorProviders.PostgreSQL, ("mdi-database", "blue-darken-2") },
+            { Constants.ConnectorProviders.MySQL, ("mdi-database", "orange-darken-1") },
+            
+            // File providers
+            { Constants.ConnectorProviders.Local, ("mdi-folder", "grey-darken-1") },
+            { Constants.ConnectorProviders.FTP, ("mdi-server-network", "green-darken-1") },
+            { Constants.ConnectorProviders.SFTP, ("mdi-server-security", "green-darken-2") },
+            { Constants.ConnectorProviders.S3, ("mdi-aws", "orange-darken-2") },
+            { Constants.ConnectorProviders.AzureBlob, ("mdi-microsoft-azure", "blue-lighten-1") },
+            
+            // API providers
+            { Constants.ConnectorProviders.REST, ("mdi-api", "purple-darken-1") }
+        };
     }
 
     public static class ConnectorDirections

@@ -37,6 +37,12 @@ public class MetadataService : IMetadataService
             Providers = MetadataConstants.ConnectorProviders.ProvidersByType
                 .ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToList()),
             
+            ProviderMetadata = MetadataConstants.ConnectorProviders.ProviderMetadata
+                .ToDictionary(
+                    kvp => kvp.Key, 
+                    kvp => new ProviderMetadataDto { Icon = kvp.Value.Icon, Color = kvp.Value.Color }
+                ),
+            
             Directions = MetadataConstants.ConnectorDirections.Directions
                 .Select(d => new DirectionDto { Value = d.Value, LabelKey = d.LabelKey, Icon = d.Icon })
                 .ToList(),
