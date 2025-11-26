@@ -17,6 +17,9 @@ using OpenIddict.Abstractions;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Configure logging to suppress watch debug logs
+builder.Logging.AddFilter("Microsoft.AspNetCore.Watch", LogLevel.None);
+
 // Response Caching
 builder.Services.AddResponseCaching();
 
@@ -319,9 +322,23 @@ builder.Services.AddSingleton<IEncryptionService, MultiTenantETL.Infrastructure.
 builder.Services.AddScoped<MultiTenantETL.Application.Connectors.IConnectorService,
     MultiTenantETL.Infrastructure.Services.ConnectorService>();
 builder.Services.AddScoped<MultiTenantETL.Application.Connectors.IConnectionTester,
-    MultiTenantETL.Infrastructure.Services.ConnectionTester>();
+    MultiTenantETL.Infrastructure.Services.ConnectionTesting.ConnectionTester>();
 builder.Services.AddScoped<MultiTenantETL.Application.Connectors.ISchemaDetector,
     MultiTenantETL.Infrastructure.Services.SchemaDetector>();
+
+// Connection Tester Services
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.Services.ConnectionTesting.Database.IDatabaseConnectionTester,
+    MultiTenantETL.Infrastructure.Services.ConnectionTesting.Database.DatabaseConnectionTester>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.Services.ConnectionTesting.Storage.IStorageConnectionTester,
+    MultiTenantETL.Infrastructure.Services.ConnectionTesting.Storage.StorageConnectionTester>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.Services.ConnectionTesting.Api.IApiConnectionTester,
+    MultiTenantETL.Infrastructure.Services.ConnectionTesting.Api.ApiConnectionTester>();
+
+// Storage Connection Testers
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.Services.ConnectionTesting.Storage.AzureBlobConnectionTester>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.Services.ConnectionTesting.Storage.S3ConnectionTester>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.Services.ConnectionTesting.Storage.FtpConnectionTester>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.Services.ConnectionTesting.Storage.SftpConnectionTester>();
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -370,14 +387,15 @@ if (app.Environment.IsDevelopment())
     using (var scope = app.Services.CreateScope())
     {
         var services = scope.ServiceProvider;
+        var logger = services.GetRequiredService<ILogger<Program>>();
         try
         {
             await MultiTenantETL.Infrastructure.Data.DbSeeder.SeedAsync(services);
-            Console.WriteLine("Database seeding completed successfully!");
+            logger.LogInformation("Database seeding completed successfully");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"An error occurred while seeding the database: {ex.Message}");
+            logger.LogError(ex, "An error occurred while seeding the database");
         }
     }
 }
