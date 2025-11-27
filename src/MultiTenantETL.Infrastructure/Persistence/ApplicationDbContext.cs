@@ -22,6 +22,7 @@ namespace MultiTenantETL.Infrastructure.Persistence
         public DbSet<AuditLog> AuditLogs { get; set; }
         public DbSet<Connector> Connectors { get; set; }
         public DbSet<Transformation> Transformations { get; set; }
+        public DbSet<Pipeline> Pipelines { get; set; }
 
         // OpenIddict entities
         public DbSet<OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreApplication> OpenIddictApplications { get; set; }
@@ -133,6 +134,45 @@ namespace MultiTenantETL.Infrastructure.Persistence
 
             builder.Entity<Transformation>()
                 .Property(t => t.ConfigJson)
+                .HasColumnType("jsonb");
+
+            // Pipelines configuration
+            builder.Entity<Pipeline>()
+                .ToTable("pipelines");
+
+            builder.Entity<Pipeline>()
+                .HasOne(p => p.Tenant)
+                .WithMany()
+                .HasForeignKey(p => p.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<Pipeline>()
+                .HasOne(p => p.SourceConnector)
+                .WithMany()
+                .HasForeignKey(p => p.SourceConnectorId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<Pipeline>()
+                .HasOne(p => p.DestinationConnector)
+                .WithMany()
+                .HasForeignKey(p => p.DestinationConnectorId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<Pipeline>()
+                .HasIndex(p => p.TenantId);
+
+            builder.Entity<Pipeline>()
+                .HasIndex(p => p.Status);
+
+            builder.Entity<Pipeline>()
+                .HasIndex(p => new { p.TenantId, p.Name });
+
+            builder.Entity<Pipeline>()
+                .Property(p => p.FieldMappingsJson)
+                .HasColumnType("jsonb");
+
+            builder.Entity<Pipeline>()
+                .Property(p => p.ScheduleJson)
                 .HasColumnType("jsonb");
         }
     }
