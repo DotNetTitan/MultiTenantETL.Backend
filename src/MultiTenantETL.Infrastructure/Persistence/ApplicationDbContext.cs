@@ -21,6 +21,7 @@ namespace MultiTenantETL.Infrastructure.Persistence
         public DbSet<UserTenant> UserTenants { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
         public DbSet<Connector> Connectors { get; set; }
+        public DbSet<Transformation> Transformations { get; set; }
 
         // OpenIddict entities
         public DbSet<OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreApplication> OpenIddictApplications { get; set; }
@@ -109,6 +110,29 @@ namespace MultiTenantETL.Infrastructure.Persistence
 
             builder.Entity<Connector>()
                 .Property(c => c.SchemaJson)
+                .HasColumnType("jsonb");
+
+            // Transformations configuration
+            builder.Entity<Transformation>()
+                .ToTable("transformations");
+
+            builder.Entity<Transformation>()
+                .HasOne(t => t.Tenant)
+                .WithMany()
+                .HasForeignKey(t => t.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<Transformation>()
+                .HasIndex(t => t.TenantId);
+
+            builder.Entity<Transformation>()
+                .HasIndex(t => t.Type);
+
+            builder.Entity<Transformation>()
+                .HasIndex(t => new { t.TenantId, t.Name });
+
+            builder.Entity<Transformation>()
+                .Property(t => t.ConfigJson)
                 .HasColumnType("jsonb");
         }
     }

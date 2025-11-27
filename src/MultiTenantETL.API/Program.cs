@@ -326,6 +326,10 @@ builder.Services.AddScoped<MultiTenantETL.Application.Connectors.IConnectionTest
 builder.Services.AddScoped<MultiTenantETL.Application.Connectors.ISchemaDetector,
     MultiTenantETL.Infrastructure.Services.SchemaDetector>();
 
+// Transformation Services
+builder.Services.AddScoped<MultiTenantETL.Application.Transformations.ITransformationService,
+    MultiTenantETL.Infrastructure.Services.TransformationService>();
+
 // Connection Tester Services
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.Services.ConnectionTesting.Database.IDatabaseConnectionTester,
     MultiTenantETL.Infrastructure.Services.ConnectionTesting.Database.DatabaseConnectionTester>();

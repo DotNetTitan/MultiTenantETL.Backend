@@ -77,4 +77,9 @@ public static class AuditActions
         public const string Updated = "Transformation.Updated";
         public const string Deleted = "Transformation.Deleted";
     }
+    
+    // Backward compatibility constants for transformations
+    public const string TransformationCreated = "Transformation.Created";
+    public const string TransformationUpdated = "Transformation.Updated";
+    public const string TransformationDeleted = "Transformation.Deleted";
 }
