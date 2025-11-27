@@ -1,0 +1,16 @@
+namespace MultiTenantETL.Application.Executions.Models;
+
+public class ExecutionStatsDto
+{
+    public int TotalExecutions { get; set; }
+    public int RunningExecutions { get; set; }
+    public int CompletedExecutions { get; set; }
+    public int FailedExecutions { get; set; }
+    public int CancelledExecutions { get; set; }
+    
+    public decimal SuccessRate { get; set; }
+    public long AverageDurationMs { get; set; }
+    public long TotalRecordsProcessed { get; set; }
+    
+    public DateTime? LastExecutionTime { get; set; }
+}

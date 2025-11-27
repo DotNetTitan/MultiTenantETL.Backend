@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Common.Models;
+using MultiTenantETL.Application.Executions;
+using MultiTenantETL.Application.Executions.Models;
 using MultiTenantETL.Application.Pipelines;
 using MultiTenantETL.Application.Pipelines.Models;
 using MultiTenantETL.Domain.Constants;
@@ -15,15 +18,21 @@ namespace MultiTenantETL.API.Controllers;
 public class PipelinesController : ControllerBase
 {
     private readonly IPipelineService _pipelineService;
+    private readonly IExecutionService _executionService;
+    private readonly ICurrentUserService _currentUserService;
     private readonly IAuthorizationService _authorizationService;
     private readonly ILogger<PipelinesController> _logger;
 
     public PipelinesController(
         IPipelineService pipelineService,
+        IExecutionService executionService,
+        ICurrentUserService currentUserService,
         IAuthorizationService authorizationService,
         ILogger<PipelinesController> logger)
     {
         _pipelineService = pipelineService;
+        _executionService = executionService;
+        _currentUserService = currentUserService;
         _authorizationService = authorizationService;
         _logger = logger;
     }
@@ -282,6 +291,62 @@ public class PipelinesController : ControllerBase
             return StatusCode(500, new ErrorResponse(
                 AuthErrorCode.InternalError,
                 "An error occurred while toggling the pipeline status",
+                new[] { ex.Message }
+            ));
+        }
+    }
+
+    /// <summary>
+    /// Execute a pipeline
+    /// </summary>
+    [HttpPost("{id}/execute")]
+    [ProducesResponseType(typeof(ExecutionResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> Execute(Guid id)
+    {
+        try
+        {
+            var authResult = await _authorizationService.AuthorizeAsync(
+                User,
+                null,
+                new PermissionRequirement(Permissions.Pipelines.Execute));
+
+            if (!authResult.Succeeded)
+            {
+                return Forbid();
+            }
+
+            var userId = _currentUserService.GetUserId();
+            var execution = await _executionService.StartExecutionAsync(id, "Manual", userId);
+            
+            return Ok(execution);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new ErrorResponse(
+                AuthErrorCode.UserNotFound,
+                ex.Message
+            ));
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ErrorResponse(
+                AuthErrorCode.ValidationError,
+                ex.Message
+            ));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error executing pipeline {PipelineId}", id);
+            return StatusCode(500, new ErrorResponse(
+                AuthErrorCode.InternalError,
+                "An error occurred while executing the pipeline",
                 new[] { ex.Message }
             ));
         }
