@@ -255,4 +255,18 @@ public class TransformationService : ITransformationService
             CreatedAt = transformation.CreatedAt
         };
     }
+
+    public async Task<IEnumerable<Transformation>> GetByPipelineIdAsync(Guid pipelineId, CancellationToken cancellationToken = default)
+    {
+        var tenantId = _currentUserService.GetTenantId();
+
+        _logger.LogInformation("Getting transformations for pipeline {PipelineId}", pipelineId);
+
+        var transformations = await _context.Transformations
+            .Where(t => t.PipelineId == pipelineId && t.TenantId == tenantId && t.IsEnabled)
+            .OrderBy(t => t.Order)
+            .ToListAsync(cancellationToken);
+
+        return transformations;
+    }
 }
