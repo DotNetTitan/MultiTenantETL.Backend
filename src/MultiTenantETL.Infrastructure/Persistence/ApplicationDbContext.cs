@@ -23,6 +23,9 @@ namespace MultiTenantETL.Infrastructure.Persistence
         public DbSet<Connector> Connectors { get; set; }
         public DbSet<Transformation> Transformations { get; set; }
         public DbSet<Pipeline> Pipelines { get; set; }
+        public DbSet<PipelineExecution> PipelineExecutions { get; set; }
+        public DbSet<ExecutionLogEntry> ExecutionLogs { get; set; }
+        public DbSet<ExecutionBatch> ExecutionBatches { get; set; }
 
         // OpenIddict entities
         public DbSet<OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreApplication> OpenIddictApplications { get; set; }
@@ -173,6 +176,100 @@ namespace MultiTenantETL.Infrastructure.Persistence
 
             builder.Entity<Pipeline>()
                 .Property(p => p.ScheduleJson)
+                .HasColumnType("jsonb");
+
+            // Pipeline Executions configuration
+            builder.Entity<PipelineExecution>()
+                .ToTable("pipeline_executions");
+
+            builder.Entity<PipelineExecution>()
+                .HasOne(e => e.Pipeline)
+                .WithMany()
+                .HasForeignKey(e => e.PipelineId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<PipelineExecution>()
+                .HasOne(e => e.Tenant)
+                .WithMany()
+                .HasForeignKey(e => e.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<PipelineExecution>()
+                .HasIndex(e => e.PipelineId);
+
+            builder.Entity<PipelineExecution>()
+                .HasIndex(e => e.TenantId);
+
+            builder.Entity<PipelineExecution>()
+                .HasIndex(e => e.Status);
+
+            builder.Entity<PipelineExecution>()
+                .HasIndex(e => e.StartTime);
+
+            builder.Entity<PipelineExecution>()
+                .Property(e => e.SummaryJson)
+                .HasColumnType("jsonb");
+
+            builder.Entity<PipelineExecution>()
+                .Property(e => e.MetadataJson)
+                .HasColumnType("jsonb");
+
+            // Execution Logs configuration
+            builder.Entity<ExecutionLogEntry>()
+                .ToTable("execution_logs");
+
+            builder.Entity<ExecutionLogEntry>()
+                .HasOne(l => l.Execution)
+                .WithMany()
+                .HasForeignKey(l => l.ExecutionId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<ExecutionLogEntry>()
+                .HasOne(l => l.Tenant)
+                .WithMany()
+                .HasForeignKey(l => l.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<ExecutionLogEntry>()
+                .HasIndex(l => l.ExecutionId);
+
+            builder.Entity<ExecutionLogEntry>()
+                .HasIndex(l => l.TenantId);
+
+            builder.Entity<ExecutionLogEntry>()
+                .HasIndex(l => l.Timestamp);
+
+            builder.Entity<ExecutionLogEntry>()
+                .HasIndex(l => l.Level);
+
+            // Execution Batches configuration
+            builder.Entity<ExecutionBatch>()
+                .ToTable("execution_batches");
+
+            builder.Entity<ExecutionBatch>()
+                .HasOne(b => b.Execution)
+                .WithMany()
+                .HasForeignKey(b => b.ExecutionId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<ExecutionBatch>()
+                .HasOne(b => b.Tenant)
+                .WithMany()
+                .HasForeignKey(b => b.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<ExecutionBatch>()
+                .HasIndex(b => b.ExecutionId);
+
+            builder.Entity<ExecutionBatch>()
+                .HasIndex(b => b.TenantId);
+
+            builder.Entity<ExecutionBatch>()
+                .HasIndex(b => new { b.ExecutionId, b.BatchIndex })
+                .IsUnique();
+
+            builder.Entity<ExecutionBatch>()
+                .Property(b => b.CheckpointInfoJson)
                 .HasColumnType("jsonb");
         }
     }

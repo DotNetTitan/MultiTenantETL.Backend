@@ -2,30 +2,57 @@ namespace MultiTenantETL.Domain.ValueObjects;
 
 public class ExecutionLog
 {
-    public DateTime Timestamp { get; set; }
-    public string Level { get; set; } = string.Empty; // Info, Warning, Error
-    public string Message { get; set; } = string.Empty;
+    public DateTimeOffset Timestamp { get; set; }
+    public required string Level { get; set; } // Info, Warning, Error, Debug
+    public required string Source { get; set; }
+    public required string Message { get; set; }
     public string? Details { get; set; }
 
-    public ExecutionLog()
+    public static ExecutionLog Info(string message, string? details = null, string source = "System")
     {
-        Timestamp = DateTime.UtcNow;
+        return new ExecutionLog
+        {
+            Timestamp = DateTimeOffset.UtcNow,
+            Level = "Info",
+            Source = source,
+            Message = message,
+            Details = details
+        };
     }
 
-    public ExecutionLog(string level, string message, string? details = null)
+    public static ExecutionLog Warning(string message, string? details = null, string source = "System")
     {
-        Timestamp = DateTime.UtcNow;
-        Level = level;
-        Message = message;
-        Details = details;
+        return new ExecutionLog
+        {
+            Timestamp = DateTimeOffset.UtcNow,
+            Level = "Warning",
+            Source = source,
+            Message = message,
+            Details = details
+        };
     }
 
-    public static ExecutionLog Info(string message, string? details = null)
-        => new("Info", message, details);
+    public static ExecutionLog Error(string message, string? details = null, string source = "System")
+    {
+        return new ExecutionLog
+        {
+            Timestamp = DateTimeOffset.UtcNow,
+            Level = "Error",
+            Source = source,
+            Message = message,
+            Details = details
+        };
+    }
 
-    public static ExecutionLog Warning(string message, string? details = null)
-        => new("Warning", message, details);
-
-    public static ExecutionLog Error(string message, string? details = null)
-        => new("Error", message, details);
+    public static ExecutionLog Debug(string message, string? details = null, string source = "System")
+    {
+        return new ExecutionLog
+        {
+            Timestamp = DateTimeOffset.UtcNow,
+            Level = "Debug",
+            Source = source,
+            Message = message,
+            Details = details
+        };
+    }
 }

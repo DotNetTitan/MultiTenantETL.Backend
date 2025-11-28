@@ -9,8 +9,8 @@ public class ExecutionStatsDto
     public int CancelledExecutions { get; set; }
     
     public decimal SuccessRate { get; set; }
-    public long AverageDurationMs { get; set; }
+    public TimeSpan? AverageDuration { get; set; }
     public long TotalRecordsProcessed { get; set; }
     
-    public DateTime? LastExecutionTime { get; set; }
+    public DateTimeOffset? LastExecutionTime { get; set; }
 }

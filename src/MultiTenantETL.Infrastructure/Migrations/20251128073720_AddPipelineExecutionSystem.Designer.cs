@@ -13,8 +13,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MultiTenantETL.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20251127080038_AddPipelineExecution")]
-    partial class AddPipelineExecution
+    [Migration("20251128073720_AddPipelineExecutionSystem")]
+    partial class AddPipelineExecutionSystem
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -275,6 +275,107 @@ namespace MultiTenantETL.Infrastructure.Migrations
                     b.ToTable("connectors", (string)null);
                 });
 
+            modelBuilder.Entity("MultiTenantETL.Domain.Entities.ExecutionBatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("BatchIndex")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("CheckpointInfoJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("EndedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ExecutionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("RowsCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RowsFailed")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RowsSucceeded")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExecutionId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("ExecutionId", "BatchIndex")
+                        .IsUnique();
+
+                    b.ToTable("execution_batches", (string)null);
+                });
+
+            modelBuilder.Entity("MultiTenantETL.Domain.Entities.ExecutionLogEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("BatchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Details")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("ExecutionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Level")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("Timestamp")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExecutionId");
+
+                    b.HasIndex("Level");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("Timestamp");
+
+                    b.ToTable("execution_logs", (string)null);
+                });
+
             modelBuilder.Entity("MultiTenantETL.Domain.Entities.Pipeline", b =>
                 {
                     b.Property<Guid>("Id")
@@ -348,6 +449,78 @@ namespace MultiTenantETL.Infrastructure.Migrations
                     b.HasIndex("TenantId", "Name");
 
                     b.ToTable("pipelines", (string)null);
+                });
+
+            modelBuilder.Entity("MultiTenantETL.Domain.Entities.PipelineExecution", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("BatchCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<TimeSpan?>("Duration")
+                        .HasColumnType("interval");
+
+                    b.Property<DateTimeOffset?>("EndTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("text");
+
+                    b.Property<string>("MetadataJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<Guid>("PipelineId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("ProgressPercent")
+                        .HasColumnType("numeric");
+
+                    b.Property<long>("RecordsFailed")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("RecordsProcessed")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("RecordsSucceeded")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("StartTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("SummaryJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TriggeredBy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("TriggeredByUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PipelineId");
+
+                    b.HasIndex("StartTime");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("pipeline_executions", (string)null);
                 });
 
             modelBuilder.Entity("MultiTenantETL.Domain.Entities.Tenant", b =>
@@ -810,6 +983,44 @@ namespace MultiTenantETL.Infrastructure.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("MultiTenantETL.Domain.Entities.ExecutionBatch", b =>
+                {
+                    b.HasOne("MultiTenantETL.Domain.Entities.PipelineExecution", "Execution")
+                        .WithMany()
+                        .HasForeignKey("ExecutionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MultiTenantETL.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Execution");
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("MultiTenantETL.Domain.Entities.ExecutionLogEntry", b =>
+                {
+                    b.HasOne("MultiTenantETL.Domain.Entities.PipelineExecution", "Execution")
+                        .WithMany()
+                        .HasForeignKey("ExecutionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MultiTenantETL.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Execution");
+
+                    b.Navigation("Tenant");
+                });
+
             modelBuilder.Entity("MultiTenantETL.Domain.Entities.Pipeline", b =>
                 {
                     b.HasOne("MultiTenantETL.Domain.Entities.Connector", "DestinationConnector")
@@ -833,6 +1044,25 @@ namespace MultiTenantETL.Infrastructure.Migrations
                     b.Navigation("DestinationConnector");
 
                     b.Navigation("SourceConnector");
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("MultiTenantETL.Domain.Entities.PipelineExecution", b =>
+                {
+                    b.HasOne("MultiTenantETL.Domain.Entities.Pipeline", "Pipeline")
+                        .WithMany()
+                        .HasForeignKey("PipelineId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MultiTenantETL.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Pipeline");
 
                     b.Navigation("Tenant");
                 });

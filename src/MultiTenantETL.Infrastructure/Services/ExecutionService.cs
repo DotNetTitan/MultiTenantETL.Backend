@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Common.Interfaces;
@@ -55,12 +54,6 @@ public class ExecutionService : IExecutionService
             throw new InvalidOperationException("Cannot execute an inactive pipeline");
         }
 
-        // Create initial log
-        var initialLogs = new List<ExecutionLog>
-        {
-            ExecutionLog.Info("Pipeline execution queued", $"Pipeline: {pipeline.Name}")
-        };
-
         // Create execution record
         var execution = new PipelineExecution
         {
@@ -68,18 +61,35 @@ public class ExecutionService : IExecutionService
             PipelineId = pipelineId,
             TenantId = pipeline.TenantId,
             Status = "Queued",
-            StartTime = DateTime.UtcNow,
+            StartTime = DateTimeOffset.UtcNow,
             RecordsProcessed = 0,
             RecordsSucceeded = 0,
             RecordsFailed = 0,
             ProgressPercent = 0,
-            LogsJson = JsonSerializer.Serialize(initialLogs),
+            BatchCount = 0,
             TriggeredBy = triggeredBy,
             TriggeredByUserId = userId,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow
         };
 
-        _context.Set<PipelineExecution>().Add(execution);
+        _context.PipelineExecutions.Add(execution);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        // Create initial log entry
+        var logEntry = new ExecutionLogEntry
+        {
+            Id = Guid.NewGuid(),
+            ExecutionId = execution.Id,
+            TenantId = execution.TenantId,
+            Timestamp = DateTimeOffset.UtcNow,
+            Level = "Info",
+            Source = "System",
+            Message = "Pipeline execution queued",
+            Details = $"Pipeline: {pipeline.Name}",
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
+        _context.ExecutionLogs.Add(logEntry);
         await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation(
@@ -95,7 +105,7 @@ public class ExecutionService : IExecutionService
 
     public async Task<ExecutionResponse> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var execution = await _context.Set<PipelineExecution>()
+        var execution = await _context.PipelineExecutions
             .Include(e => e.Pipeline)
             .Include(e => e.Tenant)
             .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
@@ -121,7 +131,7 @@ public class ExecutionService : IExecutionService
     {
         var currentTenantId = _currentUserService.GetTenantId();
 
-        var query = _context.Set<PipelineExecution>()
+        var query = _context.PipelineExecutions
             .Include(e => e.Pipeline)
             .Where(e => e.TenantId == currentTenantId);
 
@@ -179,7 +189,7 @@ public class ExecutionService : IExecutionService
             Status = e.Status,
             StartTime = e.StartTime,
             EndTime = e.EndTime,
-            Duration = e.DurationMs,
+            Duration = e.Duration,
             RecordsProcessed = e.RecordsProcessed,
             ProgressPercent = e.ProgressPercent,
             TriggeredBy = e.TriggeredBy,
@@ -198,7 +208,7 @@ public class ExecutionService : IExecutionService
 
     public async Task<ExecutionResponse> CancelExecutionAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var execution = await _context.Set<PipelineExecution>()
+        var execution = await _context.PipelineExecutions
             .Include(e => e.Pipeline)
             .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
 
@@ -222,14 +232,23 @@ public class ExecutionService : IExecutionService
 
         // Update status
         execution.Status = "Cancelled";
-        execution.EndTime = DateTime.UtcNow;
-        execution.DurationMs = (long)(execution.EndTime.Value - execution.StartTime).TotalMilliseconds;
+        execution.EndTime = DateTimeOffset.UtcNow;
+        execution.Duration = execution.EndTime.Value - execution.StartTime;
 
-        // Add cancellation log
-        var logs = JsonSerializer.Deserialize<List<ExecutionLog>>(execution.LogsJson) ?? new List<ExecutionLog>();
-        logs.Add(ExecutionLog.Warning("Execution cancelled by user"));
-        execution.LogsJson = JsonSerializer.Serialize(logs);
+        // Add cancellation log entry
+        var logEntry = new ExecutionLogEntry
+        {
+            Id = Guid.NewGuid(),
+            ExecutionId = execution.Id,
+            TenantId = execution.TenantId,
+            Timestamp = DateTimeOffset.UtcNow,
+            Level = "Warning",
+            Source = "System",
+            Message = "Execution cancelled by user",
+            CreatedAt = DateTimeOffset.UtcNow
+        };
 
+        _context.ExecutionLogs.Add(logEntry);
         await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Execution {ExecutionId} cancelled", id);
@@ -243,7 +262,7 @@ public class ExecutionService : IExecutionService
     {
         var currentTenantId = _currentUserService.GetTenantId();
 
-        var query = _context.Set<PipelineExecution>()
+        var query = _context.PipelineExecutions
             .Where(e => e.TenantId == currentTenantId);
 
         if (pipelineId.HasValue)
@@ -263,10 +282,10 @@ public class ExecutionService : IExecutionService
             ? (decimal)completedExecutions / totalExecutions * 100 
             : 0;
 
-        var completedWithDuration = executions.Where(e => e.DurationMs.HasValue).ToList();
+        var completedWithDuration = executions.Where(e => e.Duration.HasValue).ToList();
         var averageDuration = completedWithDuration.Any() 
-            ? (long)completedWithDuration.Average(e => e.DurationMs!.Value) 
-            : 0;
+            ? TimeSpan.FromTicks((long)completedWithDuration.Average(e => e.Duration!.Value.Ticks))
+            : (TimeSpan?)null;
 
         var totalRecords = executions.Sum(e => e.RecordsProcessed);
         var lastExecution = executions.OrderByDescending(e => e.StartTime).FirstOrDefault();
@@ -279,7 +298,7 @@ public class ExecutionService : IExecutionService
             FailedExecutions = failedExecutions,
             CancelledExecutions = cancelledExecutions,
             SuccessRate = successRate,
-            AverageDurationMs = averageDuration,
+            AverageDuration = averageDuration,
             TotalRecordsProcessed = totalRecords,
             LastExecutionTime = lastExecution?.StartTime
         };
@@ -293,8 +312,8 @@ public class ExecutionService : IExecutionService
             "starttime_desc" => query.OrderByDescending(e => e.StartTime),
             "status_asc" => query.OrderBy(e => e.Status),
             "status_desc" => query.OrderByDescending(e => e.Status),
-            "duration_asc" => query.OrderBy(e => e.DurationMs),
-            "duration_desc" => query.OrderByDescending(e => e.DurationMs),
+            "duration_asc" => query.OrderBy(e => e.Duration),
+            "duration_desc" => query.OrderByDescending(e => e.Duration),
             "records_asc" => query.OrderBy(e => e.RecordsProcessed),
             "records_desc" => query.OrderByDescending(e => e.RecordsProcessed),
             _ => query.OrderByDescending(e => e.StartTime) // Default sort
@@ -303,8 +322,11 @@ public class ExecutionService : IExecutionService
 
     private async Task<ExecutionResponse> MapToExecutionResponse(PipelineExecution execution, Pipeline? pipeline)
     {
-        // Deserialize logs
-        var logs = JsonSerializer.Deserialize<List<ExecutionLog>>(execution.LogsJson) ?? new List<ExecutionLog>();
+        // Load logs from execution_logs table
+        var logEntries = await _context.ExecutionLogs
+            .Where(l => l.ExecutionId == execution.Id)
+            .OrderBy(l => l.Timestamp)
+            .ToListAsync();
 
         // Get triggered by user email if available
         string? triggeredByUserEmail = null;
@@ -324,16 +346,18 @@ public class ExecutionService : IExecutionService
             Status = execution.Status,
             StartTime = execution.StartTime,
             EndTime = execution.EndTime,
-            Duration = execution.DurationMs,
+            Duration = execution.Duration,
             RecordsProcessed = execution.RecordsProcessed,
             RecordsSucceeded = execution.RecordsSucceeded,
             RecordsFailed = execution.RecordsFailed,
             ProgressPercent = execution.ProgressPercent,
+            BatchCount = execution.BatchCount,
             ErrorMessage = execution.ErrorMessage,
-            Logs = logs.Select(l => new ExecutionLogDto
+            Logs = logEntries.Select(l => new ExecutionLogDto
             {
                 Timestamp = l.Timestamp,
                 Level = l.Level,
+                Source = l.Source,
                 Message = l.Message,
                 Details = l.Details
             }).ToList(),

@@ -11,22 +11,25 @@ public class PipelineExecution : ITenantResource
     // Status: Queued, Running, Completed, Failed, Cancelled
     public required string Status { get; set; }
     
-    // Timing
-    public DateTime StartTime { get; set; }
-    public DateTime? EndTime { get; set; }
-    public long? DurationMs { get; set; } // Duration in milliseconds
+    // Timing (using DateTimeOffset for proper UTC handling)
+    public DateTimeOffset StartTime { get; set; }
+    public DateTimeOffset? EndTime { get; set; }
+    public TimeSpan? Duration { get; set; }
     
-    // Metrics
-    public int RecordsProcessed { get; set; }
-    public int RecordsSucceeded { get; set; }
-    public int RecordsFailed { get; set; }
+    // Metrics (using long for large datasets)
+    public long RecordsProcessed { get; set; }
+    public long RecordsSucceeded { get; set; }
+    public long RecordsFailed { get; set; }
     public decimal ProgressPercent { get; set; }
+    
+    // Batch tracking
+    public int BatchCount { get; set; }
     
     // Error handling
     public string? ErrorMessage { get; set; }
     
-    // Logs stored as JSON array
-    public required string LogsJson { get; set; }
+    // Compact summary (not full logs - those are in execution_logs table)
+    public string? SummaryJson { get; set; }
     
     // Additional metadata
     public string? MetadataJson { get; set; }
@@ -36,7 +39,7 @@ public class PipelineExecution : ITenantResource
     public Guid? TriggeredByUserId { get; set; }
     
     // Audit
-    public DateTime CreatedAt { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
     
     // Navigation properties
     public Pipeline? Pipeline { get; set; }
