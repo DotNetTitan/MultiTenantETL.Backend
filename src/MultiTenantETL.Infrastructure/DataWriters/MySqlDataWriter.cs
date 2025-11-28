@@ -43,6 +43,12 @@ public class MySqlDataWriter : IDataWriter
             if (batch.Rows.Count == 0)
                 return result;
 
+            // Use upsert if requested
+            if (options.UseUpsert && options.UpsertKeys?.Count > 0)
+            {
+                return await UpsertBatchAsync(connection, config.TableName, batch, options, cancellationToken);
+            }
+
             // Use multi-row INSERT for better performance (bulk insert)
             var columns = batch.Rows[0].Keys.ToList();
             var columnNames = string.Join(", ", columns.Select(c => $"`{c}`"));
@@ -95,6 +101,73 @@ public class MySqlDataWriter : IDataWriter
             _logger.LogError(ex, "Failed to write batch to MySQL");
             result.RowsFailed = batch.RowCount;
             result.Errors.Add(ex.Message);
+        }
+
+        return result;
+    }
+
+    private async Task<DataWriteResult> UpsertBatchAsync(
+        MySqlConnection connection,
+        string tableName,
+        ReadBatch batch,
+        WriteOptions options,
+        CancellationToken cancellationToken)
+    {
+        var result = new DataWriteResult { BatchId = batch.BatchId };
+        var columns = batch.Rows[0].Keys.ToList();
+        var upsertKeys = options.UpsertKeys!;
+
+        // Columns to update (exclude upsert keys to avoid updating them)
+        var updateColumns = columns.Except(upsertKeys).ToList();
+        var columnNames = string.Join(", ", columns.Select(c => $"`{c}`"));
+        var updateSet = string.Join(", ", updateColumns.Select(c => $"`{c}` = VALUES(`{c}`)"));
+
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        try
+        {
+            // Split into chunks to avoid max_allowed_packet limit
+            var chunkSize = _settings.MySqlBulkInsertChunkSize;
+            for (int i = 0; i < batch.Rows.Count; i += chunkSize)
+            {
+                var chunk = batch.Rows.Skip(i).Take(chunkSize).ToList();
+                var valuePlaceholders = new List<string>();
+                var parameters = new List<MySqlParameter>();
+
+                for (int rowIdx = 0; rowIdx < chunk.Count; rowIdx++)
+                {
+                    var rowPlaceholders = new List<string>();
+                    for (int colIdx = 0; colIdx < columns.Count; colIdx++)
+                    {
+                        var paramName = $"@p{rowIdx}_{colIdx}";
+                        rowPlaceholders.Add(paramName);
+                        var value = chunk[rowIdx][columns[colIdx]];
+                        parameters.Add(new MySqlParameter(paramName, value ?? DBNull.Value));
+                    }
+                    valuePlaceholders.Add($"({string.Join(", ", rowPlaceholders)})");
+                }
+
+                // MySQL ON DUPLICATE KEY UPDATE
+                var upsertQuery = $@"
+                    INSERT INTO `{tableName}` ({columnNames})
+                    VALUES {string.Join(", ", valuePlaceholders)}
+                    ON DUPLICATE KEY UPDATE {updateSet}";
+
+                await using var command = new MySqlCommand(upsertQuery, connection, transaction);
+                command.Parameters.AddRange(parameters.ToArray());
+                await command.ExecuteNonQueryAsync(cancellationToken);
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+            result.RowsWritten = batch.RowCount;
+            result.RowsFailed = 0;
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            _logger.LogError(ex, "Upsert operation failed for batch {BatchId}", batch.BatchId);
+            result.RowsFailed = batch.RowCount;
+            result.Errors.Add($"Upsert failed: {ex.Message}");
         }
 
         return result;

@@ -1,4 +1,8 @@
 <Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/tests/">
+    <Project Path="tests/MultiTenantETL.IntegrationTests/MultiTenantETL.IntegrationTests.csproj" />
+  </Folder>
   <Project Path="src/MultiTenantETL.Api/MultiTenantETL.Api.csproj" Id="c605783e-be61-49d5-a116-49f1d0554b99" />
   <Project Path="src/MultiTenantETL.Application/MultiTenantETL.Application.csproj" Id="4d593a92-5657-4cc7-bb7b-1bd2d9616ee9" />
   <Project Path="src/MultiTenantETL.Domain/MultiTenantETL.Domain.csproj" Id="85db7ec1-0099-4a6b-8404-73930e8472e2" />
