@@ -200,6 +200,10 @@ builder.Services.AddScoped<IAuthorizationHandler, TenantResourceAuthorizationHan
 builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.AzureCommunicationSettings>(
     builder.Configuration.GetSection("AzureCommunicationServices"));
 
+// Configure ETL settings
+builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.EtlSettings>(
+    builder.Configuration.GetSection(MultiTenantETL.Infrastructure.Configuration.EtlSettings.SectionName));
+
 // Rate Limiting
 builder.Services.AddMemoryCache();
 builder.Services.Configure<IpRateLimitOptions>(options =>
@@ -306,6 +310,12 @@ else
 // Custom Services
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddHttpClient(); // For API connector testing
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.Services.Http.IHttpClientAuthenticator,
+    MultiTenantETL.Infrastructure.Services.Http.HttpClientAuthenticator>();
+builder.Services.AddSingleton<MultiTenantETL.Infrastructure.Services.Database.IDatabaseConnectionStringBuilder,
+    MultiTenantETL.Infrastructure.Services.Database.DatabaseConnectionStringBuilder>();
+builder.Services.AddSingleton<MultiTenantETL.Infrastructure.Services.Storage.IStorageClientFactory,
+    MultiTenantETL.Infrastructure.Services.Storage.StorageClientFactory>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.Interfaces.IClaimsService,
     MultiTenantETL.Infrastructure.Services.ClaimsService>();
@@ -337,6 +347,52 @@ builder.Services.AddScoped<MultiTenantETL.Application.Pipelines.IPipelineService
 // Execution Services
 builder.Services.AddScoped<MultiTenantETL.Application.Executions.IExecutionService,
     MultiTenantETL.Infrastructure.Services.ExecutionService>();
+
+// Data Readers
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.SqlServerDataReader>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.PostgreSqlDataReader>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.MySqlDataReader>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.CsvDataReader>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.JsonDataReader>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.JsonLinesDataReader>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.RestApiDataReader>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.S3DataReader>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.AzureBlobDataReader>();
+
+// Data Writers
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.SqlServerDataWriter>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.PostgreSqlDataWriter>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.MySqlDataWriter>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.CsvDataWriter>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.JsonDataWriter>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.JsonLinesDataWriter>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.RestApiDataWriter>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.S3DataWriter>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.AzureBlobDataWriter>();
+
+// Format Validation
+builder.Services.AddScoped<MultiTenantETL.Application.Connectors.DataWriters.IFormatValidator,
+    MultiTenantETL.Infrastructure.DataWriters.FormatValidator>();
+
+// Data Reader Factories
+builder.Services.AddScoped<MultiTenantETL.Application.DataAccess.IDataReaderFactory,
+    MultiTenantETL.Infrastructure.DataAccess.Readers.DataReaderFactory>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataAccess.Readers.Database.IDatabaseDataReaderFactory,
+    MultiTenantETL.Infrastructure.DataAccess.Readers.Database.DatabaseDataReaderFactory>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataAccess.Readers.File.IFileDataReaderFactory,
+    MultiTenantETL.Infrastructure.DataAccess.Readers.File.FileDataReaderFactory>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataAccess.Readers.Api.IApiDataReaderFactory,
+    MultiTenantETL.Infrastructure.DataAccess.Readers.Api.ApiDataReaderFactory>();
+
+// Data Writer Factories
+builder.Services.AddScoped<MultiTenantETL.Application.DataAccess.IDataWriterFactory,
+    MultiTenantETL.Infrastructure.DataAccess.Writers.DataWriterFactory>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataAccess.Writers.Database.IDatabaseDataWriterFactory,
+    MultiTenantETL.Infrastructure.DataAccess.Writers.Database.DatabaseDataWriterFactory>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataAccess.Writers.File.IFileDataWriterFactory,
+    MultiTenantETL.Infrastructure.DataAccess.Writers.File.FileDataWriterFactory>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataAccess.Writers.Api.IApiDataWriterFactory,
+    MultiTenantETL.Infrastructure.DataAccess.Writers.Api.ApiDataWriterFactory>();
 
 // Connection Tester Services
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.Services.ConnectionTesting.Database.IDatabaseConnectionTester,
