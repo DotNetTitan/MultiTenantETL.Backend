@@ -543,6 +543,7 @@ public class SchemaDetector : ISchemaDetector
         }
         catch
         {
+            // Token extraction failed, likely invalid path or JSON structure
             return null;
         }
     }
@@ -584,6 +585,7 @@ public class SchemaDetector : ISchemaDetector
         }
         catch
         {
+            // Path navigation failed, return original JSON
             return json;
         }
     }

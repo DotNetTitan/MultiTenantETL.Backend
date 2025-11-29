@@ -253,6 +253,7 @@ public class ApiConnectionTester : IApiConnectionTester
         }
         catch
         {
+            // Token extraction failed, likely invalid path or JSON structure
             return null;
         }
     }

@@ -16,6 +16,8 @@ public class FileDataWriterFactory : IFileDataWriterFactory
     private readonly JsonLinesDataWriter _jsonLinesWriter;
     private readonly S3DataWriter _s3Writer;
     private readonly AzureBlobDataWriter _azureBlobWriter;
+    private readonly SftpDataWriter _sftpWriter;
+    private readonly FtpDataWriter _ftpWriter;
     private readonly ILogger<FileDataWriterFactory> _logger;
 
     public FileDataWriterFactory(
@@ -24,6 +26,8 @@ public class FileDataWriterFactory : IFileDataWriterFactory
         JsonLinesDataWriter jsonLinesWriter,
         S3DataWriter s3Writer,
         AzureBlobDataWriter azureBlobWriter,
+        SftpDataWriter sftpWriter,
+        FtpDataWriter ftpWriter,
         ILogger<FileDataWriterFactory> logger)
     {
         _csvWriter = csvWriter;
@@ -31,6 +35,8 @@ public class FileDataWriterFactory : IFileDataWriterFactory
         _jsonLinesWriter = jsonLinesWriter;
         _s3Writer = s3Writer;
         _azureBlobWriter = azureBlobWriter;
+        _sftpWriter = sftpWriter;
+        _ftpWriter = ftpWriter;
         _logger = logger;
     }
 
@@ -38,13 +44,13 @@ public class FileDataWriterFactory : IFileDataWriterFactory
     {
         _logger.LogDebug("Creating file writer for provider {Provider}", connector.Provider);
 
-        // Cloud storage providers handle their own format
+        // Cloud storage and remote file providers handle their own format detection
         return connector.Provider switch
         {
             ConnectorProviders.S3 => _s3Writer,
             ConnectorProviders.AzureBlob => _azureBlobWriter,
-            ConnectorProviders.FTP => throw new NotImplementedException("FTP writer not yet implemented"),
-            ConnectorProviders.SFTP => throw new NotImplementedException("SFTP writer not yet implemented"),
+            ConnectorProviders.SFTP => _sftpWriter,
+            ConnectorProviders.FTP => _ftpWriter,
             ConnectorProviders.Local => CreateLocalFileWriter(connector),
             _ => throw new NotSupportedException($"File provider '{connector.Provider}' is not supported")
         };
@@ -66,31 +72,40 @@ public class FileDataWriterFactory : IFileDataWriterFactory
 
     private string DetermineFormat(Connector connector)
     {
-        // Try to parse format from config
+        FileFormatConfig? config;
+        
         try
         {
-            var config = System.Text.Json.JsonSerializer.Deserialize<FileFormatConfig>(connector.ConfigJson);
-            if (!string.IsNullOrEmpty(config?.Format))
-            {
-                return config.Format;
-            }
-
-            // Fall back to file extension
-            if (!string.IsNullOrEmpty(config?.FilePath))
-            {
-                var extension = Path.GetExtension(config.FilePath).TrimStart('.');
-                if (!string.IsNullOrEmpty(extension))
-                {
-                    return extension;
-                }
-            }
+            config = System.Text.Json.JsonSerializer.Deserialize<FileFormatConfig>(connector.ConfigJson);
         }
-        catch
+        catch (System.Text.Json.JsonException ex)
         {
-            // If parsing fails, default to CSV
+            _logger.LogError(ex, "Invalid connector configuration JSON");
+            throw new InvalidOperationException("Failed to parse connector configuration", ex);
         }
 
-        return "csv";
+        if (config == null)
+        {
+            throw new InvalidOperationException("Connector configuration is null");
+        }
+
+        // Use explicit format if provided
+        if (!string.IsNullOrEmpty(config.Format))
+        {
+            return config.Format;
+        }
+
+        // Fall back to file extension
+        if (!string.IsNullOrEmpty(config.FilePath))
+        {
+            var extension = Path.GetExtension(config.FilePath).TrimStart('.');
+            if (!string.IsNullOrEmpty(extension))
+            {
+                return extension;
+            }
+        }
+
+        throw new InvalidOperationException("Cannot determine file format: no format specified and no file extension found");
     }
 
     private class FileFormatConfig

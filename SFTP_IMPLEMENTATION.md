@@ -1,7 +1,7 @@
-# SFTP Support Implementation
+# SFTP & FTP Data Reader/Writer Implementation
 
 ## Summary
-Added full SFTP (SSH File Transfer Protocol) support alongside existing FTP support for secure file transfers.
+Completed full SFTP and FTP support for both reading and writing data files. Both protocols now support CSV, JSON, and JSONL formats with automatic format detection.
 
 ## Backend Changes
 
@@ -81,8 +81,112 @@ To test SFTP connection:
 5. Click "Test Connection"
 6. Should see success message with server details
 
+## Data Reader/Writer Implementation
+
+### New Classes Added
+
+#### SFTP Support
+- **`SftpDataReader.cs`** - Reads files from SFTP servers
+  - Downloads file to memory stream
+  - Delegates to format-specific readers (CSV, JSON, JSONL)
+  - Supports schema detection
+  - Connection testing
+  
+- **`SftpDataWriter.cs`** - Writes data to SFTP servers
+  - Buffers data to memory stream
+  - Uploads on disposal
+  - Supports CSV and JSONL formats
+  - Automatic format detection from file extension
+
+#### FTP Support
+- **`FtpDataReader.cs`** - Reads files from FTP servers
+  - Uses FluentFTP async client
+  - Downloads file to memory stream
+  - Delegates to format-specific readers
+  - Supports schema detection
+  - Connection testing
+
+- **`FtpDataWriter.cs`** - Writes data to FTP servers
+  - Buffers data to memory stream
+  - Uploads on disposal with overwrite
+  - Supports CSV and JSONL formats
+  - Automatic format detection from file extension
+
+### Factory Integration
+
+#### `FileDataReaderFactory.cs`
+- Added SFTP and FTP reader injection
+- Updated `CreateReader()` to return appropriate reader based on provider
+- SFTP and FTP readers handle their own format detection
+
+#### `FileDataWriterFactory.cs`
+- Added SFTP and FTP writer injection
+- Updated `CreateWriter()` to return appropriate writer based on provider
+- SFTP and FTP writers handle their own format detection
+
+### Dependency Injection (Program.cs)
+- Registered `SftpDataReader` as scoped service
+- Registered `FtpDataReader` as scoped service
+- Registered `SftpDataWriter` as scoped service
+- Registered `FtpDataWriter` as scoped service
+
+## Configuration Format
+
+### SFTP Config
+```json
+{
+  "Host": "sftp.example.com",
+  "Port": 22,
+  "Username": "user",
+  "Password": "pass",
+  "FilePath": "/path/to/file.csv",
+  "Format": "csv"  // optional, auto-detected from extension
+}
+```
+
+### FTP Config
+```json
+{
+  "Host": "ftp.example.com",
+  "Port": 21,
+  "Username": "user",
+  "Password": "pass",
+  "FilePath": "/path/to/file.csv",
+  "Format": "csv"  // optional, auto-detected from extension
+}
+```
+
+## Supported Formats
+- **CSV** - Comma-separated values with header detection
+- **JSON** - JSON arrays (read only, JSONL recommended for write)
+- **JSONL/NDJSON** - JSON Lines (newline-delimited JSON)
+
+## How It Works
+
+### Reading Flow
+1. Factory creates appropriate reader based on connector provider
+2. Reader connects to SFTP/FTP server
+3. Downloads file to memory stream
+4. Determines format from config or file extension
+5. Delegates to format-specific reader (CsvDataReader, JsonDataReader, JsonLinesDataReader)
+6. Streams data in batches
+7. Disconnects on completion
+
+### Writing Flow
+1. Factory creates appropriate writer based on connector provider
+2. Writer buffers data to memory stream
+3. Formats data as CSV or JSONL
+4. On disposal, connects to SFTP/FTP server
+5. Uploads buffered file
+6. Disconnects
+
+## Build Status
+✅ Build succeeded with 44 warnings (all pre-existing nullable reference warnings)
+
 ## Next Steps (Optional Enhancements)
-- Add SSH key-based authentication support
-- Add known_hosts verification
+- Add SSH key-based authentication for SFTP
+- Add known_hosts verification for SFTP
 - Add connection timeout configuration
 - Add support for SFTP-specific options (compression, cipher selection)
+- Add FTP SSL/TLS support (FTPS)
+- Add progress reporting for large file transfers

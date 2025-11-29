@@ -370,6 +370,8 @@ builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.JsonLinesDa
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.RestApiDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.S3DataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.AzureBlobDataReader>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.SftpDataReader>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.FtpDataReader>();
 
 // Data Writers
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.SqlServerDataWriter>();
@@ -381,6 +383,8 @@ builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.JsonLinesDa
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.RestApiDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.S3DataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.AzureBlobDataWriter>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.SftpDataWriter>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.FtpDataWriter>();
 
 // Format Validation
 builder.Services.AddScoped<MultiTenantETL.Application.Connectors.DataWriters.IFormatValidator,
