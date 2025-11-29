@@ -204,6 +204,10 @@ builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.AzureComm
 builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.EtlSettings>(
     builder.Configuration.GetSection(MultiTenantETL.Infrastructure.Configuration.EtlSettings.SectionName));
 
+// Configure RabbitMQ settings
+builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.RabbitMqSettings>(
+    builder.Configuration.GetSection("RabbitMq"));
+
 // Rate Limiting
 builder.Services.AddMemoryCache();
 builder.Services.Configure<IpRateLimitOptions>(options =>
@@ -359,6 +363,14 @@ builder.Services.AddScoped<MultiTenantETL.Application.Pipelines.IPipelineService
 // Execution Services
 builder.Services.AddScoped<MultiTenantETL.Application.Executions.IExecutionService,
     MultiTenantETL.Infrastructure.Services.ExecutionService>();
+
+// Messaging Services
+builder.Services.AddSingleton<MultiTenantETL.Application.Messaging.IMessagePublisher,
+    MultiTenantETL.Infrastructure.Messaging.RabbitMqPublisher>();
+
+// Orchestration Services
+builder.Services.AddScoped<MultiTenantETL.Application.Orchestration.IPipelineOrchestrator,
+    MultiTenantETL.Infrastructure.Orchestration.PipelineOrchestrator>();
 
 // Data Readers
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.SqlServerDataReader>();

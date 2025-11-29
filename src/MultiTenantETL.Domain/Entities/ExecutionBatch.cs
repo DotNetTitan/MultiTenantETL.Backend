@@ -1,3 +1,4 @@
+using MultiTenantETL.Domain.Enums;
 using MultiTenantETL.Domain.Interfaces;
 
 namespace MultiTenantETL.Domain.Entities;
@@ -17,8 +18,7 @@ public class ExecutionBatch : ITenantResource
     public int RowsSucceeded { get; set; }
     public int RowsFailed { get; set; }
     
-    // Status: Queued, Processing, Completed, Failed
-    public required string Status { get; set; }
+    public BatchStatus Status { get; set; }
     
     public DateTimeOffset? StartedAt { get; set; }
     public DateTimeOffset? EndedAt { get; set; }

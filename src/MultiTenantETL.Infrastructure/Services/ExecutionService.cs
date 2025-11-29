@@ -3,7 +3,9 @@ using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Executions;
 using MultiTenantETL.Application.Executions.Models;
+using MultiTenantETL.Application.Messaging;
 using MultiTenantETL.Domain.Entities;
+using MultiTenantETL.Domain.Enums;
 using MultiTenantETL.Domain.ValueObjects;
 using MultiTenantETL.Infrastructure.Persistence;
 
@@ -13,15 +15,18 @@ public class ExecutionService : IExecutionService
 {
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IMessagePublisher _messagePublisher;
     private readonly ILogger<ExecutionService> _logger;
 
     public ExecutionService(
         ApplicationDbContext context,
         ICurrentUserService currentUserService,
+        IMessagePublisher messagePublisher,
         ILogger<ExecutionService> logger)
     {
         _context = context;
         _currentUserService = currentUserService;
+        _messagePublisher = messagePublisher;
         _logger = logger;
     }
 
@@ -60,7 +65,7 @@ public class ExecutionService : IExecutionService
             Id = Guid.NewGuid(),
             PipelineId = pipelineId,
             TenantId = pipeline.TenantId,
-            Status = "Queued",
+            Status = ExecutionStatus.Queued,
             StartTime = DateTimeOffset.UtcNow,
             RecordsProcessed = 0,
             RecordsSucceeded = 0,
@@ -96,9 +101,18 @@ public class ExecutionService : IExecutionService
             "Pipeline execution {ExecutionId} created for pipeline {PipelineId} by {TriggeredBy}",
             execution.Id, pipelineId, triggeredBy);
 
-        // TODO: Queue execution to background processor (Phase 4)
-        // For now, we'll just return the queued execution
-        // BackgroundJob.Enqueue<PipelineOrchestrator>(x => x.ExecutePipelineAsync(execution.Id, CancellationToken.None));
+        // Publish execution task to RabbitMQ
+        var executionTask = new ExecutionTask
+        {
+            ExecutionId = execution.Id,
+            PipelineId = pipelineId,
+            TenantId = pipeline.TenantId,
+            BatchSize = 1000,
+            DryRun = false,
+            QueuedAt = DateTimeOffset.UtcNow
+        };
+
+        await _messagePublisher.PublishExecutionTaskAsync(executionTask, cancellationToken);
 
         return await MapToExecutionResponse(execution, pipeline);
     }
@@ -143,7 +157,10 @@ public class ExecutionService : IExecutionService
 
         if (!string.IsNullOrEmpty(request.Status) && request.Status != "All")
         {
-            query = query.Where(e => e.Status == request.Status);
+            if (Enum.TryParse<ExecutionStatus>(request.Status, out var statusEnum))
+            {
+                query = query.Where(e => e.Status == statusEnum);
+            }
         }
 
         if (!string.IsNullOrEmpty(request.TriggeredBy))
@@ -186,7 +203,7 @@ public class ExecutionService : IExecutionService
             Id = e.Id,
             PipelineId = e.PipelineId,
             PipelineName = e.Pipeline?.Name,
-            Status = e.Status,
+            Status = e.Status.ToString(),
             StartTime = e.StartTime,
             EndTime = e.EndTime,
             Duration = e.Duration,
@@ -225,13 +242,13 @@ public class ExecutionService : IExecutionService
         }
 
         // Can only cancel running or queued executions
-        if (execution.Status != "Running" && execution.Status != "Queued")
+        if (execution.Status != ExecutionStatus.Running && execution.Status != ExecutionStatus.Queued)
         {
             throw new InvalidOperationException($"Cannot cancel execution with status: {execution.Status}");
         }
 
         // Update status
-        execution.Status = "Cancelled";
+        execution.Status = ExecutionStatus.Cancelled;
         execution.EndTime = DateTimeOffset.UtcNow;
         execution.Duration = execution.EndTime.Value - execution.StartTime;
 
@@ -253,7 +270,8 @@ public class ExecutionService : IExecutionService
 
         _logger.LogInformation("Execution {ExecutionId} cancelled", id);
 
-        // TODO: Signal background job to cancel (Phase 4)
+        // Publish cancellation request to RabbitMQ
+        await _messagePublisher.PublishCancellationRequestAsync(id, cancellationToken);
 
         return await MapToExecutionResponse(execution, execution.Pipeline);
     }
@@ -273,10 +291,10 @@ public class ExecutionService : IExecutionService
         var executions = await query.ToListAsync(cancellationToken);
 
         var totalExecutions = executions.Count;
-        var completedExecutions = executions.Count(e => e.Status == "Completed");
-        var failedExecutions = executions.Count(e => e.Status == "Failed");
-        var runningExecutions = executions.Count(e => e.Status == "Running");
-        var cancelledExecutions = executions.Count(e => e.Status == "Cancelled");
+        var completedExecutions = executions.Count(e => e.Status == ExecutionStatus.Completed);
+        var failedExecutions = executions.Count(e => e.Status == ExecutionStatus.Failed);
+        var runningExecutions = executions.Count(e => e.Status == ExecutionStatus.Running);
+        var cancelledExecutions = executions.Count(e => e.Status == ExecutionStatus.Cancelled);
 
         var successRate = totalExecutions > 0 
             ? (decimal)completedExecutions / totalExecutions * 100 
@@ -343,7 +361,7 @@ public class ExecutionService : IExecutionService
             PipelineName = pipeline?.Name,
             TenantId = execution.TenantId,
             TenantName = execution.Tenant?.Name,
-            Status = execution.Status,
+            Status = execution.Status.ToString(),
             StartTime = execution.StartTime,
             EndTime = execution.EndTime,
             Duration = execution.Duration,

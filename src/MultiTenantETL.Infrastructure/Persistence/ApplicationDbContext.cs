@@ -214,6 +214,11 @@ namespace MultiTenantETL.Infrastructure.Persistence
                 .Property(e => e.MetadataJson)
                 .HasColumnType("jsonb");
 
+            // Store ExecutionStatus enum as string
+            builder.Entity<PipelineExecution>()
+                .Property(e => e.Status)
+                .HasConversion<string>();
+
             // Execution Logs configuration
             builder.Entity<ExecutionLogEntry>()
                 .ToTable("execution_logs");
@@ -271,6 +276,11 @@ namespace MultiTenantETL.Infrastructure.Persistence
             builder.Entity<ExecutionBatch>()
                 .Property(b => b.CheckpointInfoJson)
                 .HasColumnType("jsonb");
+
+            // Store BatchStatus enum as string
+            builder.Entity<ExecutionBatch>()
+                .Property(b => b.Status)
+                .HasConversion<string>();
         }
     }
 }

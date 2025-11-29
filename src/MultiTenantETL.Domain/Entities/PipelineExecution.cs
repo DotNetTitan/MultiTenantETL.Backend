@@ -1,3 +1,4 @@
+using MultiTenantETL.Domain.Enums;
 using MultiTenantETL.Domain.Interfaces;
 
 namespace MultiTenantETL.Domain.Entities;
@@ -8,8 +9,7 @@ public class PipelineExecution : ITenantResource
     public Guid PipelineId { get; set; }
     public Guid TenantId { get; set; }
     
-    // Status: Queued, Running, Completed, Failed, Cancelled
-    public required string Status { get; set; }
+    public ExecutionStatus Status { get; set; }
     
     // Timing (using DateTimeOffset for proper UTC handling)
     public DateTimeOffset StartTime { get; set; }
