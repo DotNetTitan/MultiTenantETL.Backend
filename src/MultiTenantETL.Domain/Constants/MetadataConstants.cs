@@ -22,7 +22,8 @@ public static class MetadataConstants
         {
             { 
                 Constants.ConnectorTypes.Database, 
-                new[] { 
+                new[] 
+                { 
                     Constants.ConnectorProviders.SqlServer, 
                     Constants.ConnectorProviders.PostgreSQL, 
                     Constants.ConnectorProviders.MySQL 
@@ -30,13 +31,15 @@ public static class MetadataConstants
             },
             { 
                 Constants.ConnectorTypes.Api, 
-                new[] { 
+                new[] 
+                { 
                     Constants.ConnectorProviders.REST 
                 } 
             },
             { 
                 Constants.ConnectorTypes.File, 
-                new[] { 
+                new[] 
+                { 
                     Constants.ConnectorProviders.Local, 
                     Constants.ConnectorProviders.FTP, 
                     Constants.ConnectorProviders.SFTP, 
