@@ -8,5 +8,6 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/MultiTenantETL.IntegrationTests/MultiTenantETL.IntegrationTests.csproj" />
+    <Project Path="tests/MultiTenantETL.UnitTests/MultiTenantETL.UnitTests.csproj" />
   </Folder>
 </Solution>
