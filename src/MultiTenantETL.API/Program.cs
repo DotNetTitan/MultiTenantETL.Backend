@@ -314,6 +314,10 @@ else
 // Custom Services
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddHttpClient(); // For API connector testing
+
+// Tenant context provider (scoped per request/job)
+builder.Services.AddScoped<ITenantProvider, TenantProvider>();
+
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.Services.Http.IHttpClientAuthenticator,
     MultiTenantETL.Infrastructure.Services.Http.HttpClientAuthenticator>();
 builder.Services.AddSingleton<MultiTenantETL.Infrastructure.Services.Database.IDatabaseConnectionStringBuilder,

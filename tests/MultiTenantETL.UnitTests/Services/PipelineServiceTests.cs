@@ -28,7 +28,8 @@ public class PipelineServiceTests : IDisposable
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
 
-        _context = new ApplicationDbContext(options);
+        var tenantProvider = Substitute.For<ITenantProvider>();
+        _context = new ApplicationDbContext(options, tenantProvider);
         _logger = Substitute.For<ILogger<PipelineService>>();
         _currentUserService = Substitute.For<ICurrentUserService>();
         _auditService = Substitute.For<IAuditService>();

@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
+using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Messaging;
 using MultiTenantETL.Application.Orchestration;
 using MultiTenantETL.Infrastructure.Configuration;
@@ -114,19 +115,43 @@ public class Worker : BackgroundService
                 return;
             }
 
+            // Validate tenant ID is present
+            if (task.TenantId == Guid.Empty)
+            {
+                _logger.LogError(
+                    "Execution task missing TenantId: ExecutionId={ExecutionId}, PipelineId={PipelineId}",
+                    task.ExecutionId, task.PipelineId);
+                _channel?.BasicNack(ea.DeliveryTag, false, false);
+                return;
+            }
+
             _logger.LogInformation(
-                "Received execution task: ExecutionId={ExecutionId}, PipelineId={PipelineId}",
-                task.ExecutionId, task.PipelineId);
+                "Received execution task: ExecutionId={ExecutionId}, PipelineId={PipelineId}, TenantId={TenantId}",
+                task.ExecutionId, task.PipelineId, task.TenantId);
 
             // Create cancellation token source for this execution
             var cts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
             _runningExecutions[task.ExecutionId] = cts;
 
-            // Execute pipeline in a new scope
+            // Execute pipeline in a new scope with tenant context
             using var scope = _serviceProvider.CreateScope();
-            var orchestrator = scope.ServiceProvider.GetRequiredService<IPipelineOrchestrator>();
             
-            await orchestrator.ExecutePipelineAsync(task.ExecutionId, cts.Token);
+            // Set tenant context for this job scope
+            var tenantProvider = scope.ServiceProvider.GetRequiredService<ITenantProvider>();
+            tenantProvider.TenantId = task.TenantId;
+            tenantProvider.CorrelationId = task.ExecutionId.ToString();
+
+            // Add structured logging scope for tenant and correlation
+            using (_logger.BeginScope(new Dictionary<string, object>
+            {
+                ["TenantId"] = task.TenantId,
+                ["ExecutionId"] = task.ExecutionId,
+                ["CorrelationId"] = tenantProvider.CorrelationId
+            }))
+            {
+                var orchestrator = scope.ServiceProvider.GetRequiredService<IPipelineOrchestrator>();
+                await orchestrator.ExecutePipelineAsync(task.ExecutionId, cts.Token);
+            }
 
             // Remove from running executions
             _runningExecutions.Remove(task.ExecutionId);

@@ -3,6 +3,7 @@ using System.Security.Claims;
 using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Identity;
 using MultiTenantETL.Infrastructure.Persistence;
@@ -28,7 +29,8 @@ public class ClaimsServiceTests : IDisposable
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
 
-        _context = new ApplicationDbContext(options);
+        var tenantProvider = Substitute.For<ITenantProvider>();
+        _context = new ApplicationDbContext(options, tenantProvider);
 
         // Mock UserManager
         var userStore = Substitute.For<IUserStore<ApplicationUser>>();

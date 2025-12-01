@@ -9,10 +9,14 @@ namespace MultiTenantETL.Infrastructure.Identity;
 public class CurrentUserService : ICurrentUserService
 {
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly ITenantProvider _tenantProvider;
 
-    public CurrentUserService(IHttpContextAccessor httpContextAccessor)
+    public CurrentUserService(
+        IHttpContextAccessor httpContextAccessor,
+        ITenantProvider tenantProvider)
     {
         _httpContextAccessor = httpContextAccessor;
+        _tenantProvider = tenantProvider;
     }
 
     private ClaimsPrincipal? User => _httpContextAccessor.HttpContext?.User;
@@ -26,8 +30,13 @@ public class CurrentUserService : ICurrentUserService
 
     public Guid GetTenantId()
     {
+        // First try to get from HTTP context claims (web requests)
         var tenantIdClaim = User?.FindFirst(CustomClaims.TenantId)?.Value;
-        return Guid.TryParse(tenantIdClaim, out var tenantId) ? tenantId : Guid.Empty;
+        if (Guid.TryParse(tenantIdClaim, out var tenantId))
+            return tenantId;
+
+        // Fallback to tenant provider for non-HTTP contexts (background workers)
+        return _tenantProvider.TenantId ?? Guid.Empty;
     }
 
     public string GetRole()

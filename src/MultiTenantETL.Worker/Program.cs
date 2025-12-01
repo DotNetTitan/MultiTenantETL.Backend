@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
+using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.DataAccess;
 using MultiTenantETL.Application.Orchestration;
 using MultiTenantETL.Application.Transformations;
 using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.DataAccess.Readers;
 using MultiTenantETL.Infrastructure.DataAccess.Writers;
+using MultiTenantETL.Infrastructure.Identity;
 using MultiTenantETL.Infrastructure.Orchestration;
 using MultiTenantETL.Infrastructure.Persistence;
 using MultiTenantETL.Infrastructure.Transformations;
@@ -14,6 +16,9 @@ var builder = Host.CreateApplicationBuilder(args);
 
 // Configuration
 builder.Services.Configure<RabbitMqSettings>(builder.Configuration.GetSection("RabbitMq"));
+
+// Tenant context provider (scoped per job)
+builder.Services.AddScoped<ITenantProvider, TenantProvider>();
 
 // Database
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");

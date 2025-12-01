@@ -27,7 +27,8 @@ public class TransformationServiceTests : IDisposable
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
 
-        _context = new ApplicationDbContext(options);
+        var tenantProvider = Substitute.For<ITenantProvider>();
+        _context = new ApplicationDbContext(options, tenantProvider);
         _logger = Substitute.For<ILogger<TransformationService>>();
         _currentUserService = Substitute.For<ICurrentUserService>();
         _auditService = Substitute.For<IAuditService>();

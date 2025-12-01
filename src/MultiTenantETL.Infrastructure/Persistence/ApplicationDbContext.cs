@@ -1,7 +1,10 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using System.Reflection;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Domain.Entities;
+using MultiTenantETL.Domain.Interfaces;
 using MultiTenantETL.Infrastructure.Identity;
 
 namespace MultiTenantETL.Infrastructure.Persistence
@@ -16,6 +19,8 @@ namespace MultiTenantETL.Infrastructure.Persistence
         IdentityRoleClaim<Guid>,
         IdentityUserToken<Guid>>
     {
+        private readonly ITenantProvider _tenantProvider;
+
         // Domain entities
         public DbSet<Tenant> Tenants { get; set; }
         public DbSet<UserTenant> UserTenants { get; set; }
@@ -33,12 +38,20 @@ namespace MultiTenantETL.Infrastructure.Persistence
         public DbSet<OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreScope> OpenIddictScopes { get; set; }
         public DbSet<OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreToken> OpenIddictTokens { get; set; }
 
-        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
-            : base(options) { }
+        public ApplicationDbContext(
+            DbContextOptions<ApplicationDbContext> options,
+            ITenantProvider tenantProvider)
+            : base(options)
+        {
+            _tenantProvider = tenantProvider;
+        }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
+
+            // Apply global query filters for tenant isolation
+            ApplyTenantQueryFilters(builder);
 
             // Customize Identity table names
             builder.Entity<ApplicationUser>().ToTable("users");
@@ -281,6 +294,36 @@ namespace MultiTenantETL.Infrastructure.Persistence
             builder.Entity<ExecutionBatch>()
                 .Property(b => b.Status)
                 .HasConversion<string>();
+        }
+
+        /// <summary>
+        /// Applies global query filters to all entities implementing ITenantResource.
+        /// This ensures tenant isolation at the database level for both HTTP and worker contexts.
+        /// </summary>
+        private void ApplyTenantQueryFilters(ModelBuilder modelBuilder)
+        {
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            {
+                if (typeof(ITenantResource).IsAssignableFrom(entityType.ClrType))
+                {
+                    var method = typeof(ApplicationDbContext)
+                        .GetMethod(nameof(SetTenantQueryFilter), BindingFlags.NonPublic | BindingFlags.Instance)!
+                        .MakeGenericMethod(entityType.ClrType);
+                    
+                    method.Invoke(this, new object[] { modelBuilder });
+                }
+            }
+        }
+
+        /// <summary>
+        /// Sets the tenant query filter for a specific entity type.
+        /// The filter uses the scoped ITenantProvider, which works in both HTTP and worker contexts.
+        /// </summary>
+        private void SetTenantQueryFilter<TEntity>(ModelBuilder modelBuilder)
+            where TEntity : class, ITenantResource
+        {
+            modelBuilder.Entity<TEntity>().HasQueryFilter(e => 
+                e.TenantId == _tenantProvider.TenantId);
         }
     }
 }
