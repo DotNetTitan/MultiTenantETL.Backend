@@ -444,6 +444,7 @@ builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
     });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -476,6 +477,9 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseAuthentication();
+
+// Populate tenant context from JWT claims (must be after authentication)
+app.UseTenantContext();
 
 app.UseAuthorization();
 
