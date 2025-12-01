@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
@@ -17,6 +18,7 @@ public class PipelineOrchestrator : IPipelineOrchestrator
     private readonly IDataReaderFactory _readerFactory;
     private readonly IDataWriterFactory _writerFactory;
     private readonly ITransformationOrchestrator _transformationOrchestrator;
+    private readonly IFieldMappingService _fieldMappingService;
     private readonly ILogger<PipelineOrchestrator> _logger;
 
     public PipelineOrchestrator(
@@ -24,12 +26,14 @@ public class PipelineOrchestrator : IPipelineOrchestrator
         IDataReaderFactory readerFactory,
         IDataWriterFactory writerFactory,
         ITransformationOrchestrator transformationOrchestrator,
+        IFieldMappingService fieldMappingService,
         ILogger<PipelineOrchestrator> logger)
     {
         _context = context;
         _readerFactory = readerFactory;
         _writerFactory = writerFactory;
         _transformationOrchestrator = transformationOrchestrator;
+        _fieldMappingService = fieldMappingService;
         _logger = logger;
     }
 
@@ -148,12 +152,15 @@ public class PipelineOrchestrator : IPipelineOrchestrator
                             $"{transformationResult.TotalRowsWithErrors} errors",
                             cancellationToken);
                     }
+
+                    // Apply field mappings
+                    var mappedBatch = _fieldMappingService.ApplyFieldMappings(transformedBatch, pipeline.FieldMappingsJson);
                     
                     // Write batch
                     var writeOptions = new Application.Connectors.DataWriters.WriteOptions();
                     var writeResult = await writer.WriteBatchAsync(
                         pipeline.DestinationConnector!,
-                        transformedBatch,
+                        mappedBatch,
                         writeOptions,
                         cancellationToken);
 

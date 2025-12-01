@@ -375,6 +375,8 @@ builder.Services.AddSingleton<MultiTenantETL.Application.Messaging.IMessagePubli
 // Orchestration Services
 builder.Services.AddScoped<MultiTenantETL.Application.Orchestration.IPipelineOrchestrator,
     MultiTenantETL.Infrastructure.Orchestration.PipelineOrchestrator>();
+builder.Services.AddScoped<MultiTenantETL.Application.Orchestration.IFieldMappingService,
+    MultiTenantETL.Infrastructure.Orchestration.FieldMappingService>();
 
 // Data Readers
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.SqlServerDataReader>();

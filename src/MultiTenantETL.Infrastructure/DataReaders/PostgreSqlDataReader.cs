@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
@@ -14,11 +15,18 @@ public class PostgreSqlDataReader : IDataReader
 {
     private readonly ILogger<PostgreSqlDataReader> _logger;
     private readonly EtlSettings _settings;
+    private readonly IEncryptionService _encryptionService;
 
-    public PostgreSqlDataReader(ILogger<PostgreSqlDataReader> logger, IOptions<EtlSettings> settings)
+    private static readonly string[] SensitiveFields = new[] { "password", "Password" };
+
+    public PostgreSqlDataReader(
+        ILogger<PostgreSqlDataReader> logger, 
+        IOptions<EtlSettings> settings,
+        IEncryptionService encryptionService)
     {
         _logger = logger;
         _settings = settings.Value;
+        _encryptionService = encryptionService;
     }
 
     public async IAsyncEnumerable<ReadBatch> ReadAsync(
@@ -157,13 +165,46 @@ public class PostgreSqlDataReader : IDataReader
 
     private PostgreSqlConfig ParseConfig(string configJson)
     {
-        return JsonSerializer.Deserialize<PostgreSqlConfig>(configJson) 
+        var jsonElement = JsonSerializer.Deserialize<JsonElement>(configJson);
+        
+        // Decrypt sensitive fields
+        var decryptedElement = _encryptionService.DecryptJsonFields(jsonElement, SensitiveFields);
+        
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var config = JsonSerializer.Deserialize<PostgreSqlConfig>(decryptedElement.GetRawText(), options)
             ?? throw new InvalidOperationException("Invalid PostgreSQL configuration");
+
+        // Build connection string if not provided directly
+        if (string.IsNullOrEmpty(config.ConnectionString))
+        {
+            config.ConnectionString = BuildConnectionString(config);
+        }
+
+        return config;
+    }
+
+    private string BuildConnectionString(PostgreSqlConfig config)
+    {
+        var builder = new NpgsqlConnectionStringBuilder
+        {
+            Host = config.Host,
+            Port = config.Port > 0 ? config.Port : 5432,
+            Database = config.Database,
+            Username = config.Username ?? string.Empty,
+            Password = config.Password ?? string.Empty
+        };
+
+        return builder.ToString();
     }
 
     private class PostgreSqlConfig
     {
-        public string ConnectionString { get; set; } = string.Empty;
+        public string? ConnectionString { get; set; }
+        public string? Host { get; set; }
+        public int Port { get; set; }
+        public string? Database { get; set; }
+        public string? Username { get; set; }
+        public string? Password { get; set; }
         public string? TableName { get; set; }
         public string? Query { get; set; }
     }

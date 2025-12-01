@@ -163,23 +163,30 @@ public class Worker : BackgroundService
             _runningExecutions[task.ExecutionId] = cts;
 
             // Execute pipeline in a new scope with tenant context
-            using var scope = _serviceProvider.CreateScope();
+            var scope = _serviceProvider.CreateAsyncScope();
             
-            // Set tenant context for this job scope
-            var tenantProvider = scope.ServiceProvider.GetRequiredService<ITenantProvider>();
-            tenantProvider.TenantId = task.TenantId;
-            tenantProvider.CorrelationId = task.ExecutionId.ToString();
+            try
+            {
+                // Set tenant context for this job scope
+                var tenantProvider = scope.ServiceProvider.GetRequiredService<ITenantProvider>();
+                tenantProvider.TenantId = task.TenantId;
+                tenantProvider.CorrelationId = task.ExecutionId.ToString();
 
-            // Add structured logging scope for tenant and correlation
-            using (_logger.BeginScope(new Dictionary<string, object>
+                // Add structured logging scope for tenant and correlation
+                using (_logger.BeginScope(new Dictionary<string, object>
+                {
+                    ["TenantId"] = task.TenantId,
+                    ["ExecutionId"] = task.ExecutionId,
+                    ["CorrelationId"] = tenantProvider.CorrelationId
+                }))
+                {
+                    var orchestrator = scope.ServiceProvider.GetRequiredService<IPipelineOrchestrator>();
+                    await orchestrator.ExecutePipelineAsync(task.ExecutionId, cts.Token);
+                }
+            }
+            finally
             {
-                ["TenantId"] = task.TenantId,
-                ["ExecutionId"] = task.ExecutionId,
-                ["CorrelationId"] = tenantProvider.CorrelationId
-            }))
-            {
-                var orchestrator = scope.ServiceProvider.GetRequiredService<IPipelineOrchestrator>();
-                await orchestrator.ExecutePipelineAsync(task.ExecutionId, cts.Token);
+                await scope.DisposeAsync();
             }
 
             // Remove from running executions
@@ -199,25 +206,12 @@ public class Worker : BackgroundService
                 _runningExecutions.Remove(task.ExecutionId);
             }
 
-            // Check retry count
-            var retryCount = GetRetryCount(ea.BasicProperties);
+            // Don't retry - just fail and move on
+            // Retrying would cause duplicate batch records and infinite loops
+            _logger.LogError("Execution task failed, sending to DLX: ExecutionId={ExecutionId}", task?.ExecutionId);
             
-            if (retryCount < _settings.MaxRetryAttempts)
-            {
-                _logger.LogWarning("Requeuing execution task (attempt {Attempt}/{Max})", 
-                    retryCount + 1, _settings.MaxRetryAttempts);
-                
-                // Nack and requeue
-                _channel?.BasicNack(ea.DeliveryTag, false, true);
-            }
-            else
-            {
-                _logger.LogError("Max retry attempts reached, sending to DLX: ExecutionId={ExecutionId}", 
-                    task?.ExecutionId);
-                
-                // Send to dead letter queue
-                _channel?.BasicNack(ea.DeliveryTag, false, false);
-            }
+            // Nack without requeue (sends to dead letter exchange)
+            _channel?.BasicNack(ea.DeliveryTag, false, false);
         }
     }
 

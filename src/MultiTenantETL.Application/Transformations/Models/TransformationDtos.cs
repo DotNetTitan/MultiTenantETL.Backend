@@ -51,6 +51,7 @@ public record TransformationListResponse
     public required string Name { get; init; }
     public string? Description { get; init; }
     public required string Type { get; init; }
+    public required JsonElement Config { get; init; }  // Include config for field mapping snapshots
     public DateTime CreatedAt { get; init; }
 }
 

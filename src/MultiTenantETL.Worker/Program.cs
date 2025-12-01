@@ -16,6 +16,7 @@ var builder = Host.CreateApplicationBuilder(args);
 
 // Configuration
 builder.Services.Configure<RabbitMqSettings>(builder.Configuration.GetSection("RabbitMq"));
+builder.Services.Configure<EtlSettings>(builder.Configuration.GetSection(EtlSettings.SectionName));
 
 // Tenant context provider (scoped per job)
 builder.Services.AddScoped<ITenantProvider, TenantProvider>();
@@ -23,6 +24,9 @@ builder.Services.AddScoped<ITenantProvider, TenantProvider>();
 // CurrentUserService (needed by various services, uses TenantProvider in worker context)
 builder.Services.AddHttpContextAccessor(); // Will be null in worker, but required by CurrentUserService
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+
+// Encryption Service (needed for decrypting connector credentials)
+builder.Services.AddSingleton<IEncryptionService, MultiTenantETL.Infrastructure.Security.EncryptionService>();
 
 // Audit Service - use null implementation for worker (actions already audited at API level)
 builder.Services.AddScoped<MultiTenantETL.Application.Interfaces.IAuditService,
@@ -105,6 +109,8 @@ builder.Services.AddScoped<MultiTenantETL.Application.Connectors.DataWriters.IFo
 
 // Orchestration Services
 builder.Services.AddScoped<IPipelineOrchestrator, PipelineOrchestrator>();
+builder.Services.AddScoped<MultiTenantETL.Application.Orchestration.IFieldMappingService,
+    MultiTenantETL.Infrastructure.Orchestration.FieldMappingService>();
 
 // Worker
 builder.Services.AddHostedService<Worker>();

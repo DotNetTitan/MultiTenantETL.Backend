@@ -252,6 +252,7 @@ public class TransformationService : ITransformationService
             Name = transformation.Name,
             Description = transformation.Description,
             Type = transformation.Type,
+            Config = JsonSerializer.Deserialize<JsonElement>(transformation.ConfigJson),
             CreatedAt = transformation.CreatedAt
         };
     }

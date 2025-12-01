@@ -6,7 +6,7 @@ public class Transformation : ITenantResource
 {
     public Guid Id { get; set; }
     public Guid TenantId { get; set; }
-    public Guid PipelineId { get; set; }
+    public Guid? PipelineId { get; set; }  // Nullable - allows standalone transformations
     public required string Name { get; set; }
     public string? Description { get; set; }
     
