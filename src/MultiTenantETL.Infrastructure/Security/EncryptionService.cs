@@ -80,6 +80,13 @@ public class EncryptionService : IEncryptionService
             using var aes = Aes.Create();
             aes.Key = _key;
 
+            // Check if the cipher text is long enough to contain IV
+            if (fullCipher.Length < aes.IV.Length)
+            {
+                throw new InvalidOperationException(
+                    $"Cipher text is too short ({fullCipher.Length} bytes). Expected at least {aes.IV.Length} bytes for IV.");
+            }
+
             // Extract IV from the beginning of the cipher text
             var iv = new byte[aes.IV.Length];
             Array.Copy(fullCipher, 0, iv, 0, iv.Length);
@@ -91,6 +98,11 @@ public class EncryptionService : IEncryptionService
             using var srDecrypt = new StreamReader(csDecrypt);
             
             return srDecrypt.ReadToEnd();
+        }
+        catch (FormatException ex)
+        {
+            _logger.LogError(ex, "Failed to decrypt data - invalid base64 format");
+            throw new InvalidOperationException("Decryption failed: data is not valid base64", ex);
         }
         catch (Exception ex)
         {

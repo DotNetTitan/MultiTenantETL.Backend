@@ -27,6 +27,7 @@ public class TenantService : ITenantService
     {
         // Check if slug already exists
         var existingTenant = await _context.Tenants
+            .IgnoreQueryFilters()
             .FirstOrDefaultAsync(t => t.Slug == slug);
 
         if (existingTenant != null)
@@ -54,18 +55,21 @@ public class TenantService : ITenantService
     public async Task<Tenant?> GetTenantByIdAsync(Guid tenantId)
     {
         return await _context.Tenants
+            .IgnoreQueryFilters()
             .FirstOrDefaultAsync(t => t.Id == tenantId);
     }
 
     public async Task<Tenant?> GetTenantBySlugAsync(string slug)
     {
         return await _context.Tenants
+            .IgnoreQueryFilters()
             .FirstOrDefaultAsync(t => t.Slug == slug);
     }
 
     public async Task<List<Tenant>> GetAllTenantsAsync()
     {
         return await _context.Tenants
+            .IgnoreQueryFilters()
             .OrderBy(t => t.Name)
             .ToListAsync();
     }
@@ -73,6 +77,7 @@ public class TenantService : ITenantService
     public async Task<List<UserTenant>> GetUserTenantsAsync(Guid userId)
     {
         return await _context.UserTenants
+            .IgnoreQueryFilters()
             .Include(ut => ut.Tenant)
             .Where(ut => ut.UserId == userId && ut.IsActive)
             .OrderBy(ut => ut.Tenant.Name)
@@ -254,6 +259,7 @@ public class TenantService : ITenantService
 
         // Validate tenant exists
         var tenant = await _context.Tenants
+            .IgnoreQueryFilters()
             .FirstOrDefaultAsync(t => t.Id == tenantId && t.IsActive);
 
         if (tenant == null)

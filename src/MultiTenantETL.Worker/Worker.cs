@@ -48,10 +48,27 @@ public class Worker : BackgroundService
         _connection = factory.CreateConnection();
         _channel = _connection.CreateModel();
 
+        // Declare queues (idempotent - won't fail if they already exist)
+        _channel.QueueDeclare(
+            queue: _settings.ExecutionQueueName,
+            durable: true,
+            exclusive: false,
+            autoDelete: false,
+            arguments: null);
+
+        _channel.QueueDeclare(
+            queue: _settings.CancellationQueueName,
+            durable: true,
+            exclusive: false,
+            autoDelete: false,
+            arguments: null);
+
         // Set prefetch count to limit concurrent executions
         _channel.BasicQos(prefetchSize: 0, prefetchCount: (ushort)_settings.PrefetchCount, global: false);
 
         _logger.LogInformation("Connected to RabbitMQ at {HostName}:{Port}", _settings.HostName, _settings.Port);
+        _logger.LogInformation("Queues declared: {ExecutionQueue}, {CancellationQueue}", 
+            _settings.ExecutionQueueName, _settings.CancellationQueueName);
 
         return base.StartAsync(cancellationToken);
     }

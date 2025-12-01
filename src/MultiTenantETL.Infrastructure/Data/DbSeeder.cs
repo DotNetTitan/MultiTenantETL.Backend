@@ -114,7 +114,7 @@ public static class DbSeeder
     {
         var dbContext = services.GetRequiredService<ApplicationDbContext>();
 
-        if (!await dbContext.Tenants.AnyAsync())
+        if (!await dbContext.Tenants.IgnoreQueryFilters().AnyAsync())
         {
             var defaultTenant = new Tenant
             {

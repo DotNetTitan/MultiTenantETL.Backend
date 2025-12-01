@@ -70,6 +70,7 @@ public class ClaimsService : IClaimsService
         if (user.CurrentTenantId.HasValue)
         {
             var userTenant = await _context.UserTenants
+                .IgnoreQueryFilters()
                 .Include(ut => ut.Tenant)
                 .FirstOrDefaultAsync(ut =>
                     ut.UserId == user.Id &&
