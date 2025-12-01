@@ -48,13 +48,25 @@ public class Worker : BackgroundService
         _connection = factory.CreateConnection();
         _channel = _connection.CreateModel();
 
+        // Declare dead letter exchange
+        _channel.ExchangeDeclare(
+            exchange: _settings.DeadLetterExchange,
+            type: ExchangeType.Direct,
+            durable: true);
+
         // Declare queues (idempotent - won't fail if they already exist)
+        // Must match the arguments used in RabbitMqPublisher
+        var queueArgs = new Dictionary<string, object>
+        {
+            { "x-dead-letter-exchange", _settings.DeadLetterExchange }
+        };
+
         _channel.QueueDeclare(
             queue: _settings.ExecutionQueueName,
             durable: true,
             exclusive: false,
             autoDelete: false,
-            arguments: null);
+            arguments: queueArgs);
 
         _channel.QueueDeclare(
             queue: _settings.CancellationQueueName,
