@@ -1,6 +1,8 @@
+using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
@@ -10,6 +12,18 @@ using Testcontainers.PostgreSql;
 using Xunit;
 
 namespace MultiTenantETL.IntegrationTests.DataReaders;
+
+/// <summary>
+/// Stub implementation of IEncryptionService for integration tests.
+/// Returns input unchanged since encryption is not the focus of these tests.
+/// </summary>
+internal sealed class StubEncryptionService : IEncryptionService
+{
+    public string Encrypt(string plainText) => plainText;
+    public string Decrypt(string cipherText) => cipherText;
+    public JsonElement EncryptJsonFields(JsonElement jsonElement, params string[] fieldsToEncrypt) => jsonElement;
+    public JsonElement DecryptJsonFields(JsonElement jsonElement, params string[] fieldsToDecrypt) => jsonElement;
+}
 
 public class PostgreSqlDataReaderTests : IAsyncLifetime
 {
@@ -37,7 +51,7 @@ public class PostgreSqlDataReaderTests : IAsyncLifetime
             CommandTimeoutSeconds = 300
         });
         
-        _reader = new PostgreSqlDataReader(logger, settings);
+        _reader = new PostgreSqlDataReader(logger, settings, new StubEncryptionService());
 
         // Create and populate test table
         await using var connection = new NpgsqlConnection(_connectionString);

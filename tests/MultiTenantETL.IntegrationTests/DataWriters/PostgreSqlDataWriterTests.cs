@@ -1,6 +1,8 @@
+using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Domain.Entities;
@@ -11,6 +13,18 @@ using Testcontainers.PostgreSql;
 using Xunit;
 
 namespace MultiTenantETL.IntegrationTests.DataWriters;
+
+/// <summary>
+/// Stub implementation of IEncryptionService for integration tests.
+/// Returns input unchanged since encryption is not the focus of these tests.
+/// </summary>
+internal sealed class StubEncryptionService : IEncryptionService
+{
+    public string Encrypt(string plainText) => plainText;
+    public string Decrypt(string cipherText) => cipherText;
+    public JsonElement EncryptJsonFields(JsonElement jsonElement, params string[] fieldsToEncrypt) => jsonElement;
+    public JsonElement DecryptJsonFields(JsonElement jsonElement, params string[] fieldsToDecrypt) => jsonElement;
+}
 
 public class PostgreSqlDataWriterTests : IAsyncLifetime
 {
@@ -33,7 +47,7 @@ public class PostgreSqlDataWriterTests : IAsyncLifetime
         var logger = LoggerFactory.Create(builder => builder.AddConsole())
             .CreateLogger<PostgreSqlDataWriter>();
         
-        _writer = new PostgreSqlDataWriter(logger);
+        _writer = new PostgreSqlDataWriter(logger, new StubEncryptionService());
 
         // Create test table
         await using var connection = new NpgsqlConnection(_connectionString);

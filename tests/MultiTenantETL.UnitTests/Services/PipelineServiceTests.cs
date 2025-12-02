@@ -20,6 +20,7 @@ public class PipelineServiceTests : IDisposable
     private readonly ILogger<PipelineService> _logger;
     private readonly ICurrentUserService _currentUserService;
     private readonly IAuditService _auditService;
+    private readonly ITenantProvider _tenantProvider;
     private readonly PipelineService _sut;
 
     public PipelineServiceTests()
@@ -28,8 +29,8 @@ public class PipelineServiceTests : IDisposable
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
 
-        var tenantProvider = Substitute.For<ITenantProvider>();
-        _context = new ApplicationDbContext(options, tenantProvider);
+        _tenantProvider = Substitute.For<ITenantProvider>();
+        _context = new ApplicationDbContext(options, _tenantProvider);
         _logger = Substitute.For<ILogger<PipelineService>>();
         _currentUserService = Substitute.For<ICurrentUserService>();
         _auditService = Substitute.For<IAuditService>();
@@ -53,6 +54,7 @@ public class PipelineServiceTests : IDisposable
         var tenantId = Guid.NewGuid();
         var userId = Guid.NewGuid();
         
+        _tenantProvider.TenantId.Returns(tenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
         _currentUserService.GetUserId().Returns(userId);
 
@@ -156,6 +158,7 @@ public class PipelineServiceTests : IDisposable
     {
         // Arrange
         var tenantId = Guid.NewGuid();
+        _tenantProvider.TenantId.Returns(tenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
 
         var sourceConnector = new Connector
@@ -200,6 +203,7 @@ public class PipelineServiceTests : IDisposable
         // Arrange
         var tenantId = Guid.NewGuid();
         var pipelineId = Guid.NewGuid();
+        _tenantProvider.TenantId.Returns(tenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
 
         var sourceConnector = new Connector
@@ -287,6 +291,7 @@ public class PipelineServiceTests : IDisposable
         var userId = Guid.NewGuid();
         var pipelineId = Guid.NewGuid();
         
+        _tenantProvider.TenantId.Returns(tenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
         _currentUserService.GetUserId().Returns(userId);
 
@@ -345,6 +350,7 @@ public class PipelineServiceTests : IDisposable
         // Arrange
         var tenantId = Guid.NewGuid();
         var pipelineId = Guid.NewGuid();
+        _tenantProvider.TenantId.Returns(tenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
 
         var pipeline = new Pipeline
@@ -386,6 +392,7 @@ public class PipelineServiceTests : IDisposable
         // Arrange
         var tenantId = Guid.NewGuid();
         var pipelineId = Guid.NewGuid();
+        _tenantProvider.TenantId.Returns(tenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
 
         var pipeline = new Pipeline
