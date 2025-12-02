@@ -6,18 +6,11 @@ public class Transformation : ITenantResource
 {
     public Guid Id { get; set; }
     public Guid TenantId { get; set; }
-    public Guid? PipelineId { get; set; }  // Nullable - allows standalone transformations
     public required string Name { get; set; }
     public string? Description { get; set; }
     
-    // Transformation type: Filter, Map, String, Script
+    // Transformation type: Filter, Map, Trim, CaseConvert, Substring, Replace, Script
     public required string Type { get; set; }
-    
-    // Order of execution in the pipeline (lower numbers execute first)
-    public int Order { get; set; }
-    
-    // Whether this transformation is enabled
-    public bool IsEnabled { get; set; } = true;
     
     // JSON column for flexible configuration (PostgreSQL JSONB)
     // Stores type-specific configuration (filter rules, mappings, script code, etc.)
@@ -31,5 +24,4 @@ public class Transformation : ITenantResource
 
     // Navigation properties
     public Tenant? Tenant { get; set; }
-    public Pipeline? Pipeline { get; set; }
 }

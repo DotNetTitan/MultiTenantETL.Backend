@@ -92,67 +92,7 @@ public class FilterProcessor : ITransformationProcessor
             return config.Operator == "is_null";
         }
 
-        return config.Operator.ToLower() switch
-        {
-            "equals" => CompareEquals(fieldValue, config.Value),
-            "not_equals" => !CompareEquals(fieldValue, config.Value),
-            "contains" => fieldValue?.ToString()?.Contains(config.Value ?? "", StringComparison.OrdinalIgnoreCase) ?? false,
-            "starts_with" => fieldValue?.ToString()?.StartsWith(config.Value ?? "", StringComparison.OrdinalIgnoreCase) ?? false,
-            "ends_with" => fieldValue?.ToString()?.EndsWith(config.Value ?? "", StringComparison.OrdinalIgnoreCase) ?? false,
-            "greater_than" => CompareGreaterThan(fieldValue, config.Value),
-            "less_than" => CompareLessThan(fieldValue, config.Value),
-            "greater_than_or_equal" => CompareGreaterThanOrEqual(fieldValue, config.Value),
-            "less_than_or_equal" => CompareLessThanOrEqual(fieldValue, config.Value),
-            "is_null" => fieldValue == null,
-            "is_not_null" => fieldValue != null,
-            "in" => config.Values?.Contains(fieldValue?.ToString() ?? "") ?? false,
-            "not_in" => !(config.Values?.Contains(fieldValue?.ToString() ?? "") ?? false),
-            _ => throw new NotSupportedException($"Operator '{config.Operator}' is not supported")
-        };
-    }
-
-    private bool CompareEquals(object? fieldValue, string? compareValue)
-    {
-        if (fieldValue == null && compareValue == null) return true;
-        if (fieldValue == null || compareValue == null) return false;
-        
-        return fieldValue.ToString()?.Equals(compareValue, StringComparison.OrdinalIgnoreCase) ?? false;
-    }
-
-    private bool CompareGreaterThan(object? fieldValue, string? compareValue)
-    {
-        if (fieldValue == null || compareValue == null) return false;
-        
-        if (decimal.TryParse(fieldValue.ToString(), out var fieldNum) &&
-            decimal.TryParse(compareValue, out var compareNum))
-        {
-            return fieldNum > compareNum;
-        }
-        
-        return string.Compare(fieldValue.ToString(), compareValue, StringComparison.Ordinal) > 0;
-    }
-
-    private bool CompareLessThan(object? fieldValue, string? compareValue)
-    {
-        if (fieldValue == null || compareValue == null) return false;
-        
-        if (decimal.TryParse(fieldValue.ToString(), out var fieldNum) &&
-            decimal.TryParse(compareValue, out var compareNum))
-        {
-            return fieldNum < compareNum;
-        }
-        
-        return string.Compare(fieldValue.ToString(), compareValue, StringComparison.Ordinal) < 0;
-    }
-
-    private bool CompareGreaterThanOrEqual(object? fieldValue, string? compareValue)
-    {
-        return CompareEquals(fieldValue, compareValue) || CompareGreaterThan(fieldValue, compareValue);
-    }
-
-    private bool CompareLessThanOrEqual(object? fieldValue, string? compareValue)
-    {
-        return CompareEquals(fieldValue, compareValue) || CompareLessThan(fieldValue, compareValue);
+        return Core.FilterTransformations.EvaluateCondition(fieldValue, config.Operator, config.Value, config.Values);
     }
 
     private FilterConfig ParseConfig(string configJson)

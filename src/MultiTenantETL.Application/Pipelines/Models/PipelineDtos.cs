@@ -110,11 +110,16 @@ public record FieldMapping
     public List<string> SourceFields { get; init; } = new();
     public required string DestinationField { get; init; }
     public List<FieldTransformation> Transformations { get; init; } = new();
+    public int Order { get; init; }
 }
 
 public record FieldTransformation
 {
-    public required string TransformationId { get; init; }
+    public required string Id { get; init; }
+    public required string Type { get; init; } // Filter, Map, Trim, CaseConvert, Substring, Replace, Script
+    public required JsonElement Config { get; init; } // Type-specific configuration
+    public int Order { get; init; }
+    public bool IsEnabled { get; init; } = true;
 }
 
 public record PipelineSchedule

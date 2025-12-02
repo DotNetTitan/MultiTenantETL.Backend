@@ -111,50 +111,14 @@ public class PipelineOrchestrator : IPipelineOrchestrator
 
                 try
                 {
-                    // Apply transformations
-                    var transformationResult = await _transformationOrchestrator.ApplyTransformationsAsync(
-                        batch,
-                        pipeline.Id,
-                        TransformationPolicy.ContinueOnError,
-                        cancellationToken);
-
-                    if (!transformationResult.Success)
-                    {
-                        _logger.LogError(
-                            "Transformation failed for batch {BatchIndex}: {ErrorMessage}",
-                            batchIndex,
-                            transformationResult.ErrorMessage);
-                        
-                        executionBatch.Status = BatchStatus.Failed;
-                        executionBatch.RowsFailed = batch.RowCount;
-                        executionBatch.EndedAt = DateTimeOffset.UtcNow;
-                        
-                        totalFailed += batch.RowCount;
-                        execution.RecordsFailed = totalFailed;
-                        
-                        await _context.SaveChangesAsync(cancellationToken);
-                        await AddLogEntry(execution, "Error", "Transformation", 
-                            $"Batch {batchIndex} transformation failed: {transformationResult.ErrorMessage}", 
-                            cancellationToken);
-                        
-                        continue; // Skip to next batch
-                    }
-
-                    var transformedBatch = transformationResult.TransformedBatch;
+                    // Apply field mappings (includes embedded transformations)
+                    // Transformations are now applied per-field within the field mapping process
+                    var mappedBatch = _fieldMappingService.ApplyFieldMappings(batch, pipeline.FieldMappingsJson);
                     
-                    // Log transformation metrics
-                    if (transformationResult.StepResults.Any())
-                    {
-                        await AddLogEntry(execution, "Info", "Transformation",
-                            $"Batch {batchIndex}: Applied {transformationResult.StepResults.Count} transformations, " +
-                            $"{transformationResult.InitialRowCount} → {transformationResult.FinalRowCount} rows, " +
-                            $"{transformationResult.TotalRowsFiltered} filtered, " +
-                            $"{transformationResult.TotalRowsWithErrors} errors",
-                            cancellationToken);
-                    }
-
-                    // Apply field mappings
-                    var mappedBatch = _fieldMappingService.ApplyFieldMappings(transformedBatch, pipeline.FieldMappingsJson);
+                    await AddLogEntry(execution, "Info", "FieldMapping",
+                        $"Batch {batchIndex}: Applied field mappings with transformations, " +
+                        $"{batch.RowCount} → {mappedBatch.RowCount} rows",
+                        cancellationToken);
                     
                     // Write batch
                     var writeOptions = new Application.Connectors.DataWriters.WriteOptions();

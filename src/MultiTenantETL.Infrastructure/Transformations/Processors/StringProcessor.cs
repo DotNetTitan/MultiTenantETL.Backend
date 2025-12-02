@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Transformations;
@@ -91,37 +90,10 @@ public class StringProcessor : ITransformationProcessor
 
     private string ApplyStringOperation(string value, StringConfig config)
     {
-        return config.Operation.ToLower() switch
-        {
-            "trim" => value.Trim(),
-            "trim_start" => value.TrimStart(),
-            "trim_end" => value.TrimEnd(),
-            "upper" => value.ToUpper(),
-            "lower" => value.ToLower(),
-            "title_case" => System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(value.ToLower()),
-            "substring" => Substring(value, config.Start ?? 0, config.Length),
-            "replace" => value.Replace(config.OldValue ?? "", config.NewValue ?? ""),
-            "regex_replace" => Regex.Replace(value, config.Pattern ?? "", config.Replacement ?? ""),
-            "pad_left" => value.PadLeft(config.TotalWidth ?? value.Length, config.PaddingChar ?? ' '),
-            "pad_right" => value.PadRight(config.TotalWidth ?? value.Length, config.PaddingChar ?? ' '),
-            "remove_whitespace" => Regex.Replace(value, @"\s+", ""),
-            "normalize_whitespace" => Regex.Replace(value.Trim(), @"\s+", " "),
-            _ => throw new NotSupportedException($"Operation '{config.Operation}' is not supported")
-        };
-    }
-
-    private string Substring(string value, int start, int? length)
-    {
-        if (start < 0 || start >= value.Length)
-            return string.Empty;
+        var configJson = JsonSerializer.Serialize(config);
+        var configElement = JsonDocument.Parse(configJson).RootElement;
         
-        if (length.HasValue)
-        {
-            var actualLength = Math.Min(length.Value, value.Length - start);
-            return value.Substring(start, actualLength);
-        }
-        
-        return value.Substring(start);
+        return Core.StringTransformations.ApplyOperation(value, config.Operation, configElement, _logger) ?? value;
     }
 
     private StringConfig ParseConfig(string configJson)

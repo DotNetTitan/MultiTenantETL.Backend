@@ -135,7 +135,7 @@ public static class MetadataConstants
             ("Map", "transformations.map", "mdi-map", "transformations.categoryTransformation", "transformations.mapDescription"),
             ("Script", "transformations.script", "mdi-code-braces", "transformations.categoryCustom", "transformations.scriptDescription"),
             ("Trim", "transformations.trim", "mdi-content-cut", "transformations.categoryText", "transformations.trimDescription"),
-            ("Case", "transformations.case", "mdi-format-letter-case", "transformations.categoryText", "transformations.caseDescription"),
+            ("CaseConvert", "transformations.case", "mdi-format-letter-case", "transformations.categoryText", "transformations.caseDescription"),
             ("Substring", "transformations.substring", "mdi-text-box-outline", "transformations.categoryText", "transformations.substringDescription"),
             ("Replace", "transformations.replace", "mdi-find-replace", "transformations.categoryText", "transformations.replaceDescription")
         };

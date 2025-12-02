@@ -52,6 +52,10 @@ builder.Services.AddScoped<MultiTenantETL.Application.Transformations.ITransform
 builder.Services.AddScoped<MultiTenantETL.Application.Transformations.ITransformationProcessor,
     MultiTenantETL.Infrastructure.Transformations.Processors.ScriptProcessor>();
 
+// Field Transformation Processor (for complex field mappings)
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.Transformations.FieldProcessors.IFieldTransformationProcessor,
+    MultiTenantETL.Infrastructure.Transformations.FieldProcessors.FieldTransformationProcessor>();
+
 // Data Reader Factories
 builder.Services.AddScoped<IDataReaderFactory, DataReaderFactory>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataAccess.Readers.Database.IDatabaseDataReaderFactory,

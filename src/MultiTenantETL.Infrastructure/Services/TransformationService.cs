@@ -261,13 +261,10 @@ public class TransformationService : ITransformationService
     {
         var tenantId = _currentUserService.GetTenantId();
 
-        _logger.LogInformation("Getting transformations for pipeline {PipelineId}", pipelineId);
+        _logger.LogInformation("Getting transformations for pipeline {PipelineId} - NOTE: Transformations are now embedded in field mappings", pipelineId);
 
-        var transformations = await _context.Transformations
-            .Where(t => t.PipelineId == pipelineId && t.TenantId == tenantId && t.IsEnabled)
-            .OrderBy(t => t.Order)
-            .ToListAsync(cancellationToken);
-
-        return transformations;
+        // Transformations are now embedded in field mappings, not stored separately per pipeline
+        // Return empty list for backward compatibility
+        return Enumerable.Empty<Transformation>();
     }
 }

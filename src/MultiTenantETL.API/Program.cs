@@ -360,6 +360,10 @@ builder.Services.AddScoped<MultiTenantETL.Application.Transformations.ITransform
 builder.Services.AddScoped<MultiTenantETL.Application.Transformations.ITransformationProcessor,
     MultiTenantETL.Infrastructure.Transformations.Processors.ScriptProcessor>();
 
+// Field Transformation Processor (for complex field mappings)
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.Transformations.FieldProcessors.IFieldTransformationProcessor,
+    MultiTenantETL.Infrastructure.Transformations.FieldProcessors.FieldTransformationProcessor>();
+
 // Pipeline Services
 builder.Services.AddScoped<MultiTenantETL.Application.Pipelines.IPipelineService,
     MultiTenantETL.Infrastructure.Services.PipelineService>();

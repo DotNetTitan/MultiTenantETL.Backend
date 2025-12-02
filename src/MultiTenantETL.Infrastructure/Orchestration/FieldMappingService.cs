@@ -2,16 +2,26 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Orchestration;
+using MultiTenantETL.Application.Transformations;
+using MultiTenantETL.Infrastructure.Transformations.FieldProcessors;
+using MultiTenantETL.Domain.Entities;
 
 namespace MultiTenantETL.Infrastructure.Orchestration;
 
 public class FieldMappingService : IFieldMappingService
 {
     private readonly ILogger<FieldMappingService> _logger;
+    private readonly IFieldTransformationProcessor _fieldProcessor;
+    private readonly IEnumerable<ITransformationProcessor> _batchProcessors;
 
-    public FieldMappingService(ILogger<FieldMappingService> logger)
+    public FieldMappingService(
+        ILogger<FieldMappingService> logger,
+        IFieldTransformationProcessor fieldProcessor,
+        IEnumerable<ITransformationProcessor> batchProcessors)
     {
         _logger = logger;
+        _fieldProcessor = fieldProcessor;
+        _batchProcessors = batchProcessors;
     }
 
     public ReadBatch ApplyFieldMappings(ReadBatch batch, string fieldMappingsJson)
@@ -30,35 +40,39 @@ public class FieldMappingService : IFieldMappingService
                 return batch;
             }
 
-            var mappedBatch = new ReadBatch { BatchId = batch.BatchId };
+            // HYBRID APPROACH: Separate simple vs complex mappings
+            var simpleMappings = mappings.Where(m => m.SourceFields.Count == 1).OrderBy(m => m.Order).ToList();
+            var complexMappings = mappings.Where(m => m.SourceFields.Count > 1).OrderBy(m => m.Order).ToList();
 
-            foreach (var row in batch.Rows)
+            // STEP 1: Process simple mappings with BATCH processors (performance)
+            foreach (var mapping in simpleMappings)
             {
-                var mappedRow = new Dictionary<string, object?>();
+                var sourceField = mapping.SourceFields[0];
 
-                foreach (var mapping in mappings.OrderBy(m => m.Order))
+                // Apply transformations at batch level
+                if (mapping.Transformations != null && mapping.Transformations.Count > 0)
                 {
-                    // Get source value(s)
-                    object? value = null;
-                    
-                    if (mapping.SourceFields.Count == 0)
+                    foreach (var trans in mapping.Transformations.OrderBy(t => t.Order).Where(t => t.IsEnabled))
                     {
-                        _logger.LogWarning("Mapping has no source fields for destination '{Dest}'", mapping.DestinationField);
-                        continue;
+                        batch = ApplyBatchTransformation(batch, sourceField, trans);
                     }
-                    else if (mapping.SourceFields.Count == 1)
+                }
+
+                // Rename field if needed
+                if (sourceField != mapping.DestinationField)
+                {
+                    batch = RenameFieldInBatch(batch, sourceField, mapping.DestinationField);
+                }
+            }
+
+            // STEP 2: Process complex mappings ROW-BY-ROW (flexibility)
+            if (complexMappings.Any())
+            {
+                foreach (var row in batch.Rows)
+                {
+                    foreach (var mapping in complexMappings)
                     {
-                        // Single source field
-                        var sourceField = mapping.SourceFields[0];
-                        if (!row.TryGetValue(sourceField, out value))
-                        {
-                            _logger.LogWarning("Source field '{SourceField}' not found in row", sourceField);
-                            value = null;
-                        }
-                    }
-                    else
-                    {
-                        // Multiple source fields - create array
+                        // Get multiple source values
                         var values = new List<object?>();
                         foreach (var sourceField in mapping.SourceFields)
                         {
@@ -71,26 +85,31 @@ public class FieldMappingService : IFieldMappingService
                                 values.Add(null);
                             }
                         }
-                        value = values;
-                    }
 
-                    // Apply transformations in order
-                    if (mapping.Transformations != null && mapping.Transformations.Count > 0)
-                    {
-                        foreach (var transformation in mapping.Transformations.OrderBy(t => t.Order))
+                        // Apply transformations to combined value
+                        object? result = values;
+                        if (mapping.Transformations != null && mapping.Transformations.Count > 0)
                         {
-                            value = ApplyTransformation(value, transformation, mapping.SourceFields);
+                            foreach (var trans in mapping.Transformations.OrderBy(t => t.Order).Where(t => t.IsEnabled))
+                            {
+                                var transformationConfig = new Transformations.FieldProcessors.TransformationConfig
+                                {
+                                    Id = trans.Id,
+                                    Type = trans.Type,
+                                    Config = trans.Config,
+                                    Order = trans.Order,
+                                    IsEnabled = trans.IsEnabled
+                                };
+                                result = _fieldProcessor.ApplyTransformation(result, transformationConfig, mapping.SourceFields);
+                            }
                         }
+
+                        row[mapping.DestinationField] = result;
                     }
-
-                    mappedRow[mapping.DestinationField] = value;
                 }
-
-                mappedBatch.Rows.Add(mappedRow);
-                mappedBatch.RowCount++;
             }
 
-            return mappedBatch;
+            return batch;
         }
         catch (Exception ex)
         {
@@ -99,173 +118,84 @@ public class FieldMappingService : IFieldMappingService
         }
     }
 
-    private object? ApplyTransformation(object? value, TransformationConfig transformation, List<string> sourceFields)
+    private ReadBatch ApplyBatchTransformation(ReadBatch batch, string fieldName, TransformationDto transformation)
     {
         try
         {
-            if (transformation.Config == null || !transformation.Config.HasValue)
+            // Find appropriate batch processor
+            var processor = _batchProcessors.FirstOrDefault(p =>
+                p.TransformationType.Equals(transformation.Type, StringComparison.OrdinalIgnoreCase));
+
+            if (processor == null)
             {
-                _logger.LogWarning("Transformation has no config");
-                return value;
+                _logger.LogWarning("No batch processor found for type {Type}, skipping", transformation.Type);
+                return batch;
             }
 
-            var config = transformation.Config.Value;
-
-            return transformation.Type switch
+            // Create transformation entity for processor
+            var transformationEntity = new Transformation
             {
-                "Script" => ApplyScriptTransformation(value, config),
-                "Trim" => ApplyTrimTransformation(value, config),
-                "Case Convert" => ApplyCaseConvertTransformation(value, config),
-                "Substring" => ApplySubstringTransformation(value, config),
-                "Replace" => ApplyReplaceTransformation(value, config),
-                "Map" => ApplyMapTransformation(value, config),
-                "Filter" => ApplyFilterTransformation(value, config),
-                _ => value
+                Id = Guid.Parse(transformation.Id),
+                TenantId = Guid.Empty, // Not needed for processing
+                Name = transformation.Type,
+                Type = transformation.Type,
+                ConfigJson = transformation.Config?.ToString() ?? "{}",
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = Guid.Empty
+            };
+
+            // Apply transformation synchronously (processors are fast)
+            var result = processor.ProcessBatchAsync(batch, transformationEntity, CancellationToken.None).GetAwaiter().GetResult();
+
+            return new ReadBatch
+            {
+                BatchId = batch.BatchId,
+                Rows = result.TransformedRows,
+                RowCount = result.TransformedRows.Count
             };
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error applying transformation {Type}", transformation.Type);
-            return value;
+            _logger.LogError(ex, "Error applying batch transformation {Type} to field {Field}", transformation.Type, fieldName);
+            return batch;
         }
     }
 
-    private object? ApplyScriptTransformation(object? value, JsonElement config)
+    private ReadBatch RenameFieldInBatch(ReadBatch batch, string oldName, string newName)
     {
-        // For now, just convert to string as a simple implementation
-        // Full script execution would require Jint or similar
-        if (value == null) return null;
-        return value.ToString();
-    }
-
-    private object? ApplyTrimTransformation(object? value, JsonElement config)
-    {
-        if (value == null) return null;
-        var str = value.ToString();
-        if (string.IsNullOrEmpty(str)) return str;
-
-        var trimType = config.TryGetProperty("trimType", out var prop) ? prop.GetString() : "both";
-        
-        return trimType switch
+        foreach (var row in batch.Rows)
         {
-            "start" => str.TrimStart(),
-            "end" => str.TrimEnd(),
-            _ => str.Trim()
-        };
-    }
-
-    private object? ApplyCaseConvertTransformation(object? value, JsonElement config)
-    {
-        if (value == null) return null;
-        var str = value.ToString();
-        if (string.IsNullOrEmpty(str)) return str;
-
-        var caseType = config.TryGetProperty("caseType", out var prop) ? prop.GetString() : "uppercase";
-        
-        return caseType switch
-        {
-            "lowercase" => str.ToLower(),
-            "uppercase" => str.ToUpper(),
-            "titlecase" => System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(str.ToLower()),
-            "camelcase" => ToCamelCase(str),
-            _ => str
-        };
-    }
-
-    private object? ApplySubstringTransformation(object? value, JsonElement config)
-    {
-        if (value == null) return null;
-        var str = value.ToString();
-        if (string.IsNullOrEmpty(str)) return str;
-
-        var start = config.TryGetProperty("start", out var startProp) ? startProp.GetInt32() : 0;
-        var length = config.TryGetProperty("length", out var lengthProp) ? lengthProp.GetInt32() : (int?)null;
-
-        if (start >= str.Length) return string.Empty;
-        
-        return length.HasValue 
-            ? str.Substring(start, Math.Min(length.Value, str.Length - start))
-            : str.Substring(start);
-    }
-
-    private object? ApplyReplaceTransformation(object? value, JsonElement config)
-    {
-        if (value == null) return null;
-        var str = value.ToString();
-        if (string.IsNullOrEmpty(str)) return str;
-
-        var searchValue = config.TryGetProperty("searchValue", out var searchProp) ? searchProp.GetString() : "";
-        var replaceValue = config.TryGetProperty("replaceValue", out var replaceProp) ? replaceProp.GetString() : "";
-        
-        if (string.IsNullOrEmpty(searchValue)) return str;
-
-        return str.Replace(searchValue, replaceValue ?? "");
-    }
-
-    private object? ApplyMapTransformation(object? value, JsonElement config)
-    {
-        if (value == null) return null;
-        var str = value.ToString();
-
-        if (config.TryGetProperty("mappings", out var mappingsProp) && mappingsProp.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var mapping in mappingsProp.EnumerateArray())
+            if (row.TryGetValue(oldName, out var value))
             {
-                var from = mapping.TryGetProperty("from", out var fromProp) ? fromProp.GetString() : "";
-                var to = mapping.TryGetProperty("to", out var toProp) ? toProp.GetString() : "";
-                
-                if (str == from)
+                row[newName] = value;
+                if (oldName != newName)
                 {
-                    return to;
+                    row.Remove(oldName);
                 }
             }
         }
-
-        // Return default value if no mapping found
-        if (config.TryGetProperty("defaultValue", out var defaultProp))
-        {
-            return defaultProp.GetString();
-        }
-
-        return value;
+        return batch;
     }
 
-    private object? ApplyFilterTransformation(object? value, JsonElement config)
-    {
-        // Filter transformations don't modify values, they're used for row filtering
-        // This would be handled at a higher level
-        return value;
-    }
 
-    private string ToCamelCase(string str)
-    {
-        if (string.IsNullOrEmpty(str)) return str;
-        var words = str.Split(new[] { ' ', '_', '-' }, StringSplitOptions.RemoveEmptyEntries);
-        if (words.Length == 0) return str;
-        
-        var result = words[0].ToLower();
-        for (int i = 1; i < words.Length; i++)
-        {
-            result += char.ToUpper(words[i][0]) + words[i].Substring(1).ToLower();
-        }
-        return result;
-    }
 
     private class FieldMapping
     {
         public string Id { get; set; } = string.Empty;
         public int Order { get; set; }
         public List<string> SourceFields { get; set; } = new();
-        public List<TransformationConfig> Transformations { get; set; } = new();
+        public List<TransformationDto> Transformations { get; set; } = new();
         public string DestinationField { get; set; } = string.Empty;
     }
 
-    private class TransformationConfig
+    private class TransformationDto
     {
-        public string TransformationId { get; set; } = string.Empty;
+        public string Id { get; set; } = string.Empty;
         public string Type { get; set; } = string.Empty;
-        public string Name { get; set; } = string.Empty;
         public JsonElement? Config { get; set; }
         public int Order { get; set; }
+        public bool IsEnabled { get; set; } = true;
     }
+
+
 }

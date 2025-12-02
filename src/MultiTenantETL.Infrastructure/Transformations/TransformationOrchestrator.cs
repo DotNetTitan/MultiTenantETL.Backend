@@ -40,119 +40,24 @@ public class TransformationOrchestrator : ITransformationOrchestrator
 
         try
         {
-            // Load transformations for this pipeline
-            var transformations = await _transformationService.GetByPipelineIdAsync(pipelineId, cancellationToken);
-            
-            if (!transformations.Any())
-            {
-                _logger.LogInformation("No transformations configured for pipeline {PipelineId}", pipelineId);
-                result.TransformedBatch = batch;
-                result.FinalRowCount = batch.RowCount;
-                return result;
-            }
-
-            // Sort transformations by order
-            var orderedTransformations = transformations.OrderBy(t => t.Order).ToList();
+            // NOTE: Transformations are now embedded in field mappings
+            // This orchestrator is kept for backward compatibility and global transformations
+            // Field-level transformations are handled by FieldMappingService
             
             _logger.LogInformation(
-                "Applying {Count} transformations to batch {BatchId} with policy {Policy}",
-                orderedTransformations.Count,
-                batch.BatchId,
-                policy);
+                "TransformationOrchestrator called for pipeline {PipelineId} - transformations now handled in field mappings",
+                pipelineId);
 
-            // Apply transformations sequentially
-            var currentBatch = batch;
-            
-            foreach (var transformation in orderedTransformations)
-            {
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    result.Success = false;
-                    result.ErrorMessage = "Operation cancelled";
-                    break;
-                }
-
-                try
-                {
-                    var stepResult = await ApplyTransformationAsync(
-                        currentBatch,
-                        transformation,
-                        policy,
-                        cancellationToken);
-
-                    result.StepResults.Add(stepResult);
-                    result.TotalRowsFiltered += stepResult.Result.RowsFiltered;
-                    result.TotalRowsWithErrors += stepResult.Result.RowsWithErrors;
-
-                    // Check if we should continue based on policy
-                    if (stepResult.Result.RowsWithErrors > 0 && policy == TransformationPolicy.FailFast)
-                    {
-                        result.Success = false;
-                        result.ErrorMessage = $"Transformation '{transformation.Name}' failed with {stepResult.Result.RowsWithErrors} errors (FailFast policy)";
-                        break;
-                    }
-
-                    // Update current batch for next transformation
-                    currentBatch = new ReadBatch
-                    {
-                        BatchId = batch.BatchId,
-                        Rows = stepResult.Result.TransformedRows,
-                        RowCount = stepResult.Result.TransformedRows.Count
-                    };
-
-                    _logger.LogInformation(
-                        "Transformation '{Name}' completed: {Processed} processed, {Filtered} filtered, {Errors} errors, {Time}ms",
-                        transformation.Name,
-                        stepResult.Result.RowsProcessed,
-                        stepResult.Result.RowsFiltered,
-                        stepResult.Result.RowsWithErrors,
-                        stepResult.Result.ExecutionTime.TotalMilliseconds);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Transformation '{Name}' failed", transformation.Name);
-                    
-                    if (policy == TransformationPolicy.FailFast)
-                    {
-                        result.Success = false;
-                        result.ErrorMessage = $"Transformation '{transformation.Name}' threw exception: {ex.Message}";
-                        break;
-                    }
-                    
-                    // Log error but continue with next transformation
-                    result.StepResults.Add(new TransformationStepResult
-                    {
-                        TransformationId = transformation.Id,
-                        TransformationType = transformation.Type,
-                        Order = transformation.Order,
-                        Result = new TransformationResult
-                        {
-                            BatchId = batch.BatchId,
-                            RowsProcessed = currentBatch.RowCount,
-                            RowsWithErrors = currentBatch.RowCount,
-                            Errors = new List<TransformationError>
-                            {
-                                new()
-                                {
-                                    RowIndex = -1,
-                                    Message = ex.Message,
-                                    ErrorCode = "TRANSFORMATION_EXCEPTION"
-                                }
-                            }
-                        }
-                    });
-                }
-            }
-
-            result.TransformedBatch = currentBatch;
-            result.FinalRowCount = currentBatch.RowCount;
+            // Return batch unchanged - transformations applied in field mapping phase
+            result.TransformedBatch = batch;
+            result.FinalRowCount = batch.RowCount;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Orchestration failed for batch {BatchId}", batch.BatchId);
             result.Success = false;
             result.ErrorMessage = $"Orchestration failed: {ex.Message}";
-            result.TransformedBatch = batch; // Return original batch on failure
+            result.TransformedBatch = batch;
             result.FinalRowCount = batch.RowCount;
         }
         finally
@@ -186,7 +91,7 @@ public class TransformationOrchestrator : ITransformationOrchestrator
         {
             TransformationId = transformation.Id,
             TransformationType = transformation.Type,
-            Order = transformation.Order,
+            Order = 0, // Order is now managed in field mappings
             Result = result
         };
     }
