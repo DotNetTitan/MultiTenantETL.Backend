@@ -5,7 +5,8 @@ var postgres = builder.AddPostgres("postgres")
     .WithDataVolume("multitenant-etl-postgres-data")
     .WithPgAdmin();
 
-var postgresDb = postgres.AddDatabase("multitenant_etl");
+// Resource name must use hyphens (Aspire naming rules), but actual database name can use underscores
+var postgresDb = postgres.AddDatabase("multitenant-etl-db", databaseName: "multitenant_etl");
 
 // RabbitMQ message broker
 var rabbitmq = builder.AddRabbitMQ("messaging")
