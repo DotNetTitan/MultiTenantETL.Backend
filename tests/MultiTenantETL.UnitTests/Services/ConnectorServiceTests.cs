@@ -22,6 +22,7 @@ public class ConnectorServiceTests : IDisposable
     private readonly IEncryptionService _encryptionService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IAuditService _auditService;
+    private readonly ITenantProvider _tenantProvider;
     private readonly ConnectorService _sut;
 
     public ConnectorServiceTests()
@@ -30,8 +31,8 @@ public class ConnectorServiceTests : IDisposable
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
 
-        var tenantProvider = Substitute.For<ITenantProvider>();
-        _context = new ApplicationDbContext(options, tenantProvider);
+        _tenantProvider = Substitute.For<ITenantProvider>();
+        _context = new ApplicationDbContext(options, _tenantProvider);
         _logger = Substitute.For<ILogger<ConnectorService>>();
         _connectionTester = Substitute.For<IConnectionTester>();
         _schemaDetector = Substitute.For<ISchemaDetector>();
@@ -59,6 +60,7 @@ public class ConnectorServiceTests : IDisposable
         // Arrange
         var tenantId = Guid.NewGuid();
         var userId = Guid.NewGuid();
+        _tenantProvider.TenantId.Returns(tenantId);
         var request = new CreateConnectorRequest
         {
             Name = "Test Connector",
@@ -109,6 +111,7 @@ public class ConnectorServiceTests : IDisposable
         var tenantId = Guid.NewGuid();
         var connectorId = Guid.NewGuid();
         var encryptedConfigJson = "{\"Host\":\"localhost\",\"Password\":\"encrypted_secret\"}";
+        _tenantProvider.TenantId.Returns(tenantId);
         
         var connector = new Connector
         {
@@ -167,6 +170,7 @@ public class ConnectorServiceTests : IDisposable
         var tenantId = Guid.NewGuid();
         var otherTenantId = Guid.NewGuid();
         var connectorId = Guid.NewGuid();
+        _tenantProvider.TenantId.Returns(otherTenantId);
         
         var connector = new Connector
         {
@@ -187,6 +191,9 @@ public class ConnectorServiceTests : IDisposable
 
         _context.Connectors.Add(connector);
         await _context.SaveChangesAsync();
+        
+        // Switch tenant context for the query
+        _tenantProvider.TenantId.Returns(tenantId);
 
         // Act
         var act = async () => await _sut.GetByIdAsync(connectorId, tenantId);
@@ -202,6 +209,7 @@ public class ConnectorServiceTests : IDisposable
         var tenantId = Guid.NewGuid();
         var userId = Guid.NewGuid();
         var connectorId = Guid.NewGuid();
+        _tenantProvider.TenantId.Returns(tenantId);
         
         var connector = new Connector
         {
@@ -262,6 +270,7 @@ public class ConnectorServiceTests : IDisposable
         // Arrange
         var tenantId = Guid.NewGuid();
         var connectorId = Guid.NewGuid();
+        _tenantProvider.TenantId.Returns(tenantId);
         
         var connector = new Connector
         {
@@ -305,6 +314,7 @@ public class ConnectorServiceTests : IDisposable
         // Arrange
         var tenantId = Guid.NewGuid();
         var otherTenantId = Guid.NewGuid();
+        _tenantProvider.TenantId.Returns(tenantId);
         
         var connector1 = new Connector
         {

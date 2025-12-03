@@ -5,6 +5,7 @@ using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.DataReaders;
+using MultiTenantETL.IntegrationTests.TestUtilities;
 using Npgsql;
 using Testcontainers.PostgreSql;
 using Xunit;
@@ -37,7 +38,7 @@ public class PostgreSqlDataReaderTests : IAsyncLifetime
             CommandTimeoutSeconds = 300
         });
         
-        _reader = new PostgreSqlDataReader(logger, settings);
+        _reader = new PostgreSqlDataReader(logger, settings, new StubEncryptionService());
 
         // Create and populate test table
         await using var connection = new NpgsqlConnection(_connectionString);

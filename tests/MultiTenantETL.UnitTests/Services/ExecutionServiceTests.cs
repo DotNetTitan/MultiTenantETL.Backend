@@ -19,6 +19,7 @@ public class ExecutionServiceTests : IDisposable
     private readonly ILogger<ExecutionService> _logger;
     private readonly ICurrentUserService _currentUserService;
     private readonly IMessagePublisher _messagePublisher;
+    private readonly ITenantProvider _tenantProvider;
     private readonly ExecutionService _sut;
 
     public ExecutionServiceTests()
@@ -27,8 +28,8 @@ public class ExecutionServiceTests : IDisposable
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
 
-        var tenantProvider = Substitute.For<ITenantProvider>();
-        _context = new ApplicationDbContext(options, tenantProvider);
+        _tenantProvider = Substitute.For<ITenantProvider>();
+        _context = new ApplicationDbContext(options, _tenantProvider);
         _logger = Substitute.For<ILogger<ExecutionService>>();
         _currentUserService = Substitute.For<ICurrentUserService>();
         _messagePublisher = Substitute.For<IMessagePublisher>();
@@ -53,6 +54,7 @@ public class ExecutionServiceTests : IDisposable
         var userId = Guid.NewGuid();
         var pipelineId = Guid.NewGuid();
         
+        _tenantProvider.TenantId.Returns(tenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
 
         var tenant = new Tenant { Id = tenantId, Name = "Test Tenant", Slug = "test", IsActive = true, CreatedAt = DateTime.UtcNow };
@@ -117,6 +119,7 @@ public class ExecutionServiceTests : IDisposable
         // Arrange
         var tenantId = Guid.NewGuid();
         var pipelineId = Guid.NewGuid();
+        _tenantProvider.TenantId.Returns(tenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
 
         var tenant = new Tenant { Id = tenantId, Name = "Test Tenant", Slug = "test", IsActive = true, CreatedAt = DateTime.UtcNow };
@@ -149,13 +152,14 @@ public class ExecutionServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task StartExecutionAsync_WrongTenant_ThrowsUnauthorizedAccessException()
+    public async Task StartExecutionAsync_WrongTenant_ThrowsKeyNotFoundException()
     {
         // Arrange
         var tenantId = Guid.NewGuid();
         var otherTenantId = Guid.NewGuid();
         var pipelineId = Guid.NewGuid();
         
+        _tenantProvider.TenantId.Returns(otherTenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
 
         var tenant = new Tenant { Id = tenantId, Name = "Test Tenant", Slug = "test", IsActive = true, CreatedAt = DateTime.UtcNow };
@@ -179,13 +183,17 @@ public class ExecutionServiceTests : IDisposable
 
         _context.Pipelines.Add(pipeline);
         await _context.SaveChangesAsync();
+        
+        // Switch tenant context for the query (service will use different tenant than inserted pipeline)
+        // With tenant query filters, the pipeline won't be found - this is the correct tenant isolation behavior
+        _tenantProvider.TenantId.Returns(tenantId);
 
         // Act
         var act = async () => await _sut.StartExecutionAsync(pipelineId, "Manual", null);
 
-        // Assert
-        await act.Should().ThrowAsync<UnauthorizedAccessException>()
-            .WithMessage("You don't have access to this pipeline");
+        // Assert - With tenant query filters, pipelines from other tenants are not found
+        await act.Should().ThrowAsync<KeyNotFoundException>()
+            .WithMessage($"Pipeline with ID {pipelineId} not found");
     }
 
     [Fact]
@@ -196,6 +204,7 @@ public class ExecutionServiceTests : IDisposable
         var executionId = Guid.NewGuid();
         var pipelineId = Guid.NewGuid();
         
+        _tenantProvider.TenantId.Returns(tenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
 
         var pipeline = new Pipeline
@@ -253,6 +262,7 @@ public class ExecutionServiceTests : IDisposable
         var executionId = Guid.NewGuid();
         var pipelineId = Guid.NewGuid();
         
+        _tenantProvider.TenantId.Returns(tenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
 
         var pipeline = new Pipeline
@@ -301,6 +311,7 @@ public class ExecutionServiceTests : IDisposable
         var executionId = Guid.NewGuid();
         var pipelineId = Guid.NewGuid();
         
+        _tenantProvider.TenantId.Returns(tenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
 
         var tenant = new Tenant { Id = tenantId, Name = "Test Tenant", Slug = "test", IsActive = true, CreatedAt = DateTime.UtcNow };

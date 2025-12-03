@@ -6,6 +6,7 @@ using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.DataWriters;
+using MultiTenantETL.IntegrationTests.TestUtilities;
 using Npgsql;
 using Testcontainers.PostgreSql;
 using Xunit;
@@ -33,7 +34,7 @@ public class PostgreSqlDataWriterTests : IAsyncLifetime
         var logger = LoggerFactory.Create(builder => builder.AddConsole())
             .CreateLogger<PostgreSqlDataWriter>();
         
-        _writer = new PostgreSqlDataWriter(logger);
+        _writer = new PostgreSqlDataWriter(logger, new StubEncryptionService());
 
         // Create test table
         await using var connection = new NpgsqlConnection(_connectionString);

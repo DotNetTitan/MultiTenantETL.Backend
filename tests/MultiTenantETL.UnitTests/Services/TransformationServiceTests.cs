@@ -19,6 +19,7 @@ public class TransformationServiceTests : IDisposable
     private readonly ILogger<TransformationService> _logger;
     private readonly ICurrentUserService _currentUserService;
     private readonly IAuditService _auditService;
+    private readonly ITenantProvider _tenantProvider;
     private readonly TransformationService _sut;
 
     public TransformationServiceTests()
@@ -27,8 +28,8 @@ public class TransformationServiceTests : IDisposable
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
 
-        var tenantProvider = Substitute.For<ITenantProvider>();
-        _context = new ApplicationDbContext(options, tenantProvider);
+        _tenantProvider = Substitute.For<ITenantProvider>();
+        _context = new ApplicationDbContext(options, _tenantProvider);
         _logger = Substitute.For<ILogger<TransformationService>>();
         _currentUserService = Substitute.For<ICurrentUserService>();
         _auditService = Substitute.For<IAuditService>();
@@ -51,6 +52,7 @@ public class TransformationServiceTests : IDisposable
         // Arrange
         var tenantId = Guid.NewGuid();
         var userId = Guid.NewGuid();
+        _tenantProvider.TenantId.Returns(tenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
         _currentUserService.GetUserId().Returns(userId);
 
@@ -113,6 +115,7 @@ public class TransformationServiceTests : IDisposable
         // Arrange
         var tenantId = Guid.NewGuid();
         var transformationId = Guid.NewGuid();
+        _tenantProvider.TenantId.Returns(tenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
 
         var transformation = new Transformation
@@ -158,6 +161,7 @@ public class TransformationServiceTests : IDisposable
         // Arrange
         var tenantId = Guid.NewGuid();
         var transformationId = Guid.NewGuid();
+        _tenantProvider.TenantId.Returns(tenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
 
         var transformation = new Transformation
@@ -207,6 +211,7 @@ public class TransformationServiceTests : IDisposable
         // Arrange
         var tenantId = Guid.NewGuid();
         var transformationId = Guid.NewGuid();
+        _tenantProvider.TenantId.Returns(tenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
 
         var transformation = new Transformation
@@ -246,6 +251,7 @@ public class TransformationServiceTests : IDisposable
         var tenantId = Guid.NewGuid();
         var otherTenantId = Guid.NewGuid();
         var transformationId = Guid.NewGuid();
+        _tenantProvider.TenantId.Returns(otherTenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
 
         var transformation = new Transformation
@@ -261,6 +267,9 @@ public class TransformationServiceTests : IDisposable
 
         _context.Transformations.Add(transformation);
         await _context.SaveChangesAsync();
+        
+        // Switch tenant context for the query
+        _tenantProvider.TenantId.Returns(tenantId);
 
         // Act
         var act = async () => await _sut.GetByIdAsync(transformationId);
