@@ -10,6 +10,7 @@ public class ExecutionStatsDto
     
     public decimal SuccessRate { get; set; }
     public TimeSpan? AverageDuration { get; set; }
+    public double? AverageDurationMs => AverageDuration?.TotalMilliseconds;
     public long TotalRecordsProcessed { get; set; }
     
     public DateTimeOffset? LastExecutionTime { get; set; }
