@@ -155,6 +155,18 @@ public class ScriptProcessor : ITransformationProcessor
         // Execute the script
         var scriptResult = engine.Evaluate(config.Script);
 
+        // If the script defined a function but didn't return a value (undefined),
+        // check if there's a 'transform' function we should call
+        if (scriptResult.IsUndefined())
+        {
+            var transformFunc = engine.GetValue("transform");
+            if (transformFunc.IsObject() && transformFunc.AsObject() is Jint.Native.Function.Function)
+            {
+                // Call the transform function with the row
+                scriptResult = engine.Invoke("transform", row);
+            }
+        }
+
         // Handle different return types
         if (scriptResult.IsNull() || scriptResult.IsUndefined())
         {

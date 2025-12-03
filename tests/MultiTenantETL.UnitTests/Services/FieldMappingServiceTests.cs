@@ -282,4 +282,76 @@ public class FieldMappingServiceTests
         result.Rows[0].Should().ContainKey("second");
         result.Rows[0].Should().ContainKey("third");
     }
+
+    [Fact]
+    public void ApplyFieldMappings_WithFailingTransformationOnOneField_DoesNotAffectOtherFields()
+    {
+        // Arrange - Simulates the scenario where one field has a transformation that might fail
+        // Other fields should still be mapped correctly
+        var batch = new ReadBatch
+        {
+            BatchId = Guid.NewGuid(),
+            RowCount = 2,
+            Rows = new List<Dictionary<string, object?>>
+            {
+                new() { { "id", 1 }, { "name", "Product A" }, { "stock", 100 } },
+                new() { { "id", 2 }, { "name", "Product B" }, { "stock", 50 } }
+            }
+        };
+
+        // Field mappings with a transformation on one field
+        var fieldMappingsJson = $@"[
+            {{
+                ""id"": ""{Guid.NewGuid()}"",
+                ""sourceFields"": [""id""],
+                ""destinationField"": ""product_id"",
+                ""order"": 1,
+                ""transformations"": []
+            }},
+            {{
+                ""id"": ""{Guid.NewGuid()}"",
+                ""sourceFields"": [""name""],
+                ""destinationField"": ""product_name"",
+                ""order"": 2,
+                ""transformations"": []
+            }},
+            {{
+                ""id"": ""{Guid.NewGuid()}"",
+                ""sourceFields"": [""stock""],
+                ""destinationField"": ""stock_status"",
+                ""order"": 3,
+                ""transformations"": [
+                    {{
+                        ""id"": ""{Guid.NewGuid()}"",
+                        ""type"": ""Script"",
+                        ""order"": 1,
+                        ""config"": {{
+                            ""script"": ""function transform(row) {{ return row.value > 0 ? 'In Stock' : 'Out of Stock'; }}"",
+                            ""scriptLanguage"": ""javascript""
+                        }},
+                        ""isEnabled"": true
+                    }}
+                ]
+            }}
+        ]";
+
+        // Act
+        var result = _sut.ApplyFieldMappings(batch, fieldMappingsJson);
+
+        // Assert - All rows should still exist even if transformation on 'stock' field has issues
+        result.Should().NotBeNull();
+        result.RowCount.Should().Be(2); // Both rows should still be present
+        result.Rows.Should().HaveCount(2);
+        
+        // Other fields should be properly mapped
+        result.Rows[0].Should().ContainKey("product_id");
+        result.Rows[0]["product_id"].Should().Be(1);
+        result.Rows[0].Should().ContainKey("product_name");
+        result.Rows[0]["product_name"].Should().Be("Product A");
+        
+        result.Rows[1].Should().ContainKey("product_id");
+        result.Rows[1]["product_id"].Should().Be(2);
+        result.Rows[1].Should().ContainKey("product_name");
+        result.Rows[1]["product_name"].Should().Be("Product B");
+    }
 }

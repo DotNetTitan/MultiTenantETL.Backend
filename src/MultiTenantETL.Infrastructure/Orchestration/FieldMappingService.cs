@@ -44,24 +44,49 @@ public class FieldMappingService : IFieldMappingService
             var simpleMappings = mappings.Where(m => m.SourceFields.Count == 1).OrderBy(m => m.Order).ToList();
             var complexMappings = mappings.Where(m => m.SourceFields.Count > 1).OrderBy(m => m.Order).ToList();
 
-            // STEP 1: Process simple mappings with BATCH processors (performance)
+            // STEP 1: Process simple mappings (1 source field -> 1 destination field)
+            // Apply transformations per-field, not per-batch, to avoid filtering out rows
             foreach (var mapping in simpleMappings)
             {
                 var sourceField = mapping.SourceFields[0];
 
-                // Apply transformations at batch level
+                // Apply transformations to each row's field value individually
                 if (mapping.Transformations != null && mapping.Transformations.Count > 0)
                 {
-                    foreach (var trans in mapping.Transformations.OrderBy(t => t.Order).Where(t => t.IsEnabled))
+                    foreach (var row in batch.Rows)
                     {
-                        batch = ApplyBatchTransformation(batch, sourceField, trans);
+                        if (row.TryGetValue(sourceField, out var fieldValue))
+                        {
+                            object? transformedValue = fieldValue;
+                            
+                            foreach (var trans in mapping.Transformations.OrderBy(t => t.Order).Where(t => t.IsEnabled))
+                            {
+                                transformedValue = ApplyFieldTransformation(transformedValue, trans, sourceField);
+                            }
+                            
+                            // Store the transformed value in the destination field
+                            row[mapping.DestinationField] = transformedValue;
+                            
+                            // Remove source field if different from destination
+                            if (sourceField != mapping.DestinationField)
+                            {
+                                row.Remove(sourceField);
+                            }
+                        }
+                        else
+                        {
+                            // Source field doesn't exist, set destination to null
+                            row[mapping.DestinationField] = null;
+                        }
                     }
                 }
-
-                // Rename field if needed
-                if (sourceField != mapping.DestinationField)
+                else
                 {
-                    batch = RenameFieldInBatch(batch, sourceField, mapping.DestinationField);
+                    // No transformations, just rename field if needed
+                    if (sourceField != mapping.DestinationField)
+                    {
+                        batch = RenameFieldInBatch(batch, sourceField, mapping.DestinationField);
+                    }
                 }
             }
 
@@ -166,6 +191,34 @@ public class FieldMappingService : IFieldMappingService
         {
             _logger.LogError(ex, "Error applying batch transformation {Type} to field {Field}", transformation.Type, fieldName);
             return batch;
+        }
+    }
+
+    /// <summary>
+    /// Applies a transformation to a single field value.
+    /// This is used for per-field transformations in field mappings.
+    /// If the transformation fails, it logs the error and returns the original value.
+    /// </summary>
+    private object? ApplyFieldTransformation(object? value, TransformationDto transformation, string fieldName)
+    {
+        try
+        {
+            var transformationConfig = new Transformations.FieldProcessors.TransformationConfig
+            {
+                Id = transformation.Id,
+                Type = transformation.Type,
+                Config = transformation.Config,
+                Order = transformation.Order,
+                IsEnabled = transformation.IsEnabled
+            };
+
+            return _fieldProcessor.ApplyTransformation(value, transformationConfig, new List<string> { fieldName });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error applying transformation {Type} to field {Field}, returning original value", 
+                transformation.Type, fieldName);
+            return value; // Return original value on error
         }
     }
 
