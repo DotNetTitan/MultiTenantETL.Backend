@@ -14,7 +14,7 @@ public class TransformationProcessorTests
     [Fact]
     public async Task ScriptProcessor_WithCamelCaseConfig_ParsesScriptCorrectly()
     {
-        // Arrange - This tests the fix for camelCase JSON config deserialization
+        // Arrange - Test that camelCase JSON properties (script, scriptLanguage, etc.) are correctly deserialized to PascalCase C# properties
         var logger = Substitute.For<ILogger<ScriptProcessor>>();
         var settings = Options.Create(new EtlSettings { EnableDetailedLogging = false });
         var processor = new ScriptProcessor(logger, settings);
