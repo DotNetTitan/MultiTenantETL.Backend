@@ -142,6 +142,14 @@ Located in `tests/MultiTenantETL.IntegrationTests/`
 - Use test containers for database and RabbitMQ
 - Test data reader/writer implementations
 
+### Test Guidelines
+
+- Write unit tests for new business logic in services and processors
+- Use xUnit as the test framework
+- Mock external dependencies using interfaces
+- Name test methods: `MethodName_Scenario_ExpectedResult`
+- Ensure tests are isolated and can run independently
+
 ## Common Commands
 
 ```bash
@@ -208,3 +216,13 @@ When adding new NuGet packages:
 - Phase 4 Implementation: `/README-PHASE4.md`
 - SFTP Implementation: `/SFTP_IMPLEMENTATION.md`
 - Steering docs: `/.kiro/steering/`
+
+## Pull Request Guidelines
+
+When creating or reviewing pull requests:
+1. Keep changes focused and minimal
+2. Include tests for new functionality
+3. Update documentation if adding new features
+4. Ensure all existing tests pass
+5. Follow the established coding conventions
+6. Add appropriate error handling and logging
