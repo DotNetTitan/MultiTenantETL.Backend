@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Orchestration;
 using MultiTenantETL.Application.Transformations;
+using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.Transformations.FieldProcessors;
 using MultiTenantETL.Domain.Entities;
 
@@ -33,8 +34,7 @@ public class FieldMappingService : IFieldMappingService
 
         try
         {
-            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            var mappings = JsonSerializer.Deserialize<List<FieldMapping>>(fieldMappingsJson, options);
+            var mappings = JsonSerializer.Deserialize<List<FieldMapping>>(fieldMappingsJson, JsonSerializerOptionsProvider.Default);
             if (mappings == null || mappings.Count == 0)
             {
                 return batch;

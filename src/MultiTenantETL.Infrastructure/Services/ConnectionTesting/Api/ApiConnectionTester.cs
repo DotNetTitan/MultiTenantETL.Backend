@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors;
 using MultiTenantETL.Application.Connectors.Models;
+using MultiTenantETL.Infrastructure.Configuration;
 
 namespace MultiTenantETL.Infrastructure.Services.ConnectionTesting.Api;
 
@@ -9,12 +10,6 @@ public class ApiConnectionTester : IApiConnectionTester
 {
     private readonly ILogger<ApiConnectionTester> _logger;
     private readonly IHttpClientFactory _httpClientFactory;
-    
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    };
 
     public ApiConnectionTester(ILogger<ApiConnectionTester> logger, IHttpClientFactory httpClientFactory)
     {
@@ -24,7 +19,7 @@ public class ApiConnectionTester : IApiConnectionTester
 
     public async Task<ConnectionTestResult> TestConnectionAsync(string provider, JsonElement config)
     {
-        var apiConfig = JsonSerializer.Deserialize<ApiConfig>(config, JsonOptions);
+        var apiConfig = JsonSerializer.Deserialize<ApiConfig>(config, JsonSerializerOptionsProvider.Default);
         if (apiConfig == null)
         {
             return new ConnectionTestResult

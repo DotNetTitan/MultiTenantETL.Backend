@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Transformations;
 using MultiTenantETL.Domain.Entities;
+using MultiTenantETL.Infrastructure.Configuration;
 
 namespace MultiTenantETL.Infrastructure.Transformations.Processors;
 
@@ -96,11 +97,9 @@ public class StringProcessor : ITransformationProcessor
         return Core.StringTransformations.ApplyOperation(value, config.Operation, configElement, _logger) ?? value;
     }
 
-    private static readonly JsonSerializerOptions s_jsonOptions = new() { PropertyNameCaseInsensitive = true };
-
     private StringConfig ParseConfig(string configJson)
     {
-        return JsonSerializer.Deserialize<StringConfig>(configJson, s_jsonOptions)
+        return JsonSerializer.Deserialize<StringConfig>(configJson, JsonSerializerOptionsProvider.Default)
             ?? throw new InvalidOperationException("Invalid string configuration");
     }
 

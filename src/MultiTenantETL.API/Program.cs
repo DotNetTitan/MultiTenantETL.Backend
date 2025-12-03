@@ -9,6 +9,7 @@ using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Infrastructure.Authorization.Handlers;
 using MultiTenantETL.Infrastructure.Authorization.Requirements;
+using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.Identity;
 using MultiTenantETL.Infrastructure.Persistence;
 using MultiTenantETL.Infrastructure.Security;
@@ -460,8 +461,7 @@ builder.Services.AddScoped<MultiTenantETL.Infrastructure.Services.ConnectionTest
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
-        options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
-        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+        JsonSerializerOptionsProvider.Configure(options.JsonSerializerOptions);
     });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

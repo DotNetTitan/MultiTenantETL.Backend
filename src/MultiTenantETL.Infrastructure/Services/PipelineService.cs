@@ -8,6 +8,7 @@ using MultiTenantETL.Application.Pipelines;
 using MultiTenantETL.Application.Pipelines.Models;
 using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
+using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.Persistence;
 
 namespace MultiTenantETL.Infrastructure.Services;
@@ -365,13 +366,6 @@ public class PipelineService : IPipelineService
     /// <exception cref="ArgumentException">Thrown when the field mappings JSON cannot be parsed.</exception>
     private static string NormalizeFieldMappings(JsonElement fieldMappingsElement)
     {
-        var options = new JsonSerializerOptions 
-        { 
-            PropertyNameCaseInsensitive = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-        };
-
         // Handle empty or null mappings
         if (fieldMappingsElement.ValueKind == JsonValueKind.Null ||
             (fieldMappingsElement.ValueKind == JsonValueKind.Array && fieldMappingsElement.GetArrayLength() == 0))
@@ -381,7 +375,7 @@ public class PipelineService : IPipelineService
 
         try
         {
-            var mappings = JsonSerializer.Deserialize<List<FieldMappingInternal>>(fieldMappingsElement.GetRawText(), options);
+            var mappings = JsonSerializer.Deserialize<List<FieldMappingInternal>>(fieldMappingsElement.GetRawText(), JsonSerializerOptionsProvider.Default);
             if (mappings == null || mappings.Count == 0)
             {
                 return "[]";
@@ -397,7 +391,7 @@ public class PipelineService : IPipelineService
                 Transformations = NormalizeTransformations(mapping.Transformations)
             }).ToList();
 
-            return JsonSerializer.Serialize(normalizedMappings, options);
+            return JsonSerializer.Serialize(normalizedMappings, JsonSerializerOptionsProvider.Default);
         }
         catch (JsonException ex)
         {

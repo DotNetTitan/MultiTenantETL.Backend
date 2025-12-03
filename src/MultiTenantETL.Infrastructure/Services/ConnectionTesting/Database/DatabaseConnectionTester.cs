@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors;
 using MultiTenantETL.Application.Connectors.Models;
 using MultiTenantETL.Domain.Constants;
+using MultiTenantETL.Infrastructure.Configuration;
 using Npgsql;
 using MySqlConnector;
 
@@ -12,11 +13,6 @@ namespace MultiTenantETL.Infrastructure.Services.ConnectionTesting.Database;
 public class DatabaseConnectionTester : IDatabaseConnectionTester
 {
     private readonly ILogger<DatabaseConnectionTester> _logger;
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    };
 
     public DatabaseConnectionTester(ILogger<DatabaseConnectionTester> logger)
     {
@@ -25,7 +21,7 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
 
     public async Task<ConnectionTestResult> TestConnectionAsync(string provider, JsonElement config)
     {
-        var dbConfig = JsonSerializer.Deserialize<DatabaseConfig>(config, JsonOptions);
+        var dbConfig = JsonSerializer.Deserialize<DatabaseConfig>(config, JsonSerializerOptionsProvider.Default);
         if (dbConfig == null)
         {
             return new ConnectionTestResult

@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors;
 using MultiTenantETL.Application.Connectors.Models;
+using MultiTenantETL.Infrastructure.Configuration;
 
 namespace MultiTenantETL.Infrastructure.Services.ConnectionTesting.Storage;
 
@@ -12,12 +13,6 @@ public class StorageConnectionTester : IStorageConnectionTester
     private readonly FtpConnectionTester _ftpTester;
     private readonly SftpConnectionTester _sftpTester;
     private readonly ILogger<StorageConnectionTester> _logger;
-    
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    };
 
     public StorageConnectionTester(
         AzureBlobConnectionTester azureBlobTester,
@@ -35,7 +30,7 @@ public class StorageConnectionTester : IStorageConnectionTester
 
     public async Task<ConnectionTestResult> TestConnectionAsync(string provider, JsonElement config)
     {
-        var fileConfig = JsonSerializer.Deserialize<FileConfig>(config, JsonOptions);
+        var fileConfig = JsonSerializer.Deserialize<FileConfig>(config, JsonSerializerOptionsProvider.Default);
         if (fileConfig == null)
         {
             return new ConnectionTestResult

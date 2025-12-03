@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Transformations;
 using MultiTenantETL.Domain.Entities;
+using MultiTenantETL.Infrastructure.Configuration;
 
 namespace MultiTenantETL.Infrastructure.Transformations.Processors;
 
@@ -147,11 +148,9 @@ public class MapProcessor : ITransformationProcessor
         return mappedRow;
     }
 
-    private static readonly JsonSerializerOptions s_jsonOptions = new() { PropertyNameCaseInsensitive = true };
-
     private MapConfig ParseConfig(string configJson)
     {
-        return JsonSerializer.Deserialize<MapConfig>(configJson, s_jsonOptions)
+        return JsonSerializer.Deserialize<MapConfig>(configJson, JsonSerializerOptionsProvider.Default)
             ?? throw new InvalidOperationException("Invalid map configuration");
     }
 
