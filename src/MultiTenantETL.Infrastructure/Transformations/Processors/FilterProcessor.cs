@@ -95,9 +95,11 @@ public class FilterProcessor : ITransformationProcessor
         return Core.FilterTransformations.EvaluateCondition(fieldValue, config.Operator, config.Value, config.Values);
     }
 
+    private static readonly JsonSerializerOptions s_jsonOptions = new() { PropertyNameCaseInsensitive = true };
+
     private FilterConfig ParseConfig(string configJson)
     {
-        return JsonSerializer.Deserialize<FilterConfig>(configJson)
+        return JsonSerializer.Deserialize<FilterConfig>(configJson, s_jsonOptions)
             ?? throw new InvalidOperationException("Invalid filter configuration");
     }
 

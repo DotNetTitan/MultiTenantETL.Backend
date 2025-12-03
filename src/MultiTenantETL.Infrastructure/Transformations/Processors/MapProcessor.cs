@@ -147,9 +147,11 @@ public class MapProcessor : ITransformationProcessor
         return mappedRow;
     }
 
+    private static readonly JsonSerializerOptions s_jsonOptions = new() { PropertyNameCaseInsensitive = true };
+
     private MapConfig ParseConfig(string configJson)
     {
-        return JsonSerializer.Deserialize<MapConfig>(configJson)
+        return JsonSerializer.Deserialize<MapConfig>(configJson, s_jsonOptions)
             ?? throw new InvalidOperationException("Invalid map configuration");
     }
 

@@ -96,9 +96,11 @@ public class StringProcessor : ITransformationProcessor
         return Core.StringTransformations.ApplyOperation(value, config.Operation, configElement, _logger) ?? value;
     }
 
+    private static readonly JsonSerializerOptions s_jsonOptions = new() { PropertyNameCaseInsensitive = true };
+
     private StringConfig ParseConfig(string configJson)
     {
-        return JsonSerializer.Deserialize<StringConfig>(configJson)
+        return JsonSerializer.Deserialize<StringConfig>(configJson, s_jsonOptions)
             ?? throw new InvalidOperationException("Invalid string configuration");
     }
 
