@@ -17,6 +17,13 @@ inclusion: always
 - Npgsql.EntityFrameworkCore.PostgreSQL 8.0
 - Database naming convention: snake_case for tables
 
+## Message Broker
+
+- **RabbitMQ 3.13+** (pipeline execution queue)
+- **RabbitMQ.Client 6.8.1** (.NET client)
+- Durable queues with dead letter exchange
+- Configurable prefetch count and retry attempts
+
 ## Authentication & Authorization
 
 - **OpenIddict 7.2.0** (OAuth 2.0 & OpenID Connect server)
@@ -30,6 +37,24 @@ inclusion: always
 - **ASP.NET Core Identity** (user/role management)
 - **Custom Authorization**: Permission-based handlers (PermissionAuthorizationHandler, TenantResourceAuthorizationHandler)
 - **BCrypt.Net-Next 4.0.3** (password hashing)
+
+## Data Connectors
+
+### Database Libraries
+- **Microsoft.Data.SqlClient** - SQL Server connectivity
+- **Npgsql** - PostgreSQL connectivity  
+- **MySqlConnector** - MySQL/MariaDB connectivity
+
+### File & Storage Libraries
+- **CsvHelper** - CSV reading/writing
+- **System.Text.Json** - JSON/JSONL processing
+- **SSH.NET 2024.1.0** - SFTP client library
+- **FluentFTP** - FTP client library
+- **AWSSDK.S3** - Amazon S3 storage
+- **Azure.Storage.Blobs** - Azure Blob Storage
+
+### API Libraries
+- **System.Net.Http.Json** - REST API client
 
 ## Key Libraries
 
@@ -52,8 +77,24 @@ dotnet build
 # Run API (from src/MultiTenantETL.API)
 dotnet run
 
+# Run Worker (from src/MultiTenantETL.Worker)
+dotnet run
+
 # Run with watch (auto-reload)
 dotnet watch run
+```
+
+### Docker Compose
+
+```bash
+# Start infrastructure (PostgreSQL + RabbitMQ)
+docker-compose up -d
+
+# Stop infrastructure
+docker-compose down
+
+# View logs
+docker-compose logs -f
 ```
 
 ### Database Migrations
@@ -94,15 +135,45 @@ dotnet test
 
 # Run with coverage
 dotnet test /p:CollectCoverage=true
+
+# Run specific test project
+dotnet test tests/MultiTenantETL.UnitTests
+dotnet test tests/MultiTenantETL.IntegrationTests
 ```
 
 ## Development Environment
 
-- Default ports: HTTPS (7288), HTTP (5244)
+- Default API ports: HTTPS (7288), HTTP (5244)
+- Default RabbitMQ ports: AMQP (5672), Management UI (15672)
 - User secrets for sensitive configuration (UserSecretsId: 96149a75-7a4b-4db0-89c3-93fc63bf95e8)
 - Swagger UI available in development mode at `/swagger`
-- Database seeding runs automatically in development (roles, permissions, admin user, OAuth clients)
+- Database seeding runs automatically in development
 - CORS configured for `http://localhost:5173` (Vue dev server)
+
+## Configuration Files
+
+### API Configuration (appsettings.json)
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=localhost;Port=5432;Database=multitenant_etl;..."
+  },
+  "RabbitMq": {
+    "HostName": "localhost",
+    "Port": 5672,
+    "UserName": "guest",
+    "Password": "guest",
+    "ExecutionQueueName": "pipeline-executions",
+    "CancellationQueueName": "pipeline-cancellations",
+    "PrefetchCount": 1,
+    "MaxRetryAttempts": 5
+  },
+  "AzureCommunication": {
+    "ConnectionString": "...",
+    "SenderEmail": "noreply@yourdomain.com"
+  }
+}
+```
 
 ## Security Configuration
 
@@ -111,3 +182,12 @@ dotnet test /p:CollectCoverage=true
 - **Password Requirements**: Min 8 chars, uppercase, lowercase, digit, special character
 - **Rate Limiting**: Configured on authentication endpoints
 - **Security Headers**: X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy
+
+## Infrastructure Services (Docker Compose)
+
+- **PostgreSQL 16**: Database on port 5432
+  - Default credentials: postgres/postgres
+  - Default database: multitenant_etl
+- **RabbitMQ 3.13**: Message broker on ports 5672 (AMQP), 15672 (Management UI)
+  - Default credentials: guest/guest
+  - Management UI: http://localhost:15672
