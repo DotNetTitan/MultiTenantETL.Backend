@@ -6,12 +6,12 @@ using MultiTenantETL.Application.Transformations;
 namespace MultiTenantETL.Infrastructure.Transformations;
 
 /// <summary>
-/// Orchestrates the execution of multiple transformations on a batch
+/// Orchestrates the execution of multiple transformations on a batch.
+/// NOTE: Transformations are now embedded in field mappings and processed by FieldMappingService.
+/// This orchestrator is kept for backward compatibility and potential future global transformations.
 /// </summary>
 public class TransformationOrchestrator : ITransformationOrchestrator
 {
-    private readonly ITransformationService _transformationService;
-    private readonly IEnumerable<ITransformationProcessor> _processors;
     private readonly ILogger<TransformationOrchestrator> _logger;
 
     public TransformationOrchestrator(
@@ -19,80 +19,38 @@ public class TransformationOrchestrator : ITransformationOrchestrator
         IEnumerable<ITransformationProcessor> processors,
         ILogger<TransformationOrchestrator> logger)
     {
-        _transformationService = transformationService;
-        _processors = processors;
+        // Dependencies kept for backward compatibility with DI registration
+        _ = transformationService;
+        _ = processors;
         _logger = logger;
     }
 
-    public async Task<TransformationOrchestrationResult> ApplyTransformationsAsync(
+    public Task<TransformationOrchestrationResult> ApplyTransformationsAsync(
         ReadBatch batch,
         Guid pipelineId,
         TransformationPolicy policy,
         CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
+        
+        // NOTE: Transformations are now embedded in field mappings
+        // This orchestrator returns the batch unchanged - transformations are applied in field mapping phase
+        _logger.LogDebug(
+            "TransformationOrchestrator called for pipeline {PipelineId} - transformations are handled in field mappings",
+            pipelineId);
+
+        stopwatch.Stop();
+        
         var result = new TransformationOrchestrationResult
         {
             BatchId = batch.BatchId,
             InitialRowCount = batch.RowCount,
-            Success = true
+            FinalRowCount = batch.RowCount,
+            TransformedBatch = batch,
+            Success = true,
+            TotalExecutionTime = stopwatch.Elapsed
         };
 
-        try
-        {
-            // NOTE: Transformations are now embedded in field mappings
-            // This orchestrator is kept for backward compatibility and global transformations
-            // Field-level transformations are handled by FieldMappingService
-            
-            _logger.LogInformation(
-                "TransformationOrchestrator called for pipeline {PipelineId} - transformations now handled in field mappings",
-                pipelineId);
-
-            // Return batch unchanged - transformations applied in field mapping phase
-            result.TransformedBatch = batch;
-            result.FinalRowCount = batch.RowCount;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Orchestration failed for batch {BatchId}", batch.BatchId);
-            result.Success = false;
-            result.ErrorMessage = $"Orchestration failed: {ex.Message}";
-            result.TransformedBatch = batch;
-            result.FinalRowCount = batch.RowCount;
-        }
-        finally
-        {
-            stopwatch.Stop();
-            result.TotalExecutionTime = stopwatch.Elapsed;
-        }
-
-        return result;
-    }
-
-    private async Task<TransformationStepResult> ApplyTransformationAsync(
-        ReadBatch batch,
-        Domain.Entities.Transformation transformation,
-        TransformationPolicy policy,
-        CancellationToken cancellationToken)
-    {
-        // Find the appropriate processor for this transformation type
-        var processor = _processors.FirstOrDefault(p => 
-            p.TransformationType.Equals(transformation.Type, StringComparison.OrdinalIgnoreCase));
-
-        if (processor == null)
-        {
-            throw new NotSupportedException($"No processor found for transformation type '{transformation.Type}'");
-        }
-
-        // Execute the transformation
-        var result = await processor.ProcessBatchAsync(batch, transformation, cancellationToken);
-
-        return new TransformationStepResult
-        {
-            TransformationId = transformation.Id,
-            TransformationType = transformation.Type,
-            Order = 0, // Order is now managed in field mappings
-            Result = result
-        };
+        return Task.FromResult(result);
     }
 }

@@ -2,10 +2,8 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Orchestration;
-using MultiTenantETL.Application.Transformations;
 using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.Transformations.FieldProcessors;
-using MultiTenantETL.Domain.Entities;
 
 namespace MultiTenantETL.Infrastructure.Orchestration;
 
@@ -13,16 +11,13 @@ public class FieldMappingService : IFieldMappingService
 {
     private readonly ILogger<FieldMappingService> _logger;
     private readonly IFieldTransformationProcessor _fieldProcessor;
-    private readonly IEnumerable<ITransformationProcessor> _batchProcessors;
 
     public FieldMappingService(
         ILogger<FieldMappingService> logger,
-        IFieldTransformationProcessor fieldProcessor,
-        IEnumerable<ITransformationProcessor> batchProcessors)
+        IFieldTransformationProcessor fieldProcessor)
     {
         _logger = logger;
         _fieldProcessor = fieldProcessor;
-        _batchProcessors = batchProcessors;
     }
 
     public ReadBatch ApplyFieldMappings(ReadBatch batch, string fieldMappingsJson)
@@ -94,7 +89,7 @@ public class FieldMappingService : IFieldMappingService
             }
 
             // STEP 2: Process complex mappings ROW-BY-ROW (flexibility)
-            if (complexMappings.Any())
+            if (complexMappings.Count > 0)
             {
                 foreach (var row in batch.Rows)
                 {
@@ -120,7 +115,7 @@ public class FieldMappingService : IFieldMappingService
                         {
                             foreach (var trans in mapping.Transformations.OrderBy(t => t.Order).Where(t => t.IsEnabled))
                             {
-                                var transformationConfig = new Transformations.FieldProcessors.TransformationConfig
+                                var transformationConfig = new TransformationConfig
                                 {
                                     Id = trans.Id,
                                     Type = trans.Type,
@@ -156,57 +151,6 @@ public class FieldMappingService : IFieldMappingService
         }
     }
 
-    private ReadBatch ApplyBatchTransformation(ReadBatch batch, string fieldName, TransformationDto transformation)
-    {
-        try
-        {
-            // Find appropriate batch processor
-            var processor = _batchProcessors.FirstOrDefault(p =>
-                p.TransformationType.Equals(transformation.Type, StringComparison.OrdinalIgnoreCase));
-
-            if (processor == null)
-            {
-                _logger.LogWarning("No batch processor found for type {Type}, skipping", transformation.Type);
-                return batch;
-            }
-
-            // Parse transformation ID - use TryParse for robustness with legacy or frontend-generated IDs
-            // If parsing fails, generate a new GUID since the ID is only used for tracking/logging
-            if (!Guid.TryParse(transformation.Id, out var transformationId))
-            {
-                _logger.LogDebug("Transformation ID '{Id}' is not a valid GUID, generating new ID for execution", transformation.Id);
-                transformationId = Guid.NewGuid();
-            }
-
-            // Create transformation entity for processor
-            var transformationEntity = new Transformation
-            {
-                Id = transformationId,
-                TenantId = Guid.Empty, // Not needed for processing
-                Name = transformation.Type,
-                Type = transformation.Type,
-                ConfigJson = transformation.Config?.ToString() ?? "{}",
-                CreatedAt = DateTime.UtcNow,
-                CreatedBy = Guid.Empty
-            };
-
-            // Apply transformation synchronously (processors are fast)
-            var result = processor.ProcessBatchAsync(batch, transformationEntity, CancellationToken.None).GetAwaiter().GetResult();
-
-            return new ReadBatch
-            {
-                BatchId = batch.BatchId,
-                Rows = result.TransformedRows,
-                RowCount = result.TransformedRows.Count
-            };
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error applying batch transformation {Type} to field {Field}", transformation.Type, fieldName);
-            return batch;
-        }
-    }
-
     /// <summary>
     /// Applies a transformation to a single field value.
     /// This is used for per-field transformations in field mappings.
@@ -216,7 +160,7 @@ public class FieldMappingService : IFieldMappingService
     {
         try
         {
-            var transformationConfig = new Transformations.FieldProcessors.TransformationConfig
+            var transformationConfig = new TransformationConfig
             {
                 Id = transformation.Id,
                 Type = transformation.Type,
@@ -235,7 +179,7 @@ public class FieldMappingService : IFieldMappingService
         }
     }
 
-    private ReadBatch RenameFieldInBatch(ReadBatch batch, string oldName, string newName)
+    private static ReadBatch RenameFieldInBatch(ReadBatch batch, string oldName, string newName)
     {
         foreach (var row in batch.Rows)
         {
@@ -251,9 +195,7 @@ public class FieldMappingService : IFieldMappingService
         return batch;
     }
 
-
-
-    private class FieldMapping
+    private sealed class FieldMapping
     {
         public string Id { get; set; } = string.Empty;
         public int Order { get; set; }
@@ -262,7 +204,7 @@ public class FieldMappingService : IFieldMappingService
         public string DestinationField { get; set; } = string.Empty;
     }
 
-    private class TransformationDto
+    private sealed class TransformationDto
     {
         public string Id { get; set; } = string.Empty;
         public string Type { get; set; } = string.Empty;
@@ -270,6 +212,4 @@ public class FieldMappingService : IFieldMappingService
         public int Order { get; set; }
         public bool IsEnabled { get; set; } = true;
     }
-
-
 }
