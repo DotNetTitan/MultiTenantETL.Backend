@@ -207,9 +207,17 @@ builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.AzureComm
 builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.EtlSettings>(
     builder.Configuration.GetSection(MultiTenantETL.Infrastructure.Configuration.EtlSettings.SectionName));
 
-// Configure RabbitMQ settings
-builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.RabbitMqSettings>(
-    builder.Configuration.GetSection("RabbitMq"));
+// Configure RabbitMQ settings with Aspire connection string support
+builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.RabbitMqSettings>(options =>
+{
+    builder.Configuration.GetSection("RabbitMq").Bind(options);
+    // Check for Aspire-provided connection string
+    var connectionString = builder.Configuration.GetConnectionString("RabbitMq");
+    if (!string.IsNullOrEmpty(connectionString))
+    {
+        options.ConnectionString = connectionString;
+    }
+});
 
 // Rate Limiting
 builder.Services.AddMemoryCache();

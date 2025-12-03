@@ -22,16 +22,9 @@ public class RabbitMqPublisher : IMessagePublisher, IDisposable
         _settings = settings.Value;
         _logger = logger;
 
-        var factory = new ConnectionFactory
-        {
-            HostName = _settings.HostName,
-            Port = _settings.Port,
-            UserName = _settings.UserName,
-            Password = _settings.Password,
-            VirtualHost = _settings.VirtualHost,
-            AutomaticRecoveryEnabled = true,
-            NetworkRecoveryInterval = TimeSpan.FromSeconds(10)
-        };
+        var factory = _settings.CreateConnectionFactory();
+        // Publisher doesn't need async dispatch
+        factory.DispatchConsumersAsync = false;
 
         _connection = factory.CreateConnection();
         _channel = _connection.CreateModel();

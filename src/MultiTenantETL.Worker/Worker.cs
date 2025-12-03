@@ -33,17 +33,7 @@ public class Worker : BackgroundService
     {
         _logger.LogInformation("Pipeline Worker starting...");
         
-        var factory = new ConnectionFactory
-        {
-            HostName = _settings.HostName,
-            Port = _settings.Port,
-            UserName = _settings.UserName,
-            Password = _settings.Password,
-            VirtualHost = _settings.VirtualHost,
-            AutomaticRecoveryEnabled = true,
-            NetworkRecoveryInterval = TimeSpan.FromSeconds(10),
-            DispatchConsumersAsync = true
-        };
+        var factory = _settings.CreateConnectionFactory();
 
         _connection = factory.CreateConnection();
         _channel = _connection.CreateModel();
