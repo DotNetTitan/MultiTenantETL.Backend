@@ -132,10 +132,18 @@ public class FieldMappingService : IFieldMappingService
                 return batch;
             }
 
+            // Parse transformation ID - use TryParse for robustness with legacy or frontend-generated IDs
+            // If parsing fails, generate a new GUID since the ID is only used for tracking/logging
+            if (!Guid.TryParse(transformation.Id, out var transformationId))
+            {
+                _logger.LogDebug("Transformation ID '{Id}' is not a valid GUID, generating new ID for execution", transformation.Id);
+                transformationId = Guid.NewGuid();
+            }
+
             // Create transformation entity for processor
             var transformationEntity = new Transformation
             {
-                Id = Guid.Parse(transformation.Id),
+                Id = transformationId,
                 TenantId = Guid.Empty, // Not needed for processing
                 Name = transformation.Type,
                 Type = transformation.Type,
