@@ -435,4 +435,300 @@ public class PipelineServiceTests : IDisposable
             Arg.Any<string>(),
             Arg.Any<object>());
     }
+
+    [Fact]
+    public async Task CreateAsync_WithFrontendGeneratedIds_RegeneratesProperGuidIds()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        
+        _tenantProvider.TenantId.Returns(tenantId);
+        _currentUserService.GetTenantId().Returns(tenantId);
+        _currentUserService.GetUserId().Returns(userId);
+
+        var sourceConnector = new Connector
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Source",
+            Type = "Database",
+            Provider = "PostgreSQL",
+            Direction = "Source",
+            IsSource = true,
+            IsDestination = false,
+            RequiresCredentials = true,
+            IsActive = true,
+            ConfigJson = "{}",
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        var destConnector = new Connector
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Dest",
+            Type = "Database",
+            Provider = "PostgreSQL",
+            Direction = "Destination",
+            IsSource = false,
+            IsDestination = true,
+            RequiresCredentials = true,
+            IsActive = true,
+            ConfigJson = "{}",
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        _context.Connectors.AddRange(sourceConnector, destConnector);
+        await _context.SaveChangesAsync();
+
+        // Frontend-style field mappings with temporary IDs
+        var fieldMappingsJson = @"[
+            {
+                ""id"": ""mapping-1701629000000-0.5"",
+                ""sourceFields"": [""firstName""],
+                ""destinationField"": ""first_name"",
+                ""order"": 1,
+                ""transformations"": [
+                    {
+                        ""id"": ""trans-1701629000000-0.123"",
+                        ""type"": ""Trim"",
+                        ""config"": {},
+                        ""order"": 1,
+                        ""isEnabled"": true
+                    },
+                    {
+                        ""id"": ""trans-1701629000000-0.456"",
+                        ""type"": ""CaseConvert"",
+                        ""config"": {""caseType"": ""uppercase""},
+                        ""order"": 2,
+                        ""isEnabled"": true
+                    }
+                ]
+            },
+            {
+                ""id"": ""mapping-1701629000001-0.789"",
+                ""sourceFields"": [""lastName""],
+                ""destinationField"": ""last_name"",
+                ""order"": 2,
+                ""transformations"": []
+            }
+        ]";
+
+        var request = new CreatePipelineRequest
+        {
+            Name = "Test Pipeline with Transformations",
+            Description = "Test Description",
+            SourceConnectorId = sourceConnector.Id,
+            DestinationConnectorId = destConnector.Id,
+            FieldMappings = JsonDocument.Parse(fieldMappingsJson).RootElement,
+            IsScheduled = false
+        };
+
+        // Act
+        var result = await _sut.CreateAsync(request);
+
+        // Assert
+        result.Should().NotBeNull();
+        
+        // Get the stored pipeline from database
+        var pipeline = await _context.Pipelines.FirstOrDefaultAsync(p => p.Id == result.Id);
+        pipeline.Should().NotBeNull();
+
+        // Parse the stored field mappings
+        var storedMappings = JsonDocument.Parse(pipeline!.FieldMappingsJson).RootElement;
+        storedMappings.GetArrayLength().Should().Be(2);
+
+        // Check first mapping
+        var firstMapping = storedMappings[0];
+        var firstMappingId = firstMapping.GetProperty("id").GetString();
+        firstMappingId.Should().NotBe("mapping-1701629000000-0.5"); // Should not be the frontend ID
+        Guid.TryParse(firstMappingId, out _).Should().BeTrue(); // Should be a valid GUID
+        firstMapping.GetProperty("destinationField").GetString().Should().Be("first_name");
+        firstMapping.GetProperty("order").GetInt32().Should().Be(1);
+
+        // Check transformations in first mapping
+        var transformations = firstMapping.GetProperty("transformations");
+        transformations.GetArrayLength().Should().Be(2);
+
+        var firstTrans = transformations[0];
+        var firstTransId = firstTrans.GetProperty("id").GetString();
+        firstTransId.Should().NotBe("trans-1701629000000-0.123"); // Should not be the frontend ID
+        Guid.TryParse(firstTransId, out _).Should().BeTrue(); // Should be a valid GUID
+        firstTrans.GetProperty("type").GetString().Should().Be("Trim");
+        firstTrans.GetProperty("isEnabled").GetBoolean().Should().BeTrue();
+
+        var secondTrans = transformations[1];
+        var secondTransId = secondTrans.GetProperty("id").GetString();
+        secondTransId.Should().NotBe("trans-1701629000000-0.456");
+        Guid.TryParse(secondTransId, out _).Should().BeTrue();
+        secondTrans.GetProperty("type").GetString().Should().Be("CaseConvert");
+
+        // Check second mapping
+        var secondMapping = storedMappings[1];
+        var secondMappingId = secondMapping.GetProperty("id").GetString();
+        secondMappingId.Should().NotBe("mapping-1701629000001-0.789");
+        Guid.TryParse(secondMappingId, out _).Should().BeTrue();
+        secondMapping.GetProperty("destinationField").GetString().Should().Be("last_name");
+
+        // Verify that the response also contains GUID IDs
+        var responseMappings = result.FieldMappings;
+        responseMappings.GetArrayLength().Should().Be(2);
+        var responseFirstId = responseMappings[0].GetProperty("id").GetString();
+        Guid.TryParse(responseFirstId, out _).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithFrontendGeneratedIds_RegeneratesProperGuidIds()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var pipelineId = Guid.NewGuid();
+        
+        _tenantProvider.TenantId.Returns(tenantId);
+        _currentUserService.GetTenantId().Returns(tenantId);
+        _currentUserService.GetUserId().Returns(userId);
+
+        var pipeline = new Pipeline
+        {
+            Id = pipelineId,
+            TenantId = tenantId,
+            Name = "Original Name",
+            SourceConnectorId = Guid.NewGuid(),
+            DestinationConnectorId = Guid.NewGuid(),
+            Status = "Idle",
+            FieldMappingsJson = "[]",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = Guid.NewGuid()
+        };
+
+        _context.Pipelines.Add(pipeline);
+        await _context.SaveChangesAsync();
+
+        // Frontend-style field mappings with temporary IDs
+        var newFieldMappingsJson = @"[
+            {
+                ""id"": ""new-mapping-1701629999999-0.111"",
+                ""sourceFields"": [""email""],
+                ""destinationField"": ""email_address"",
+                ""order"": 1,
+                ""transformations"": [
+                    {
+                        ""id"": ""new-trans-1701629999999-0.222"",
+                        ""type"": ""Replace"",
+                        ""config"": {""findPattern"": ""old"", ""replaceWith"": ""new""},
+                        ""order"": 1,
+                        ""isEnabled"": true
+                    }
+                ]
+            }
+        ]";
+
+        var request = new UpdatePipelineRequest
+        {
+            Name = "Updated Pipeline",
+            Description = "Updated Description",
+            FieldMappings = JsonDocument.Parse(newFieldMappingsJson).RootElement,
+            IsScheduled = true,
+            IsActive = true
+        };
+
+        // Act
+        var result = await _sut.UpdateAsync(pipelineId, request);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Name.Should().Be("Updated Pipeline");
+
+        // Parse the response field mappings
+        var responseMappings = result.FieldMappings;
+        responseMappings.GetArrayLength().Should().Be(1);
+
+        var mapping = responseMappings[0];
+        var mappingId = mapping.GetProperty("id").GetString();
+        mappingId.Should().NotBe("new-mapping-1701629999999-0.111");
+        Guid.TryParse(mappingId, out _).Should().BeTrue();
+
+        var transformations = mapping.GetProperty("transformations");
+        transformations.GetArrayLength().Should().Be(1);
+
+        var trans = transformations[0];
+        var transId = trans.GetProperty("id").GetString();
+        transId.Should().NotBe("new-trans-1701629999999-0.222");
+        Guid.TryParse(transId, out _).Should().BeTrue();
+        trans.GetProperty("type").GetString().Should().Be("Replace");
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithEmptyFieldMappings_HandlesCorrectly()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        
+        _tenantProvider.TenantId.Returns(tenantId);
+        _currentUserService.GetTenantId().Returns(tenantId);
+        _currentUserService.GetUserId().Returns(userId);
+
+        var sourceConnector = new Connector
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Source",
+            Type = "Database",
+            Provider = "PostgreSQL",
+            Direction = "Source",
+            IsSource = true,
+            IsDestination = false,
+            RequiresCredentials = true,
+            IsActive = true,
+            ConfigJson = "{}",
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        var destConnector = new Connector
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Dest",
+            Type = "Database",
+            Provider = "PostgreSQL",
+            Direction = "Destination",
+            IsSource = false,
+            IsDestination = true,
+            RequiresCredentials = true,
+            IsActive = true,
+            ConfigJson = "{}",
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        _context.Connectors.AddRange(sourceConnector, destConnector);
+        await _context.SaveChangesAsync();
+
+        var request = new CreatePipelineRequest
+        {
+            Name = "Empty Mappings Pipeline",
+            Description = "Test with no mappings",
+            SourceConnectorId = sourceConnector.Id,
+            DestinationConnectorId = destConnector.Id,
+            FieldMappings = JsonDocument.Parse("[]").RootElement,
+            IsScheduled = false
+        };
+
+        // Act
+        var result = await _sut.CreateAsync(request);
+
+        // Assert
+        result.Should().NotBeNull();
+        
+        var pipeline = await _context.Pipelines.FirstOrDefaultAsync(p => p.Id == result.Id);
+        pipeline.Should().NotBeNull();
+        pipeline!.FieldMappingsJson.Should().Be("[]");
+    }
 }
