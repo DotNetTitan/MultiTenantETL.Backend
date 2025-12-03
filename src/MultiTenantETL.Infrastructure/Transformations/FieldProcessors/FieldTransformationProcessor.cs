@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Jint;
+using Jint.Native;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Infrastructure.Transformations.Core;
 
@@ -18,6 +20,11 @@ public class FieldTransformationProcessor : IFieldTransformationProcessor
     }
 
     public object? ApplyTransformation(object? value, TransformationConfig transformation, List<string> sourceFields)
+    {
+        return ApplyTransformation(value, transformation, sourceFields, null);
+    }
+
+    public object? ApplyTransformation(object? value, TransformationConfig transformation, List<string> sourceFields, Dictionary<string, object?>? row)
     {
         try
         {
@@ -43,7 +50,7 @@ public class FieldTransformationProcessor : IFieldTransformationProcessor
                 "Replace" => StringTransformations.ApplyReplace(stringValue, config, _logger),
                 "Map" => ValueTransformations.ApplyMap(value, config),
                 "Filter" => FilterTransformations.EvaluateCondition(value, config) ? value : null, // Return null to filter out
-                "Script" => ApplyScript(value, config, sourceFields),
+                "Script" => ApplyScript(value, config, sourceFields, row),
                 _ => value
             };
         }
@@ -54,31 +61,115 @@ public class FieldTransformationProcessor : IFieldTransformationProcessor
         }
     }
 
-    private object? ApplyScript(object? value, JsonElement config, List<string> sourceFields)
+    private object? ApplyScript(object? value, JsonElement config, List<string> sourceFields, Dictionary<string, object?>? row)
     {
-        // For simple script transformations (like concatenation of multiple fields)
-        // Full JavaScript execution would be handled by ScriptProcessor with Jint
+        var script = config.TryGetProperty("script", out var scriptProp) ? scriptProp.GetString() : "";
         
-        // Handle multiple source fields - simple concatenation
-        if (value is List<object?> values)
+        if (string.IsNullOrEmpty(script))
         {
-            var separator = " "; // Default separator
-            var script = config.TryGetProperty("script", out var scriptProp) ? scriptProp.GetString() : "";
-            
-            // Try to extract separator from simple join scripts
-            if (!string.IsNullOrEmpty(script) && script.Contains("join"))
-            {
-                var match = System.Text.RegularExpressions.Regex.Match(script, @"join\(['""](.+?)['""]\)");
-                if (match.Success)
-                {
-                    separator = match.Groups[1].Value;
-                }
-            }
-            
-            return string.Join(separator, values.Where(v => v != null).Select(v => v.ToString()));
+            _logger.LogWarning("Script transformation has empty script");
+            return value;
         }
 
-        // For complex scripts with single values, would need full ScriptProcessor
-        return value?.ToString();
+        try
+        {
+            // Create Jint engine with security constraints
+            var engine = new Engine(options =>
+            {
+                options.LimitRecursion(100);
+                options.TimeoutInterval(TimeSpan.FromMilliseconds(5000));
+                options.MaxStatements(10000);
+            });
+
+            // Set the current field value
+            engine.SetValue("value", value);
+            
+            // Set source field names for reference
+            engine.SetValue("sourceFields", sourceFields);
+            
+            // If we have the full row context, expose it
+            if (row != null)
+            {
+                engine.SetValue("row", row);
+            }
+            else
+            {
+                // Create a minimal row object with just the source field(s)
+                var minimalRow = new Dictionary<string, object?>();
+                if (sourceFields.Count == 1)
+                {
+                    minimalRow[sourceFields[0]] = value;
+                }
+                else if (value is List<object?> values && values.Count == sourceFields.Count)
+                {
+                    for (int i = 0; i < sourceFields.Count; i++)
+                    {
+                        minimalRow[sourceFields[i]] = values[i];
+                    }
+                }
+                engine.SetValue("row", minimalRow);
+            }
+
+            // Execute the script
+            var result = engine.Evaluate(script);
+
+            // Convert result back to .NET type
+            return ConvertJsValue(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error executing script transformation: {Script}", script);
+            return value; // Return original value on error
+        }
+    }
+
+    private object? ConvertJsValue(JsValue value)
+    {
+        if (value.IsNull() || value.IsUndefined())
+            return null;
+
+        if (value.IsBoolean())
+            return value.AsBoolean();
+
+        if (value.IsNumber())
+        {
+            var num = value.AsNumber();
+            // Try to preserve integer types
+            if (num % 1 == 0 && num >= int.MinValue && num <= int.MaxValue)
+                return (int)num;
+            if (num % 1 == 0 && num >= long.MinValue && num <= long.MaxValue)
+                return (long)num;
+            return num;
+        }
+
+        if (value.IsString())
+            return value.AsString();
+
+        if (value.IsDate())
+            return value.AsDate().ToDateTime();
+
+        if (value.IsArray())
+        {
+            var array = value.AsArray();
+            var list = new List<object?>();
+            for (uint i = 0; i < array.Length; i++)
+            {
+                list.Add(ConvertJsValue(array.Get(i.ToString())));
+            }
+            return list;
+        }
+
+        if (value.IsObject())
+        {
+            var dict = new Dictionary<string, object?>();
+            foreach (var property in value.AsObject().GetOwnProperties())
+            {
+                var key = property.Key.ToString();
+                dict[key] = ConvertJsValue(property.Value.Value);
+            }
+            return dict;
+        }
+
+        return value.ToString();
     }
 }

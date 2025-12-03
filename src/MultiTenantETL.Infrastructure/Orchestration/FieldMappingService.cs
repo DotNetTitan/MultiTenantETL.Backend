@@ -43,6 +43,9 @@ public class FieldMappingService : IFieldMappingService
             // HYBRID APPROACH: Separate simple vs complex mappings
             var simpleMappings = mappings.Where(m => m.SourceFields.Count == 1).OrderBy(m => m.Order).ToList();
             var complexMappings = mappings.Where(m => m.SourceFields.Count > 1).OrderBy(m => m.Order).ToList();
+            
+            // Collect all destination fields to know which fields should be preserved
+            var allDestinationFields = mappings.Select(m => m.DestinationField).ToHashSet();
 
             // STEP 1: Process simple mappings (1 source field -> 1 destination field)
             // Apply transformations per-field, not per-batch, to avoid filtering out rows
@@ -61,7 +64,7 @@ public class FieldMappingService : IFieldMappingService
                             
                             foreach (var trans in mapping.Transformations.OrderBy(t => t.Order).Where(t => t.IsEnabled))
                             {
-                                transformedValue = ApplyFieldTransformation(transformedValue, trans, sourceField);
+                                transformedValue = ApplyFieldTransformation(transformedValue, trans, sourceField, row);
                             }
                             
                             // Store the transformed value in the destination field
@@ -125,11 +128,21 @@ public class FieldMappingService : IFieldMappingService
                                     Order = trans.Order,
                                     IsEnabled = trans.IsEnabled
                                 };
-                                result = _fieldProcessor.ApplyTransformation(result, transformationConfig, mapping.SourceFields);
+                                result = _fieldProcessor.ApplyTransformation(result, transformationConfig, mapping.SourceFields, row);
                             }
                         }
 
                         row[mapping.DestinationField] = result;
+                        
+                        // Remove source fields that are not used as destination fields elsewhere
+                        // This prevents sending unmapped columns to the destination while preserving mapped ones
+                        foreach (var sourceField in mapping.SourceFields)
+                        {
+                            if (sourceField != mapping.DestinationField && !allDestinationFields.Contains(sourceField))
+                            {
+                                row.Remove(sourceField);
+                            }
+                        }
                     }
                 }
             }
@@ -199,7 +212,7 @@ public class FieldMappingService : IFieldMappingService
     /// This is used for per-field transformations in field mappings.
     /// If the transformation fails, it logs the error and returns the original value.
     /// </summary>
-    private object? ApplyFieldTransformation(object? value, TransformationDto transformation, string fieldName)
+    private object? ApplyFieldTransformation(object? value, TransformationDto transformation, string fieldName, Dictionary<string, object?>? row = null)
     {
         try
         {
@@ -212,7 +225,7 @@ public class FieldMappingService : IFieldMappingService
                 IsEnabled = transformation.IsEnabled
             };
 
-            return _fieldProcessor.ApplyTransformation(value, transformationConfig, new List<string> { fieldName });
+            return _fieldProcessor.ApplyTransformation(value, transformationConfig, new List<string> { fieldName }, row);
         }
         catch (Exception ex)
         {

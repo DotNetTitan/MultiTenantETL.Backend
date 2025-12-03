@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
+using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Application.DataAccess;
 using MultiTenantETL.Application.Orchestration;
 using MultiTenantETL.Application.Transformations;
@@ -75,6 +76,7 @@ public class PipelineOrchestrator : IPipelineOrchestrator
             var writer = _writerFactory.CreateWriter(pipeline.DestinationConnector!);
 
             var readOptions = new ReadOptions { BatchSize = 1000 };
+            var writeOptions = ExtractWriteOptions(pipeline.DestinationConnector!);
             
             long totalProcessed = 0;
             long totalSucceeded = 0;
@@ -121,7 +123,6 @@ public class PipelineOrchestrator : IPipelineOrchestrator
                         cancellationToken);
                     
                     // Write batch
-                    var writeOptions = new Application.Connectors.DataWriters.WriteOptions();
                     var writeResult = await writer.WriteBatchAsync(
                         pipeline.DestinationConnector!,
                         mappedBatch,
@@ -243,5 +244,65 @@ public class PipelineOrchestrator : IPipelineOrchestrator
 
         await _context.SaveChangesAsync(cancellationToken);
         await AddLogEntry(execution, "Warning", "System", message, cancellationToken);
+    }
+
+    /// <summary>
+    /// Extracts write options from the destination connector's configuration.
+    /// Supports database connectors with writeConfig containing operation and primaryKeys.
+    /// </summary>
+    private WriteOptions ExtractWriteOptions(Connector destinationConnector)
+    {
+        var options = new WriteOptions();
+
+        if (string.IsNullOrEmpty(destinationConnector.ConfigJson))
+        {
+            return options;
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(destinationConnector.ConfigJson);
+            var root = doc.RootElement;
+
+            // Check for writeConfig section (database connectors)
+            if (root.TryGetProperty("writeConfig", out var writeConfig))
+            {
+                // Check operation type
+                if (writeConfig.TryGetProperty("operation", out var operation))
+                {
+                    var operationValue = operation.GetString()?.ToUpperInvariant();
+                    options.UseUpsert = operationValue == "UPSERT";
+                    
+                    _logger.LogDebug("Destination connector operation: {Operation}, UseUpsert: {UseUpsert}", 
+                        operationValue, options.UseUpsert);
+                }
+
+                // Get primary keys for upsert
+                if (writeConfig.TryGetProperty("primaryKeys", out var primaryKeys) && 
+                    primaryKeys.ValueKind == JsonValueKind.Array)
+                {
+                    options.UpsertKeys = primaryKeys.EnumerateArray()
+                        .Select(k => k.GetString())
+                        .Where(k => !string.IsNullOrEmpty(k))
+                        .Cast<string>()
+                        .ToList();
+                    
+                    _logger.LogDebug("Destination connector primary keys: {PrimaryKeys}", 
+                        string.Join(", ", options.UpsertKeys));
+                }
+
+                // Check for truncate option
+                if (writeConfig.TryGetProperty("truncateBeforeLoad", out var truncate))
+                {
+                    options.TruncateBeforeLoad = truncate.GetBoolean();
+                }
+            }
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogWarning(ex, "Failed to parse destination connector config for write options");
+        }
+
+        return options;
     }
 }
