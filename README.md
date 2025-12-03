@@ -87,11 +87,13 @@ dotnet run
 ```
 
 This automatically:
-- Starts PostgreSQL with a data volume
-- Starts RabbitMQ with the management plugin
-- Starts the API service
-- Starts the Worker service
+- Starts PostgreSQL with a data volume (managed by Aspire)
+- Starts RabbitMQ with the management plugin (managed by Aspire)
+- Starts the API service with automatic connection string injection
+- Starts the Worker service with automatic connection string injection
 - Opens the Aspire Dashboard for monitoring
+
+> **Note:** When running with Aspire, you don't need to configure connection strings manually. Aspire automatically manages PostgreSQL and RabbitMQ containers and injects the correct connection strings into the API and Worker services.
 
 The Aspire Dashboard will open in your browser, showing:
 - All services and their health status

@@ -5,10 +5,10 @@ var postgres = builder.AddPostgres("postgres")
     .WithDataVolume("multitenant-etl-postgres-data")
     .WithPgAdmin();
 
-var postgresDb = postgres.AddDatabase("multitenant-etl");
+var postgresDb = postgres.AddDatabase("DefaultConnection");
 
 // RabbitMQ message broker
-var rabbitmq = builder.AddRabbitMQ("rabbitmq")
+var rabbitmq = builder.AddRabbitMQ("messaging")
     .WithDataVolume("multitenant-etl-rabbitmq-data")
     .WithManagementPlugin();
 
