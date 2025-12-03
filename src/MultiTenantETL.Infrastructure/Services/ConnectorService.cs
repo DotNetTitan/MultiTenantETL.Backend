@@ -263,9 +263,9 @@ public class ConnectorService : IConnectorService
 
         ValidateTypeAndProvider(request.Type, request.Provider);
 
-        // Decrypt sensitive fields before testing
-        var decryptedConfig = _encryptionService.DecryptJsonFields(request.Config, SensitiveFields);
-        var result = await _connectionTester.TestConnectionAsync(request.Type, request.Provider, decryptedConfig);
+        // For testing a NEW connection, the config comes in plain text from the request,
+        // so no decryption is needed (it was never encrypted)
+        var result = await _connectionTester.TestConnectionAsync(request.Type, request.Provider, request.Config);
 
         // Audit log
         await _auditService.LogAsync(
@@ -383,12 +383,12 @@ public class ConnectorService : IConnectorService
 
         ValidateTypeAndProvider(request.Type, request.Provider);
 
-        // Decrypt sensitive fields before schema detection
-        var decryptedConfig = _encryptionService.DecryptJsonFields(request.Config, SensitiveFields);
+        // For schema preview of a NEW connection, the config comes in plain text from the request,
+        // so no decryption is needed (it was never encrypted)
         var result = await _schemaDetector.DetectSchemaAsync(
             request.Type,
             request.Provider,
-            decryptedConfig,
+            request.Config,
             request.TableOrResourceName);
 
         // Audit log
