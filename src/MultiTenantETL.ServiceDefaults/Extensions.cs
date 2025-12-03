@@ -14,6 +14,7 @@ namespace Microsoft.Extensions.Hosting;
 /// </summary>
 public static class Extensions
 {
+    private const string OtlpExporterEndpointEnvVar = "OTEL_EXPORTER_OTLP_ENDPOINT";
     /// <summary>
     /// Adds service defaults to the host application builder, including OpenTelemetry,
     /// health checks, and service discovery.
@@ -73,7 +74,7 @@ public static class Extensions
 
     private static IHostApplicationBuilder AddOpenTelemetryExporters(this IHostApplicationBuilder builder)
     {
-        var useOtlpExporter = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
+        var useOtlpExporter = !string.IsNullOrWhiteSpace(builder.Configuration[OtlpExporterEndpointEnvVar]);
 
         if (useOtlpExporter)
         {
@@ -102,13 +103,13 @@ public static class Extensions
     /// </summary>
     /// <param name="app">The <see cref="WebApplication"/>.</param>
     /// <returns>The <see cref="WebApplication"/> for chaining.</returns>
+    /// <remarks>
+    /// Health check endpoints are only mapped in development environments by default.
+    /// Adding health checks endpoints in non-development environments has security implications.
+    /// See https://aka.ms/dotnet/aspire/healthchecks for details before enabling in production.
+    /// </remarks>
     public static WebApplication MapDefaultEndpoints(this WebApplication app)
     {
-        // Uncomment the following line to enable the Prometheus endpoint (requires the OpenTelemetry.Exporter.Prometheus.AspNetCore package)
-        // app.MapPrometheusScrapingEndpoint();
-
-        // Adding health checks endpoints to applications in non-development environments has security implications.
-        // See https://aka.ms/dotnet/aspire/healthchecks for details before enabling these endpoints in non-development environments.
         if (app.Environment.IsDevelopment())
         {
             // All health checks must pass for app to be considered ready to accept traffic after starting
