@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Common.Interfaces;
@@ -65,7 +66,7 @@ public class PipelineService : IPipelineService
             SourceConnectorId = request.SourceConnectorId,
             DestinationConnectorId = request.DestinationConnectorId,
             Status = "Idle",
-            FieldMappingsJson = JsonSerializer.Serialize(request.FieldMappings),
+            FieldMappingsJson = NormalizeFieldMappings(request.FieldMappings),
             ScheduleJson = request.Schedule.HasValue ? JsonSerializer.Serialize(request.Schedule.Value) : null,
             IsScheduled = request.IsScheduled,
             IsActive = true,
@@ -189,7 +190,7 @@ public class PipelineService : IPipelineService
 
         pipeline.Name = request.Name;
         pipeline.Description = request.Description;
-        pipeline.FieldMappingsJson = JsonSerializer.Serialize(request.FieldMappings);
+        pipeline.FieldMappingsJson = NormalizeFieldMappings(request.FieldMappings);
         pipeline.ScheduleJson = request.Schedule.HasValue ? JsonSerializer.Serialize(request.Schedule.Value) : null;
         pipeline.IsScheduled = request.IsScheduled;
 
@@ -352,5 +353,92 @@ public class PipelineService : IPipelineService
             LastRunStatus = pipeline.LastRunStatus,
             CreatedAt = pipeline.CreatedAt
         };
+    }
+
+    /// <summary>
+    /// Normalizes field mappings from frontend by regenerating proper server-side IDs.
+    /// Frontend generates temporary IDs (e.g., "trans-1701629000000-0.123") which should be
+    /// replaced with proper GUIDs when saving to the database.
+    /// </summary>
+    private static string NormalizeFieldMappings(JsonElement fieldMappingsElement)
+    {
+        var options = new JsonSerializerOptions 
+        { 
+            PropertyNameCaseInsensitive = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        };
+
+        // Handle empty or null mappings
+        if (fieldMappingsElement.ValueKind == JsonValueKind.Null ||
+            (fieldMappingsElement.ValueKind == JsonValueKind.Array && fieldMappingsElement.GetArrayLength() == 0))
+        {
+            return "[]";
+        }
+
+        try
+        {
+            var mappings = JsonSerializer.Deserialize<List<FieldMappingInternal>>(fieldMappingsElement.GetRawText(), options);
+            if (mappings == null || mappings.Count == 0)
+            {
+                return "[]";
+            }
+
+            // Regenerate IDs for each mapping and its transformations
+            var normalizedMappings = mappings.Select((mapping, index) => new FieldMappingInternal
+            {
+                Id = Guid.NewGuid().ToString(), // Generate proper GUID for field mapping
+                SourceFields = mapping.SourceFields ?? new List<string>(),
+                DestinationField = mapping.DestinationField ?? string.Empty,
+                Order = mapping.Order > 0 ? mapping.Order : index + 1,
+                Transformations = NormalizeTransformations(mapping.Transformations)
+            }).ToList();
+
+            return JsonSerializer.Serialize(normalizedMappings, options);
+        }
+        catch (JsonException)
+        {
+            // If parsing fails, return the original JSON as-is
+            return fieldMappingsElement.GetRawText();
+        }
+    }
+
+    /// <summary>
+    /// Normalizes transformations by regenerating proper server-side IDs.
+    /// </summary>
+    private static List<FieldTransformationInternal> NormalizeTransformations(List<FieldTransformationInternal>? transformations)
+    {
+        if (transformations == null || transformations.Count == 0)
+        {
+            return new List<FieldTransformationInternal>();
+        }
+
+        return transformations.Select((trans, index) => new FieldTransformationInternal
+        {
+            Id = Guid.NewGuid().ToString(), // Generate proper GUID for transformation
+            Type = trans.Type ?? string.Empty,
+            Config = trans.Config,
+            Order = trans.Order > 0 ? trans.Order : index + 1,
+            IsEnabled = trans.IsEnabled
+        }).ToList();
+    }
+
+    // Internal DTOs for field mapping normalization (allow mutable properties)
+    private class FieldMappingInternal
+    {
+        public string Id { get; set; } = string.Empty;
+        public List<string> SourceFields { get; set; } = new();
+        public string DestinationField { get; set; } = string.Empty;
+        public List<FieldTransformationInternal> Transformations { get; set; } = new();
+        public int Order { get; set; }
+    }
+
+    private class FieldTransformationInternal
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+        public JsonElement? Config { get; set; }
+        public int Order { get; set; }
+        public bool IsEnabled { get; set; } = true;
     }
 }
