@@ -4,8 +4,8 @@ using MultiTenantETL.Application.Interfaces;
 namespace MultiTenantETL.Infrastructure.Services
 {
     /// <summary>
-    /// Stub implementation of IEmailService for development
-    /// TODO: Replace with actual Azure Communication Services implementation
+    /// Stub implementation of IEmailService for development and testing.
+    /// For production, use AzureCommunicationEmailService.
     /// </summary>
     public class StubEmailService : IEmailService
     {

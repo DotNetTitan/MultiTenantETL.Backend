@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Connectors.DataReaders;
+using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
 using Npgsql;
@@ -16,8 +17,6 @@ public class PostgreSqlDataReader : IDataReader
     private readonly ILogger<PostgreSqlDataReader> _logger;
     private readonly EtlSettings _settings;
     private readonly IEncryptionService _encryptionService;
-
-    private static readonly string[] SensitiveFields = new[] { "password", "Password" };
 
     public PostgreSqlDataReader(
         ILogger<PostgreSqlDataReader> logger, 
@@ -168,7 +167,7 @@ public class PostgreSqlDataReader : IDataReader
         var jsonElement = JsonSerializer.Deserialize<JsonElement>(configJson);
         
         // Decrypt sensitive fields
-        var decryptedElement = _encryptionService.DecryptJsonFields(jsonElement, SensitiveFields);
+        var decryptedElement = _encryptionService.DecryptJsonFields(jsonElement, EncryptionConstants.SensitiveFields);
         
         var config = JsonSerializer.Deserialize<PostgreSqlConfig>(decryptedElement.GetRawText(), JsonSerializerOptionsProvider.Default)
             ?? throw new InvalidOperationException("Invalid PostgreSQL configuration");
