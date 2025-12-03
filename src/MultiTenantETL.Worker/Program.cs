@@ -14,8 +14,20 @@ using MultiTenantETL.Worker;
 
 var builder = Host.CreateApplicationBuilder(args);
 
-// Configuration
-builder.Services.Configure<RabbitMqSettings>(builder.Configuration.GetSection("RabbitMq"));
+// Add Aspire service defaults (includes OpenTelemetry, health checks, service discovery)
+builder.AddServiceDefaults();
+
+// Configuration - bind RabbitMq settings and inject connection string if available from Aspire
+builder.Services.Configure<RabbitMqSettings>(options =>
+{
+    builder.Configuration.GetSection("RabbitMq").Bind(options);
+    // Check for Aspire-provided connection string
+    var connectionString = builder.Configuration.GetConnectionString("RabbitMq");
+    if (!string.IsNullOrEmpty(connectionString))
+    {
+        options.ConnectionString = connectionString;
+    }
+});
 builder.Services.Configure<EtlSettings>(builder.Configuration.GetSection(EtlSettings.SectionName));
 
 // Tenant context provider (scoped per job)

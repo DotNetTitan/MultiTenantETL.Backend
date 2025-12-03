@@ -28,6 +28,7 @@
   <ItemGroup>
     <ProjectReference Include="..\MultiTenantETL.Application\MultiTenantETL.Application.csproj" />
     <ProjectReference Include="..\MultiTenantETL.Infrastructure\MultiTenantETL.Infrastructure.csproj" />
+    <ProjectReference Include="..\MultiTenantETL.ServiceDefaults\MultiTenantETL.ServiceDefaults.csproj" />
   </ItemGroup>
 
 </Project>

@@ -17,6 +17,9 @@ using OpenIddict.Abstractions;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Add Aspire service defaults (includes OpenTelemetry, health checks, service discovery)
+builder.AddServiceDefaults();
+
 // Configure logging to suppress watch debug logs
 builder.Logging.AddFilter("Microsoft.AspNetCore.Watch", LogLevel.None);
 
@@ -204,9 +207,17 @@ builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.AzureComm
 builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.EtlSettings>(
     builder.Configuration.GetSection(MultiTenantETL.Infrastructure.Configuration.EtlSettings.SectionName));
 
-// Configure RabbitMQ settings
-builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.RabbitMqSettings>(
-    builder.Configuration.GetSection("RabbitMq"));
+// Configure RabbitMQ settings with Aspire connection string support
+builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.RabbitMqSettings>(options =>
+{
+    builder.Configuration.GetSection("RabbitMq").Bind(options);
+    // Check for Aspire-provided connection string
+    var connectionString = builder.Configuration.GetConnectionString("RabbitMq");
+    if (!string.IsNullOrEmpty(connectionString))
+    {
+        options.ConnectionString = connectionString;
+    }
+});
 
 // Rate Limiting
 builder.Services.AddMemoryCache();
@@ -491,21 +502,32 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-// Seed database in development
+// Map Aspire default endpoints (health checks)
+app.MapDefaultEndpoints();
+
+// Apply migrations and seed database in development
 if (app.Environment.IsDevelopment())
 {
     using (var scope = app.Services.CreateScope())
     {
         var services = scope.ServiceProvider;
         var logger = services.GetRequiredService<ILogger<Program>>();
+        var dbContext = services.GetRequiredService<MultiTenantETL.Infrastructure.Persistence.ApplicationDbContext>();
+        
         try
         {
+            // Apply pending migrations (creates database if it doesn't exist)
+            logger.LogInformation("Applying database migrations...");
+            await dbContext.Database.MigrateAsync();
+            logger.LogInformation("Database migrations applied successfully");
+            
+            // Seed the database
             await MultiTenantETL.Infrastructure.Data.DbSeeder.SeedAsync(services);
             logger.LogInformation("Database seeding completed successfully");
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "An error occurred while seeding the database");
+            logger.LogError(ex, "An error occurred while migrating or seeding the database");
         }
     }
 }
