@@ -360,6 +360,9 @@ public class PipelineService : IPipelineService
     /// Frontend generates temporary IDs (e.g., "trans-1701629000000-0.123") which should be
     /// replaced with proper GUIDs when saving to the database.
     /// </summary>
+    /// <param name="fieldMappingsElement">The field mappings JSON element from the frontend request.</param>
+    /// <returns>A JSON string with field mappings containing proper server-generated GUID IDs.</returns>
+    /// <exception cref="ArgumentException">Thrown when the field mappings JSON cannot be parsed.</exception>
     private static string NormalizeFieldMappings(JsonElement fieldMappingsElement)
     {
         var options = new JsonSerializerOptions 
@@ -396,16 +399,17 @@ public class PipelineService : IPipelineService
 
             return JsonSerializer.Serialize(normalizedMappings, options);
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
-            // If parsing fails, return the original JSON as-is
-            return fieldMappingsElement.GetRawText();
+            throw new ArgumentException($"Invalid field mappings format: {ex.Message}", nameof(fieldMappingsElement), ex);
         }
     }
 
     /// <summary>
     /// Normalizes transformations by regenerating proper server-side IDs.
     /// </summary>
+    /// <param name="transformations">The list of transformations to normalize, or null.</param>
+    /// <returns>A new list of transformations with proper server-generated GUID IDs.</returns>
     private static List<FieldTransformationInternal> NormalizeTransformations(List<FieldTransformationInternal>? transformations)
     {
         if (transformations == null || transformations.Count == 0)
