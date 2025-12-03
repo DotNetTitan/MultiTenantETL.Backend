@@ -186,6 +186,8 @@ dotnet test tests/MultiTenantETL.IntegrationTests
 ## Infrastructure Services (Docker Compose)
 
 - **PostgreSQL 16**: Database on port 5432
+  - Default credentials: postgres/postgres
+  - Default database: multitenant_etl
 - **RabbitMQ 3.13**: Message broker on ports 5672 (AMQP), 15672 (Management UI)
   - Default credentials: guest/guest
   - Management UI: http://localhost:15672
