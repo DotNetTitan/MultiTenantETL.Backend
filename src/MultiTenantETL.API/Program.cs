@@ -458,6 +458,10 @@ builder.Services.AddScoped<MultiTenantETL.Infrastructure.Services.ConnectionTest
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.Services.ConnectionTesting.Storage.FtpConnectionTester>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.Services.ConnectionTesting.Storage.SftpConnectionTester>();
 
+// Global Exception Handler
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
+
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -467,6 +471,9 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+// Global exception handler - should be first to catch all exceptions
+app.UseExceptionHandler();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
