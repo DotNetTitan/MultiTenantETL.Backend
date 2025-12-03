@@ -246,11 +246,9 @@ public class ScriptProcessor : ITransformationProcessor
         return value.ToString();
     }
 
-    private static readonly JsonSerializerOptions s_jsonOptions = new() { PropertyNameCaseInsensitive = true };
-
     private ScriptConfig ParseConfig(string configJson)
     {
-        return JsonSerializer.Deserialize<ScriptConfig>(configJson, s_jsonOptions)
+        return JsonSerializer.Deserialize<ScriptConfig>(configJson, JsonSerializerOptionsProvider.Default)
             ?? throw new InvalidOperationException("Invalid script configuration");
     }
 

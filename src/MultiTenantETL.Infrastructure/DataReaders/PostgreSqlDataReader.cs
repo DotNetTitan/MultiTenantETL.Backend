@@ -170,8 +170,7 @@ public class PostgreSqlDataReader : IDataReader
         // Decrypt sensitive fields
         var decryptedElement = _encryptionService.DecryptJsonFields(jsonElement, SensitiveFields);
         
-        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-        var config = JsonSerializer.Deserialize<PostgreSqlConfig>(decryptedElement.GetRawText(), options)
+        var config = JsonSerializer.Deserialize<PostgreSqlConfig>(decryptedElement.GetRawText(), JsonSerializerOptionsProvider.Default)
             ?? throw new InvalidOperationException("Invalid PostgreSQL configuration");
 
         // Build connection string if not provided directly

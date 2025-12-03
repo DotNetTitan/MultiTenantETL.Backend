@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Transformations;
 using MultiTenantETL.Domain.Entities;
+using MultiTenantETL.Infrastructure.Configuration;
 
 namespace MultiTenantETL.Infrastructure.Transformations.Processors;
 
@@ -95,11 +96,9 @@ public class FilterProcessor : ITransformationProcessor
         return Core.FilterTransformations.EvaluateCondition(fieldValue, config.Operator, config.Value, config.Values);
     }
 
-    private static readonly JsonSerializerOptions s_jsonOptions = new() { PropertyNameCaseInsensitive = true };
-
     private FilterConfig ParseConfig(string configJson)
     {
-        return JsonSerializer.Deserialize<FilterConfig>(configJson, s_jsonOptions)
+        return JsonSerializer.Deserialize<FilterConfig>(configJson, JsonSerializerOptionsProvider.Default)
             ?? throw new InvalidOperationException("Invalid filter configuration");
     }
 

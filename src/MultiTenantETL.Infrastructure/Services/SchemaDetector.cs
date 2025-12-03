@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors;
 using MultiTenantETL.Application.Connectors.Models;
 using MultiTenantETL.Domain.Constants;
+using MultiTenantETL.Infrastructure.Configuration;
 using Npgsql;
 using MySqlConnector;
 
@@ -64,12 +65,7 @@ public class SchemaDetector : ISchemaDetector
             };
         }
 
-        var options = new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true
-        };
-        
-        var dbConfig = JsonSerializer.Deserialize<DatabaseConfig>(config, options);
+        var dbConfig = JsonSerializer.Deserialize<DatabaseConfig>(config, JsonSerializerOptionsProvider.Default);
         if (dbConfig == null)
         {
             return new SchemaDetectionResult
@@ -301,12 +297,7 @@ public class SchemaDetector : ISchemaDetector
             };
         }
 
-        var options = new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true
-        };
-        
-        var apiConfig = JsonSerializer.Deserialize<ApiConfig>(config, options);
+        var apiConfig = JsonSerializer.Deserialize<ApiConfig>(config, JsonSerializerOptionsProvider.Default);
         if (apiConfig == null)
         {
             return new SchemaDetectionResult
