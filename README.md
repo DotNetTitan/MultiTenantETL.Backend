@@ -59,24 +59,56 @@ A production-ready, secure multi-tenant ASP.NET Core 8.0 platform designed for E
 ### Clean Architecture
 - Strict separation of concerns with Domain, Application, Infrastructure, API, and Worker layers
 
+### .NET Aspire Support
+- **Orchestration**: Single entry point to run all services with dependencies (PostgreSQL, RabbitMQ)
+- **Service Discovery**: Built-in service discovery for inter-service communication
+- **Health Checks**: Standardized health check endpoints (/health, /alive)
+- **OpenTelemetry**: Distributed tracing and metrics out of the box
+- **Resilience**: HTTP client resilience patterns (retries, circuit breakers)
+- **Dashboard**: Aspire dashboard for monitoring all services during development
+
 ## 📋 Prerequisites
 
 - [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
 - [PostgreSQL 12+](https://www.postgresql.org/download/)
 - [RabbitMQ 3.13+](https://www.rabbitmq.com/download.html) (for pipeline execution)
-- [Docker](https://www.docker.com/get-started/) (recommended for local infrastructure)
+- [Docker](https://www.docker.com/get-started/) (required for Aspire orchestration)
 - A code editor ([VS Code](https://code.visualstudio.com/), [Visual Studio](https://visualstudio.microsoft.com/), or [Rider](https://www.jetbrains.com/rider/))
 
 ## 🛠️ Setup Instructions
 
-### 1. Clone the Repository
+### Option A: Using .NET Aspire (Recommended)
+
+The easiest way to run the complete application stack:
+
+```bash
+cd src/MultiTenantETL.AppHost
+dotnet run
+```
+
+This automatically:
+- Starts PostgreSQL with a data volume
+- Starts RabbitMQ with the management plugin
+- Starts the API service
+- Starts the Worker service
+- Opens the Aspire Dashboard for monitoring
+
+The Aspire Dashboard will open in your browser, showing:
+- All services and their health status
+- Distributed traces across services
+- Resource logs and metrics
+- Service endpoints
+
+### Option B: Manual Setup
+
+#### 1. Clone the Repository
 
 ```bash
 git clone <repository-url>
 cd MultiTenantETL
 ```
 
-### 2. Start Infrastructure with Docker Compose
+#### 2. Start Infrastructure with Docker Compose
 
 The easiest way to set up PostgreSQL and RabbitMQ:
 
@@ -88,7 +120,7 @@ This starts:
 - PostgreSQL on port 5432
 - RabbitMQ on port 5672 (AMQP) and 15672 (Management UI)
 
-### 3. Configure Application Settings
+#### 3. Configure Application Settings
 
 Use **user secrets** for sensitive configuration (recommended for development):
 
@@ -111,7 +143,7 @@ dotnet user-secrets set "AzureCommunication:SenderEmail" "noreply@yourdomain.com
 
 **User Secrets ID**: `96149a75-7a4b-4db0-89c3-93fc63bf95e8`
 
-### 4. Run Database Migrations
+#### 4. Run Database Migrations
 
 ```bash
 # From the project root
@@ -120,9 +152,9 @@ dotnet ef database update --project src/MultiTenantETL.Infrastructure --startup-
 
 This creates all necessary tables and seeds initial data (roles, permissions, admin user, OAuth clients).
 
-### 5. Run the Application
+#### 5. Run the Application
 
-#### Start the API
+##### Start the API
 
 ```bash
 cd src/MultiTenantETL.API
@@ -134,7 +166,7 @@ The API will be available at:
 - **HTTP**: `http://localhost:5244`
 - **Swagger UI**: `https://localhost:7288/swagger` (development only)
 
-#### Start the Worker (for pipeline execution)
+##### Start the Worker (for pipeline execution)
 
 In a separate terminal:
 
@@ -145,7 +177,7 @@ dotnet run
 
 The Worker connects to RabbitMQ and processes pipeline execution tasks.
 
-### 6. Access RabbitMQ Management UI
+#### 6. Access RabbitMQ Management UI
 
 Open browser: http://localhost:15672
 - Username: `guest`

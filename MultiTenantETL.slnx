@@ -5,6 +5,8 @@
     <Project Path="src/MultiTenantETL.Domain/MultiTenantETL.Domain.csproj" Id="85db7ec1-0099-4a6b-8404-73930e8472e2" />
     <Project Path="src/MultiTenantETL.Infrastructure/MultiTenantETL.Infrastructure.csproj" Id="b3e4faca-812d-4ba7-a94d-cb4c207a9201" />
     <Project Path="src/MultiTenantETL.Worker/MultiTenantETL.Worker.csproj" />
+    <Project Path="src/MultiTenantETL.AppHost/MultiTenantETL.AppHost.csproj" />
+    <Project Path="src/MultiTenantETL.ServiceDefaults/MultiTenantETL.ServiceDefaults.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/MultiTenantETL.IntegrationTests/MultiTenantETL.IntegrationTests.csproj" />

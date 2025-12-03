@@ -14,6 +14,9 @@ using MultiTenantETL.Worker;
 
 var builder = Host.CreateApplicationBuilder(args);
 
+// Add Aspire service defaults (includes OpenTelemetry, health checks, service discovery)
+builder.AddServiceDefaults();
+
 // Configuration
 builder.Services.Configure<RabbitMqSettings>(builder.Configuration.GetSection("RabbitMq"));
 builder.Services.Configure<EtlSettings>(builder.Configuration.GetSection(EtlSettings.SectionName));

@@ -17,6 +17,9 @@ using OpenIddict.Abstractions;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Add Aspire service defaults (includes OpenTelemetry, health checks, service discovery)
+builder.AddServiceDefaults();
+
 // Configure logging to suppress watch debug logs
 builder.Logging.AddFilter("Microsoft.AspNetCore.Watch", LogLevel.None);
 
@@ -490,6 +493,9 @@ app.UseTenantContext();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Map Aspire default endpoints (health checks)
+app.MapDefaultEndpoints();
 
 // Seed database in development
 if (app.Environment.IsDevelopment())
