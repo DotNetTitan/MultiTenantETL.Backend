@@ -155,6 +155,18 @@ public class ScriptProcessor : ITransformationProcessor
         // Execute the script
         var scriptResult = engine.Evaluate(config.Script);
 
+        // If the script defined a function but didn't return a value (undefined),
+        // check if there's a 'transform' function we should call
+        if (scriptResult.IsUndefined())
+        {
+            var transformFunc = engine.GetValue("transform");
+            if (transformFunc.IsObject() && transformFunc.AsObject() is Jint.Native.Function.Function)
+            {
+                // Call the transform function with the row
+                scriptResult = engine.Invoke("transform", row);
+            }
+        }
+
         // Handle different return types
         if (scriptResult.IsNull() || scriptResult.IsUndefined())
         {
@@ -234,9 +246,11 @@ public class ScriptProcessor : ITransformationProcessor
         return value.ToString();
     }
 
+    private static readonly JsonSerializerOptions s_jsonOptions = new() { PropertyNameCaseInsensitive = true };
+
     private ScriptConfig ParseConfig(string configJson)
     {
-        return JsonSerializer.Deserialize<ScriptConfig>(configJson)
+        return JsonSerializer.Deserialize<ScriptConfig>(configJson, s_jsonOptions)
             ?? throw new InvalidOperationException("Invalid script configuration");
     }
 
