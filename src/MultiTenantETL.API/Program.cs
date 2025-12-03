@@ -505,21 +505,29 @@ app.MapControllers();
 // Map Aspire default endpoints (health checks)
 app.MapDefaultEndpoints();
 
-// Seed database in development
+// Apply migrations and seed database in development
 if (app.Environment.IsDevelopment())
 {
     using (var scope = app.Services.CreateScope())
     {
         var services = scope.ServiceProvider;
         var logger = services.GetRequiredService<ILogger<Program>>();
+        var dbContext = services.GetRequiredService<MultiTenantETL.Infrastructure.Persistence.ApplicationDbContext>();
+        
         try
         {
+            // Apply pending migrations (creates database if it doesn't exist)
+            logger.LogInformation("Applying database migrations...");
+            await dbContext.Database.MigrateAsync();
+            logger.LogInformation("Database migrations applied successfully");
+            
+            // Seed the database
             await MultiTenantETL.Infrastructure.Data.DbSeeder.SeedAsync(services);
             logger.LogInformation("Database seeding completed successfully");
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "An error occurred while seeding the database");
+            logger.LogError(ex, "An error occurred while migrating or seeding the database");
         }
     }
 }
