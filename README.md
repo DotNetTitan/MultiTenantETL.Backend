@@ -1,45 +1,70 @@
-# MultiTenant ETL - Multi-Tenant ASP.NET Core Web API
+# MultiTenant ETL - Enterprise ETL Platform
 
-A production-ready, secure multi-tenant ASP.NET Core 8.0 Web API designed for ETL (Extract, Transform, Load) operations with complete tenant isolation, OAuth 2.0/OpenID Connect authentication powered by OpenIddict, and permission-based authorization.
+A production-ready, secure multi-tenant ASP.NET Core 8.0 platform designed for ETL (Extract, Transform, Load) operations with complete tenant isolation, OAuth 2.0/OpenID Connect authentication powered by OpenIddict, and a scalable pipeline execution engine with RabbitMQ message broker integration.
 
 ## 🚀 Features
 
-- **Multi-Tenancy**: Complete tenant isolation with per-user tenant switching
-  - Automatic personal workspace creation on registration
-  - Full tenant CRUD operations with SuperAdmin/Admin controls
-  - User-tenant relationship management
-  - Role-based access within tenants (SuperAdmin, Admin, User)
+### Multi-Tenancy
+- **Complete Tenant Isolation**: Per-user tenant switching with automatic personal workspace creation on registration
+- **Tenant Management**: Full CRUD operations with SuperAdmin/Admin controls
+- **User-Tenant Relationships**: Users can belong to multiple tenants and switch between them seamlessly
+- **Role-Based Access**: SuperAdmin, Admin, User roles within tenants
+
+### ETL Pipeline Engine
+- **Pipeline Management**: Create, configure, and manage ETL pipelines with source and destination connectors
+- **Field Mappings**: Configure field-to-field mappings with inline transformations
+- **Execution Tracking**: Real-time progress tracking with detailed logging
+- **Batch Processing**: Memory-efficient streaming with configurable batch sizes (default 1,000 rows)
+- **Scheduling Support**: Schedule configuration for automated pipeline runs
+
+### Data Connectors
+- **Database Connectors**: SQL Server, PostgreSQL, MySQL with connection pooling
+- **File Connectors**: CSV, JSON, JSONL with local, FTP, SFTP, Azure Blob, and S3 storage
+- **API Connectors**: REST API with authentication, headers, and pagination support
+- **Connection Testing**: Validate connector configurations before pipeline execution
+- **Schema Detection**: Auto-detect source schemas for field mapping assistance
+
+### Transformation Engine
+- **Filter Transformations**: Include/exclude rows based on conditions (equals, contains, regex, etc.)
+- **Map Transformations**: Rename fields, apply value mappings
+- **String Transformations**: Trim, case conversion, substring, replace, pad, concat
+- **Script Transformations**: Custom JavaScript expressions for complex logic
+- **Field-Level Processing**: Apply transformations to specific fields within a batch
+
+### Message Broker Integration (RabbitMQ)
+- **Asynchronous Execution**: Pipelines execute via background workers
+- **Horizontal Scalability**: Run multiple worker instances for parallel processing
+- **Durable Queues**: Persistent messages with dead letter exchange for failed tasks
+- **Cancellation Support**: Graceful cancellation via dedicated queue
+- **Retry Mechanism**: Configurable retry with exponential backoff
+
+### Authentication & Authorization
 - **OAuth 2.0 & OpenID Connect**: Powered by OpenIddict 7.2.0
-  - **Authorization Code + PKCE** (recommended for SPAs) - RFC 7636 compliant
+  - Authorization Code + PKCE (recommended for SPAs) - RFC 7636 compliant
   - Password Grant (for API testing/machine-to-machine)
   - Refresh Token support with rotation
-  - Single-use authorization codes with state parameter for CSRF protection
-- **Token Management**: 
-  - Short-lived access tokens (15 minutes)
-  - Long-lived refresh tokens (7 days)
-  - Token refresh and revocation endpoints
-  - Automatic token cleanup with Quartz background jobs
-- **ASP.NET Core Identity**: User and role management with custom claims
-- **Permission-Based Authorization**: Fine-grained access control with custom authorization handlers
-  - PermissionAuthorizationHandler for permission-based policies
-  - TenantResourceAuthorizationHandler for resource-based authorization
-- **PostgreSQL**: Entity Framework Core 8.0 with database migrations and snake_case naming
-- **Email Integration**: Azure Communication Services for welcome emails, password reset, email confirmation
-- **Security**: 
-  - BCrypt password hashing
-  - Account lockout (5 failed attempts, 15-minute lockout)
-  - Rate limiting on authentication endpoints (AspNetCoreRateLimit)
-  - CORS configuration for frontend origins
-  - Security headers middleware
-  - Token revocation on password change and logout
-  - Input sanitization utilities
-  - Email enumeration prevention
-- **Clean Architecture**: Strict separation of concerns with Domain, Application, Infrastructure, and API layers
+- **Token Management**: Short-lived access tokens (15 min), long-lived refresh tokens (7 days)
+- **Permission-Based Authorization**: Fine-grained access control with custom handlers
+
+### Security
+- BCrypt password hashing
+- Account lockout (5 failed attempts, 15-minute lockout)
+- Rate limiting on authentication endpoints
+- CORS configuration for frontend origins
+- Security headers middleware
+- Token revocation on password change and logout
+- Input sanitization utilities
+- Email enumeration prevention
+
+### Clean Architecture
+- Strict separation of concerns with Domain, Application, Infrastructure, API, and Worker layers
 
 ## 📋 Prerequisites
 
 - [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
 - [PostgreSQL 12+](https://www.postgresql.org/download/)
+- [RabbitMQ 3.13+](https://www.rabbitmq.com/download.html) (for pipeline execution)
+- [Docker](https://www.docker.com/get-started/) (recommended for local infrastructure)
 - A code editor ([VS Code](https://code.visualstudio.com/), [Visual Studio](https://visualstudio.microsoft.com/), or [Rider](https://www.jetbrains.com/rider/))
 
 ## 🛠️ Setup Instructions
@@ -51,13 +76,17 @@ git clone <repository-url>
 cd MultiTenantETL
 ```
 
-### 2. Configure Database
+### 2. Start Infrastructure with Docker Compose
 
-Create a PostgreSQL database:
+The easiest way to set up PostgreSQL and RabbitMQ:
 
-```sql
-CREATE DATABASE "MultiTenantETL";
+```bash
+docker-compose up -d
 ```
+
+This starts:
+- PostgreSQL on port 5432
+- RabbitMQ on port 5672 (AMQP) and 15672 (Management UI)
 
 ### 3. Configure Application Settings
 
@@ -67,7 +96,7 @@ Use **user secrets** for sensitive configuration (recommended for development):
 cd src/MultiTenantETL.API
 
 # Set database connection string
-dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5432;Database=MultiTenantETL;Username=YOUR_USERNAME;Password=YOUR_PASSWORD"
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5432;Database=multitenant_etl;Username=postgres;Password=postgres"
 
 # Set admin password for seeding
 dotnet user-secrets set "Seeding:AdminPassword" "YOUR_SECURE_ADMIN_PASSWORD"
@@ -82,46 +111,22 @@ dotnet user-secrets set "AzureCommunication:SenderEmail" "noreply@yourdomain.com
 
 **User Secrets ID**: `96149a75-7a4b-4db0-89c3-93fc63bf95e8`
 
-Alternatively, edit `appsettings.Development.json` (not recommended for sensitive data):
-
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "Host=localhost;Port=5432;Database=MultiTenantETL;Username=YOUR_USERNAME;Password=YOUR_PASSWORD"
-  },
-  "Seeding": {
-    "AdminPassword": "YOUR_SECURE_ADMIN_PASSWORD",
-    "OAuthClientSecret": "YOUR_OAUTH_CLIENT_SECRET"
-  },
-  "AzureCommunication": {
-    "ConnectionString": "your-azure-connection-string",
-    "SenderEmail": "noreply@yourdomain.com"
-  }
-}
-```
-
 ### 4. Run Database Migrations
 
 ```bash
 # From the project root
 dotnet ef database update --project src/MultiTenantETL.Infrastructure --startup-project src/MultiTenantETL.API
-
-# Or from src/MultiTenantETL.API
-cd src/MultiTenantETL.API
-dotnet ef database update --project ../MultiTenantETL.Infrastructure
 ```
 
-This will create all necessary tables and seed initial data (roles, permissions, admin user, OAuth clients).
+This creates all necessary tables and seeds initial data (roles, permissions, admin user, OAuth clients).
 
 ### 5. Run the Application
 
+#### Start the API
+
 ```bash
-# From src/MultiTenantETL.API
 cd src/MultiTenantETL.API
 dotnet run
-
-# Or with auto-reload during development
-dotnet watch run
 ```
 
 The API will be available at:
@@ -129,9 +134,28 @@ The API will be available at:
 - **HTTP**: `http://localhost:5244`
 - **Swagger UI**: `https://localhost:7288/swagger` (development only)
 
-### 6. Default Admin Account
+#### Start the Worker (for pipeline execution)
 
-After seeding, you can log in with:
+In a separate terminal:
+
+```bash
+cd src/MultiTenantETL.Worker
+dotnet run
+```
+
+The Worker connects to RabbitMQ and processes pipeline execution tasks.
+
+### 6. Access RabbitMQ Management UI
+
+Open browser: http://localhost:15672
+- Username: `guest`
+- Password: `guest`
+
+Monitor queues, messages, and connections.
+
+### 7. Default Admin Account
+
+After seeding, log in with:
 - **Email**: `admin@multitenant-etl.com`
 - **Password**: The password you set in user secrets under `Seeding:AdminPassword`
 - **Role**: SuperAdmin (full system access)
@@ -144,26 +168,39 @@ The project follows **Clean Architecture** principles with strict dependency rul
 MultiTenantETL/
 ├── src/
 │   ├── MultiTenantETL.Domain/          # No dependencies - Pure business entities
-│   ├── MultiTenantETL.Application/     # Depends on Domain only
-│   ├── MultiTenantETL.Infrastructure/  # Depends on Domain + Application
-│   └── MultiTenantETL.API/             # Depends on all layers
+│   ├── MultiTenantETL.Application/     # Depends on Domain only - Interfaces & DTOs
+│   ├── MultiTenantETL.Infrastructure/  # Depends on Domain + Application - Implementations
+│   ├── MultiTenantETL.API/             # Depends on all layers - Controllers & Configuration
+│   └── MultiTenantETL.Worker/          # Background worker for pipeline execution
+├── tests/
+│   ├── MultiTenantETL.UnitTests/       # Unit tests
+│   └── MultiTenantETL.IntegrationTests/ # Integration tests
 └── docs/                                # Documentation
 ```
 
 ### Layer Responsibilities
 
-- **Domain Layer**: Pure business entities (Tenant), domain interfaces (ITenantResource), enums, constants (Roles, Permissions, Policies)
-- **Application Layer**: Service interfaces (IEmailService, ICurrentUserService), DTOs, request/response models, business logic abstractions
-- **Infrastructure Layer**: ApplicationDbContext, Identity models (ApplicationUser, ApplicationRole, UserTenant), service implementations, authorization handlers, migrations, data seeding
-- **API Layer**: Controllers (Authentication, Account, Users, Tenants), middleware (SecurityHeadersMiddleware), OpenIddict configuration, rate limiting, CORS
+- **Domain Layer**: Pure business entities (Tenant, Connector, Pipeline, Transformation, PipelineExecution), domain interfaces (ITenantResource), enums, constants (Roles, Permissions, Policies)
+- **Application Layer**: Service interfaces, DTOs, data reader/writer interfaces, transformation interfaces, orchestration abstractions
+- **Infrastructure Layer**: ApplicationDbContext, data readers/writers, transformation processors, service implementations, authorization handlers, RabbitMQ integration, migrations
+- **API Layer**: Controllers, middleware, OpenIddict configuration, rate limiting, CORS
+- **Worker Layer**: Background service consuming pipeline execution tasks from RabbitMQ
 
-### Key Design Decisions
+### Pipeline Execution Flow
 
-- **Pragmatic Architecture**: Authentication entities (ApplicationUser, ApplicationRole, UserTenant) live in Infrastructure rather than Domain due to tight coupling with ASP.NET Core Identity and Entity Framework. This reduces complexity while maintaining clean separation for pure business entities like Tenant.
-- **Permission-Based Authorization**: Custom handlers (PermissionAuthorizationHandler, TenantResourceAuthorizationHandler) for fine-grained access control
-- **Tenant Context**: Managed through claims (TenantId claim in JWT tokens) for seamless tenant switching
-- **Database Naming**: snake_case convention for tables (e.g., `users`, `roles`, `user_tenants`, `tenants`)
-- **Token Cleanup**: Quartz background jobs (OpenIddict.Quartz) for automatic token cleanup
+```
+API (ExecutionService)
+  ↓ Publish ExecutionTask
+RabbitMQ (pipeline-executions queue)
+  ↓ Consume
+Worker (Background Service)
+  ↓ Execute
+PipelineOrchestrator
+  ↓ Stream batches
+DataReader → TransformationOrchestrator → DataWriter
+  ↓ Update
+Database (execution_logs, execution_batches, pipeline_executions)
+```
 
 ## 🔐 Authentication & Authorization
 
@@ -267,6 +304,55 @@ Two OAuth clients are seeded automatically by DbSeeder:
 | `/api/tenants/{id}/users` | POST | Admin | Add user to tenant |
 | `/api/tenants/{tenantId}/users/{userId}` | DELETE | Admin | Remove user from tenant |
 | `/api/tenants/{tenantId}/users/{userId}/role` | PUT | Admin | Update user role in tenant |
+
+### Connector Management
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/api/connectors` | GET | Yes | List all connectors for tenant |
+| `/api/connectors/{id}` | GET | Yes | Get connector by ID |
+| `/api/connectors` | POST | Yes | Create connector |
+| `/api/connectors/{id}` | PUT | Yes | Update connector |
+| `/api/connectors/{id}` | DELETE | Yes | Delete connector |
+| `/api/connectors/{id}/test` | POST | Yes | Test connector connection |
+| `/api/connectors/{id}/schema` | GET | Yes | Detect and get connector schema |
+
+### Pipeline Management
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/api/pipelines` | GET | Yes | List all pipelines for tenant |
+| `/api/pipelines/{id}` | GET | Yes | Get pipeline by ID |
+| `/api/pipelines` | POST | Yes | Create pipeline |
+| `/api/pipelines/{id}` | PUT | Yes | Update pipeline |
+| `/api/pipelines/{id}` | DELETE | Yes | Delete pipeline |
+| `/api/pipelines/{id}/execute` | POST | Yes | Execute a pipeline |
+
+### Execution Management
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/api/executions` | GET | Yes | List executions (paginated, filtered) |
+| `/api/executions/{id}` | GET | Yes | Get execution details with logs |
+| `/api/executions/{id}/cancel` | POST | Yes | Cancel running execution |
+| `/api/executions/stats` | GET | Yes | Get execution statistics |
+
+### Transformation Management
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/api/transformations` | GET | Yes | List transformations for tenant |
+| `/api/transformations/{id}` | GET | Yes | Get transformation by ID |
+| `/api/transformations` | POST | Yes | Create transformation |
+| `/api/transformations/{id}` | PUT | Yes | Update transformation |
+| `/api/transformations/{id}` | DELETE | Yes | Delete transformation |
+
+### Metadata
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/api/metadata/connector-types` | GET | Yes | Get available connector types |
+| `/api/metadata/transformation-types` | GET | Yes | Get available transformation types |
 
 ## 🧪 Testing
 
@@ -375,18 +461,57 @@ See `MultiTenantETL.Vue/docs/OAUTH_PKCE.md` for manual testing instructions with
 
 ### Key Tables (snake_case naming convention)
 
+#### Identity & Multi-Tenancy
 - `users` - ASP.NET Identity users with multi-tenant support (ApplicationUser)
 - `roles` - Application roles (ApplicationRole) with custom permissions
 - `tenants` - Tenant organizations (Tenant entity in Domain layer)
 - `user_tenants` - Many-to-many relationship between users and tenants (UserTenant)
+
+#### OAuth & Authentication
 - `OpenIddictApplications` - OAuth clients (multitenant-etl-spa, multitenant-etl-postman)
 - `OpenIddictTokens` - Issued tokens (access tokens, refresh tokens)
 - `OpenIddictAuthorizations` - Authorization grants
-- `OpenIddictScopes` - Available OAuth scopes (openid, email, profile, roles, api, offline_access)
+- `OpenIddictScopes` - Available OAuth scopes
+
+#### ETL Domain
+- `connectors` - Source and destination connector configurations
+- `pipelines` - Pipeline definitions with field mappings
+- `transformations` - Reusable transformation definitions
+- `pipeline_executions` - Execution metadata and progress tracking
+- `execution_batches` - Per-batch tracking for checkpointing
+- `execution_logs` - Detailed execution logs (partitioned for retention)
+- `audit_logs` - Audit trail for all operations
 
 ### Migrations
 
 All migrations are located in `src/MultiTenantETL.Infrastructure/Migrations/` and managed by Entity Framework Core 8.0.
+
+## ⚙️ Configuration
+
+### RabbitMQ Settings (appsettings.json)
+
+```json
+{
+  "RabbitMq": {
+    "HostName": "localhost",
+    "Port": 5672,
+    "UserName": "guest",
+    "Password": "guest",
+    "VirtualHost": "/",
+    "ExecutionQueueName": "pipeline-executions",
+    "CancellationQueueName": "pipeline-cancellations",
+    "DeadLetterExchange": "pipeline-dlx",
+    "PrefetchCount": 1,
+    "MaxRetryAttempts": 5
+  }
+}
+```
+
+### RabbitMQ Queues
+
+- **pipeline-executions** - Durable queue for execution tasks
+- **pipeline-cancellations** - Queue for cancellation requests  
+- **pipeline-dlx** - Dead Letter Exchange for failed messages
 
 ## 📧 Email Configuration
 
@@ -420,14 +545,16 @@ dotnet user-secrets set "AzureCommunication:SenderEmail" "noreply@yourdomain.com
 
 - [ ] Change all default passwords and secrets
 - [ ] Configure production database connection string
+- [ ] Configure production RabbitMQ connection
 - [ ] Set up SSL certificates for token signing/encryption
 - [ ] Configure CORS for your frontend origin
-- [ ] Set up email service (SendGrid, AWS SES, etc.)
+- [ ] Set up email service (Azure Communication Services, SendGrid, AWS SES)
 - [ ] Configure logging and monitoring
 - [ ] Set up health checks
 - [ ] Review and update OAuth client redirect URIs
 - [ ] Enable rate limiting on auth endpoints
 - [ ] Configure backup strategy for database
+- [ ] Set up worker service scaling (multiple instances for high load)
 
 ### Environment Variables
 
@@ -437,6 +564,40 @@ For production, use environment variables instead of appsettings:
 ConnectionStrings__DefaultConnection="your-connection-string"
 Seeding__AdminPassword="your-secure-password"
 Seeding__OAuthClientSecret="your-oauth-secret"
+RabbitMq__HostName="your-rabbitmq-host"
+RabbitMq__UserName="your-rabbitmq-user"
+RabbitMq__Password="your-rabbitmq-password"
+```
+
+### Scaling
+
+#### Horizontal Scaling (Workers)
+
+Run multiple worker instances for parallel pipeline processing:
+
+```bash
+# Terminal 1
+dotnet run --project src/MultiTenantETL.Worker
+
+# Terminal 2  
+dotnet run --project src/MultiTenantETL.Worker
+
+# Terminal 3
+dotnet run --project src/MultiTenantETL.Worker
+```
+
+RabbitMQ distributes tasks across workers using round-robin.
+
+#### Vertical Scaling (Concurrency)
+
+Increase `PrefetchCount` in RabbitMQ settings for concurrent executions per worker:
+
+```json
+{
+  "RabbitMq": {
+    "PrefetchCount": 5
+  }
+}
 ```
 
 ## 🛠️ Development
@@ -492,34 +653,42 @@ dotnet user-secrets list
 
 ### Project Components
 
-#### API Layer (`src/MultiTenantETL.API`)
-- **Controllers**: 
-  - `AuthenticationController` - OAuth 2.0 endpoints (not used directly, handled by OpenIddict)
-  - `AccountController` - Registration, password reset, email confirmation, logout, tenant switching
-  - `UsersController` - User management CRUD operations
-  - `TenantsController` - Tenant management CRUD operations
-- **Middleware**: `SecurityHeadersMiddleware` for HTTP security headers
-- **Configuration**: `Program.cs` with OpenIddict setup, DI, rate limiting, CORS
+#### Domain Layer (`src/MultiTenantETL.Domain`)
+- **Entities**: `Tenant`, `Connector`, `Pipeline`, `Transformation`, `PipelineExecution`, `ExecutionBatch`, `ExecutionLogEntry`, `AuditLog`
+- **Interfaces**: `ITenantResource` (for tenant isolation)
+- **Constants**: `Roles`, `Permissions`, `Policies`, `ClaimTypes`
+- **Enums**: `AuthErrorCode`, `ExecutionStatus`, `BatchStatus`
+- **Value Objects**: `ExecutionLog`
+
+#### Application Layer (`src/MultiTenantETL.Application`)
+- **Service Interfaces**: `IConnectorService`, `IPipelineService`, `ITransformationService`, `IExecutionService`, `IEmailService`, `ICurrentUserService`, `IAuditService`
+- **Data Access Interfaces**: `IDataReader`, `IDataWriter`, `IConnectionTester`, `ISchemaDetector`, `IFormatValidator`
+- **Transformation Interfaces**: `ITransformationOrchestrator`, `ITransformationProcessor`
+- **Messaging Interfaces**: `IMessagePublisher`
+- **Orchestration Interfaces**: `IPipelineOrchestrator`
+- **DTOs**: Request/response models for all entities
 
 #### Infrastructure Layer (`src/MultiTenantETL.Infrastructure`)
 - **Persistence**: `ApplicationDbContext` with EF Core and PostgreSQL
 - **Identity**: `ApplicationUser`, `ApplicationRole`, `UserTenant` models
-- **Services**: `EmailService`, `ClaimsService`, `TenantService`, `CurrentUserService`
+- **Data Readers**: `SqlServerDataReader`, `PostgreSqlDataReader`, `MySqlDataReader`, `CsvDataReader`, `JsonDataReader`, `JsonLinesDataReader`, `RestApiDataReader`, `SftpDataReader`, `FtpDataReader`, `S3DataReader`, `AzureBlobDataReader`
+- **Data Writers**: `SqlServerDataWriter`, `PostgreSqlDataWriter`, `MySqlDataWriter`, `CsvDataWriter`, `JsonDataWriter`, `JsonLinesDataWriter`, `RestApiDataWriter`, `SftpDataWriter`, `FtpDataWriter`, `S3DataWriter`, `AzureBlobDataWriter`
+- **Transformations**: `TransformationOrchestrator`, `FilterProcessor`, `MapProcessor`, `StringProcessor`, `ScriptProcessor`, `FieldTransformationProcessor`
+- **Messaging**: `RabbitMqPublisher`
+- **Orchestration**: `PipelineOrchestrator`
+- **Services**: `ConnectorService`, `PipelineService`, `TransformationService`, `ExecutionService`, `AuditService`, `EmailService`, `UserService`, `TenantService`
 - **Authorization**: `PermissionAuthorizationHandler`, `TenantResourceAuthorizationHandler`
-- **Data**: `DbSeeder` for initial data (roles, permissions, admin user, OAuth clients, scopes)
+- **Data**: `DbSeeder` for initial data
 - **Migrations**: EF Core migrations
-- **Security**: `InputSanitizer` utilities
 
-#### Application Layer (`src/MultiTenantETL.Application`)
-- **Interfaces**: `IEmailService`, `ICurrentUserService`, `IClaimsService`, `ITenantService`
-- **DTOs**: `LoginRequest`, `RegisterRequest`, `AuthResponse`, `UserDto`, `TenantDto`
-- **Models**: `ErrorResponse`, `ErrorDetail`
+#### API Layer (`src/MultiTenantETL.API`)
+- **Controllers**: `AuthenticationController`, `AccountController`, `UsersController`, `TenantsController`, `ConnectorsController`, `PipelinesController`, `TransformationsController`, `ExecutionsController`, `AuditLogsController`, `MetadataController`, `FormatValidationController`
+- **Middleware**: `SecurityHeadersMiddleware` for HTTP security headers
+- **Configuration**: `Program.cs` with OpenIddict, DI, RabbitMQ, rate limiting, CORS
 
-#### Domain Layer (`src/MultiTenantETL.Domain`)
-- **Entities**: `Tenant` (pure business entity)
-- **Interfaces**: `ITenantResource` (for authorization)
-- **Constants**: `Roles`, `Permissions`, `Policies`, `ClaimTypes`
-- **Enums**: `AuthErrorCode`
+#### Worker Layer (`src/MultiTenantETL.Worker`)
+- **Background Service**: Consumes pipeline execution tasks from RabbitMQ
+- **Features**: Concurrent execution management, cancellation handling, retry with exponential backoff, graceful shutdown
 
 ## 📝 License
 
