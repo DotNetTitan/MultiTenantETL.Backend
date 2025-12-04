@@ -1,5 +1,6 @@
 using System.Security.Cryptography.X509Certificates;
 using AspNetCoreRateLimit;
+using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -459,6 +460,9 @@ builder.Services.AddScoped<MultiTenantETL.Infrastructure.Services.ConnectionTest
 // Global Exception Handler
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
+
+// FluentValidation - register all validators from Application assembly
+builder.Services.AddValidatorsFromAssemblyContaining<MultiTenantETL.Application.Connectors.Validators.CreateConnectorRequestValidator>();
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>

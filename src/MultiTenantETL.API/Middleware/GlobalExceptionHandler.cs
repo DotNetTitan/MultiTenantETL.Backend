@@ -1,4 +1,5 @@
 using System.Net;
+using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 
@@ -26,6 +27,13 @@ public class GlobalExceptionHandler : IExceptionHandler
         Exception exception,
         CancellationToken cancellationToken)
     {
+        // Handle FluentValidation exceptions specially
+        if (exception is ValidationException validationException)
+        {
+            await HandleValidationException(httpContext, validationException, cancellationToken);
+            return true;
+        }
+
         var (statusCode, title, detail) = MapException(exception);
 
         _logger.LogError(
@@ -60,6 +68,40 @@ public class GlobalExceptionHandler : IExceptionHandler
         await httpContext.Response.WriteAsJsonAsync(problemDetails, cancellationToken);
 
         return true;
+    }
+
+    private async Task HandleValidationException(
+        HttpContext httpContext,
+        ValidationException exception,
+        CancellationToken cancellationToken)
+    {
+        _logger.LogWarning(
+            "Validation error occurred. TraceId: {TraceId}, Path: {Path}, Errors: {Errors}",
+            httpContext.TraceIdentifier,
+            httpContext.Request.Path,
+            exception.Errors.Select(e => $"{e.PropertyName}: {e.ErrorMessage}"));
+
+        var errors = exception.Errors
+            .GroupBy(e => e.PropertyName)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Select(e => e.ErrorMessage).ToArray());
+
+        var problemDetails = new ValidationProblemDetails(errors)
+        {
+            Status = (int)HttpStatusCode.BadRequest,
+            Title = "Validation Failed",
+            Detail = "One or more validation errors occurred.",
+            Instance = httpContext.Request.Path,
+            Type = GetProblemType((int)HttpStatusCode.BadRequest)
+        };
+
+        problemDetails.Extensions["traceId"] = httpContext.TraceIdentifier;
+
+        httpContext.Response.StatusCode = (int)HttpStatusCode.BadRequest;
+        httpContext.Response.ContentType = "application/problem+json";
+
+        await httpContext.Response.WriteAsJsonAsync(problemDetails, cancellationToken);
     }
 
     private static (int StatusCode, string Title, string Detail) MapException(Exception exception)
