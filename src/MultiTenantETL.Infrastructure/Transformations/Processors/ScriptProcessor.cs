@@ -44,7 +44,7 @@ public class ScriptProcessor : ITransformationProcessor
         try
         {
             var config = ParseConfig(transformation.ConfigJson);
-            var transformedRows = new List<Dictionary<string, object?>>();
+            var transformedRows = new List<Dictionary<string, object?>>(batch.Rows.Count);
 
             // Create Jint engine with security constraints
             var engine = CreateSecureEngine(config);

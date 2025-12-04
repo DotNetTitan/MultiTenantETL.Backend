@@ -36,8 +36,8 @@ public class FieldMappingService : IFieldMappingService
             }
 
             // HYBRID APPROACH: Separate simple vs complex mappings in a single pass
-            var simpleMappings = new List<FieldMapping>();
-            var complexMappings = new List<FieldMapping>();
+            var simpleMappings = new List<FieldMapping>(mappings.Count);
+            var complexMappings = new List<FieldMapping>(mappings.Count);
             var allDestinationFields = new HashSet<string>(mappings.Count);
             
             foreach (var mapping in mappings)
@@ -227,10 +227,7 @@ public class FieldMappingService : IFieldMappingService
             if (row.TryGetValue(oldName, out var value))
             {
                 row[newName] = value;
-                if (oldName != newName)
-                {
-                    row.Remove(oldName);
-                }
+                row.Remove(oldName);
             }
         }
         return batch;

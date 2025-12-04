@@ -38,7 +38,7 @@ public class FilterProcessor : ITransformationProcessor
         try
         {
             var config = ParseConfig(transformation.ConfigJson);
-            var filteredRows = new List<Dictionary<string, object?>>();
+            var filteredRows = new List<Dictionary<string, object?>>(batch.Rows.Count);
 
             for (int i = 0; i < batch.Rows.Count; i++)
             {
