@@ -619,36 +619,36 @@ public class ScheduleService : IScheduleService
         return Task.FromResult(response);
     }
 
+    /// <summary>
+    /// Provides a simple human-readable description for common cron patterns.
+    /// For more complex expressions, returns the cron expression itself.
+    /// Consider using CronExpressionDescriptor library for production if detailed descriptions are needed.
+    /// </summary>
     private static string GetCronDescription(string cronExpression)
     {
-        // Simple cron description - for production, use a library like CronExpressionDescriptor
         try
         {
             var parts = cronExpression.Split(' ');
             if (parts.Length < 5) return cronExpression;
 
-            var second = parts.Length > 5 ? parts[0] : "0";
+            // Handle both 5-field (minute hour day month weekday) and 6-field (second minute hour day month weekday) cron
             var minute = parts.Length > 5 ? parts[1] : parts[0];
             var hour = parts.Length > 5 ? parts[2] : parts[1];
             var dayOfMonth = parts.Length > 5 ? parts[3] : parts[2];
             var month = parts.Length > 5 ? parts[4] : parts[3];
             var dayOfWeek = parts.Length > 5 ? parts[5] : parts[4];
 
-            // Common patterns
-            if (minute == "0" && hour == "0" && dayOfMonth == "*" && month == "*" && dayOfWeek == "*")
+            // Match exact common patterns only
+            if (minute == "0" && hour == "0" && dayOfMonth == "*" && month == "*" && (dayOfWeek == "*" || dayOfWeek == "?"))
                 return "Daily at midnight";
-            if (minute == "0" && hour == "*" && dayOfMonth == "*" && month == "*" && dayOfWeek == "*")
+            if (minute == "0" && hour == "*" && dayOfMonth == "*" && month == "*" && (dayOfWeek == "*" || dayOfWeek == "?"))
                 return "Every hour at :00";
-            if (minute == "*/5" && hour == "*" && dayOfMonth == "*" && month == "*" && dayOfWeek == "*")
+            if (minute == "*/5" && hour == "*" && dayOfMonth == "*" && month == "*" && (dayOfWeek == "*" || dayOfWeek == "?"))
                 return "Every 5 minutes";
-            if (minute == "*/15" && hour == "*" && dayOfMonth == "*" && month == "*" && dayOfWeek == "*")
+            if (minute == "*/15" && hour == "*" && dayOfMonth == "*" && month == "*" && (dayOfWeek == "*" || dayOfWeek == "?"))
                 return "Every 15 minutes";
-            if (minute == "*/30" && hour == "*" && dayOfMonth == "*" && month == "*" && dayOfWeek == "*")
+            if (minute == "*/30" && hour == "*" && dayOfMonth == "*" && month == "*" && (dayOfWeek == "*" || dayOfWeek == "?"))
                 return "Every 30 minutes";
-            if (dayOfWeek == "1-5")
-                return $"Weekdays at {hour}:{minute.PadLeft(2, '0')}";
-            if (dayOfWeek == "0,6")
-                return $"Weekends at {hour}:{minute.PadLeft(2, '0')}";
 
             return cronExpression;
         }

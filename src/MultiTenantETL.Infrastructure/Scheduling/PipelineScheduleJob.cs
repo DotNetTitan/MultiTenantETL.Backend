@@ -56,7 +56,7 @@ public class PipelineScheduleJob : IJob
 
         try
         {
-            // Get the schedule and pipeline (use IgnoreQueryFilters to bypass tenant filter since we set context)
+            // Get the schedule and pipeline - tenant context is set above so query filters work
             var schedule = await dbContext.PipelineSchedules
                 .Include(s => s.Pipeline)
                 .FirstOrDefaultAsync(s => s.Id == scheduleId && s.TenantId == tenantId);
