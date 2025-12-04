@@ -37,8 +37,13 @@ public class StringProcessor : ITransformationProcessor
 
         try
         {
-            var config = ParseConfig(transformation.ConfigJson);
-            var transformedRows = new List<Dictionary<string, object?>>();
+            // Parse the JSON config once and keep the JsonElement for core transformations
+            using var configDoc = JsonDocument.Parse(transformation.ConfigJson);
+            var configElement = configDoc.RootElement.Clone();
+            var config = JsonSerializer.Deserialize<StringConfig>(transformation.ConfigJson, JsonSerializerOptionsProvider.Default)
+                ?? throw new InvalidOperationException("Invalid string configuration");
+            
+            var transformedRows = new List<Dictionary<string, object?>>(batch.Rows.Count);
 
             for (int i = 0; i < batch.Rows.Count; i++)
             {
@@ -52,7 +57,7 @@ public class StringProcessor : ITransformationProcessor
                     {
                         if (transformedRow.TryGetValue(field, out var value) && value != null)
                         {
-                            transformedRow[field] = ApplyStringOperation(value.ToString() ?? "", config);
+                            transformedRow[field] = ApplyStringOperation(value.ToString() ?? "", config.Operation, configElement);
                         }
                     }
                     
@@ -89,18 +94,9 @@ public class StringProcessor : ITransformationProcessor
         return Task.FromResult(result);
     }
 
-    private string ApplyStringOperation(string value, StringConfig config)
+    private string ApplyStringOperation(string value, string operation, JsonElement configElement)
     {
-        var configJson = JsonSerializer.Serialize(config);
-        var configElement = JsonDocument.Parse(configJson).RootElement;
-        
-        return Core.StringTransformations.ApplyOperation(value, config.Operation, configElement, _logger) ?? value;
-    }
-
-    private StringConfig ParseConfig(string configJson)
-    {
-        return JsonSerializer.Deserialize<StringConfig>(configJson, JsonSerializerOptionsProvider.Default)
-            ?? throw new InvalidOperationException("Invalid string configuration");
+        return Core.StringTransformations.ApplyOperation(value, operation, configElement, _logger) ?? value;
     }
 
     private class StringConfig

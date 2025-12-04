@@ -38,7 +38,7 @@ public class MapProcessor : ITransformationProcessor
         try
         {
             var config = ParseConfig(transformation.ConfigJson);
-            var mappedRows = new List<Dictionary<string, object?>>();
+            var mappedRows = new List<Dictionary<string, object?>>(batch.Rows.Count);
 
             for (int i = 0; i < batch.Rows.Count; i++)
             {
