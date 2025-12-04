@@ -37,10 +37,10 @@ public class StringProcessor : ITransformationProcessor
 
         try
         {
-            // Parse the JSON config once and keep the JsonElement for core transformations
+            // Parse the JSON config once - use JsonDocument for the configElement and deserialize from it
             using var configDoc = JsonDocument.Parse(transformation.ConfigJson);
-            var configElement = configDoc.RootElement.Clone();
-            var config = JsonSerializer.Deserialize<StringConfig>(transformation.ConfigJson, JsonSerializerOptionsProvider.Default)
+            var configElement = configDoc.RootElement;
+            var config = JsonSerializer.Deserialize<StringConfig>(configElement, JsonSerializerOptionsProvider.Default)
                 ?? throw new InvalidOperationException("Invalid string configuration");
             
             var transformedRows = new List<Dictionary<string, object?>>(batch.Rows.Count);
