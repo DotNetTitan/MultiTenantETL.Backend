@@ -34,8 +34,5 @@ public class PipelineConfiguration : IEntityTypeConfiguration<Pipeline>
 
         builder.Property(p => p.FieldMappingsJson)
             .HasColumnType("jsonb");
-
-        builder.Property(p => p.ScheduleJson)
-            .HasColumnType("jsonb");
     }
 }

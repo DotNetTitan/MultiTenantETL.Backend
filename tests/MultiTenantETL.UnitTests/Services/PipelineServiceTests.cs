@@ -101,8 +101,7 @@ public class PipelineServiceTests : IDisposable
             Description = "Test Description",
             SourceConnectorId = sourceConnector.Id,
             DestinationConnectorId = destConnector.Id,
-            FieldMappings = JsonDocument.Parse("[]").RootElement,
-            IsScheduled = false
+            FieldMappings = JsonDocument.Parse("[]").RootElement
         };
 
         // Act
@@ -317,7 +316,6 @@ public class PipelineServiceTests : IDisposable
             Name = "New Name",
             Description = "Updated Description",
             FieldMappings = JsonDocument.Parse("[]").RootElement,
-            IsScheduled = true,
             IsActive = false
         };
 
@@ -327,7 +325,6 @@ public class PipelineServiceTests : IDisposable
         // Assert
         result.Name.Should().Be("New Name");
         result.Description.Should().Be("Updated Description");
-        result.IsScheduled.Should().BeTrue();
         result.IsActive.Should().BeFalse();
 
         // Verify database update
@@ -523,8 +520,7 @@ public class PipelineServiceTests : IDisposable
             Description = "Test Description",
             SourceConnectorId = sourceConnector.Id,
             DestinationConnectorId = destConnector.Id,
-            FieldMappings = JsonDocument.Parse(fieldMappingsJson).RootElement,
-            IsScheduled = false
+            FieldMappings = JsonDocument.Parse(fieldMappingsJson).RootElement
         };
 
         // Act
@@ -633,7 +629,6 @@ public class PipelineServiceTests : IDisposable
             Name = "Updated Pipeline",
             Description = "Updated Description",
             FieldMappings = JsonDocument.Parse(newFieldMappingsJson).RootElement,
-            IsScheduled = true,
             IsActive = true
         };
 
@@ -717,8 +712,7 @@ public class PipelineServiceTests : IDisposable
             Description = "Test with no mappings",
             SourceConnectorId = sourceConnector.Id,
             DestinationConnectorId = destConnector.Id,
-            FieldMappings = JsonDocument.Parse("[]").RootElement,
-            IsScheduled = false
+            FieldMappings = JsonDocument.Parse("[]").RootElement
         };
 
         // Act

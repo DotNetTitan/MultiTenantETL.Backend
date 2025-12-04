@@ -28,6 +28,7 @@ namespace MultiTenantETL.Infrastructure.Persistence
         public DbSet<Connector> Connectors { get; set; }
         public DbSet<Transformation> Transformations { get; set; }
         public DbSet<Pipeline> Pipelines { get; set; }
+        public DbSet<PipelineSchedule> PipelineSchedules { get; set; }
         public DbSet<PipelineExecution> PipelineExecutions { get; set; }
         public DbSet<ExecutionLogEntry> ExecutionLogs { get; set; }
         public DbSet<ExecutionBatch> ExecutionBatches { get; set; }

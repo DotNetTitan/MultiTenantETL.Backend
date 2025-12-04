@@ -20,10 +20,6 @@ public record CreatePipelineRequest
 
     [Required]
     public required JsonElement FieldMappings { get; init; } // Array of field mappings
-
-    public JsonElement? Schedule { get; init; }
-
-    public bool IsScheduled { get; init; }
 }
 
 public record UpdatePipelineRequest
@@ -37,10 +33,6 @@ public record UpdatePipelineRequest
 
     [Required]
     public required JsonElement FieldMappings { get; init; }
-
-    public JsonElement? Schedule { get; init; }
-
-    public bool IsScheduled { get; init; }
 
     public bool? IsActive { get; init; }
 }
@@ -57,7 +49,6 @@ public record PipelineResponse
     public string? DestinationConnectorName { get; init; }
     public required string Status { get; init; }
     public required JsonElement FieldMappings { get; init; }
-    public JsonElement? Schedule { get; init; }
     public bool IsScheduled { get; init; }
     public bool IsActive { get; init; }
     public DateTime? LastRunAt { get; init; }
@@ -120,14 +111,4 @@ public record FieldTransformation
     public required JsonElement Config { get; init; } // Type-specific configuration
     public int Order { get; init; }
     public bool IsEnabled { get; init; } = true;
-}
-
-public record PipelineSchedule
-{
-    public required string Frequency { get; init; } // Daily, Weekly, Monthly, Custom
-    public string? Time { get; init; } // HH:mm format
-    public int? DayOfWeek { get; init; } // 0-6 for Weekly
-    public int? DayOfMonth { get; init; } // 1-31 for Monthly
-    public string? CronExpression { get; init; } // For Custom
-    public required string Timezone { get; init; }
 }
