@@ -68,8 +68,7 @@ public class PipelineService : IPipelineService
             DestinationConnectorId = request.DestinationConnectorId,
             Status = "Idle",
             FieldMappingsJson = NormalizeFieldMappings(request.FieldMappings),
-            ScheduleJson = request.Schedule.HasValue ? JsonSerializer.Serialize(request.Schedule.Value) : null,
-            IsScheduled = request.IsScheduled,
+            IsScheduled = false, // Managed via /api/schedules endpoints
             IsActive = true,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = userId
@@ -192,8 +191,7 @@ public class PipelineService : IPipelineService
         pipeline.Name = request.Name;
         pipeline.Description = request.Description;
         pipeline.FieldMappingsJson = NormalizeFieldMappings(request.FieldMappings);
-        pipeline.ScheduleJson = request.Schedule.HasValue ? JsonSerializer.Serialize(request.Schedule.Value) : null;
-        pipeline.IsScheduled = request.IsScheduled;
+        // Note: IsScheduled is managed via /api/schedules endpoints
 
         if (request.IsActive.HasValue)
         {
@@ -325,9 +323,6 @@ public class PipelineService : IPipelineService
             DestinationConnectorName = pipeline.DestinationConnector?.Name,
             Status = pipeline.Status,
             FieldMappings = JsonSerializer.Deserialize<JsonElement>(pipeline.FieldMappingsJson),
-            Schedule = !string.IsNullOrEmpty(pipeline.ScheduleJson)
-                ? JsonSerializer.Deserialize<JsonElement>(pipeline.ScheduleJson)
-                : null,
             IsScheduled = pipeline.IsScheduled,
             IsActive = pipeline.IsActive,
             LastRunAt = pipeline.LastRunAt,

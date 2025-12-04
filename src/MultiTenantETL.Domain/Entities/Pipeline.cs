@@ -18,9 +18,8 @@ public class Pipeline : ITenantResource
     
     // JSON columns for flexible configuration (PostgreSQL JSONB)
     public required string FieldMappingsJson { get; set; } // Array of field mappings with transformations
-    public string? ScheduleJson { get; set; } // Schedule configuration (frequency, time, cron, timezone)
     
-    // Scheduling
+    // Scheduling (managed via PipelineSchedule entity and /api/schedules endpoints)
     public bool IsScheduled { get; set; }
     public bool IsActive { get; set; }
     
