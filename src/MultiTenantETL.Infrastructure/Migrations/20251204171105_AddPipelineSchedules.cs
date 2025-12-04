@@ -65,7 +65,7 @@ namespace MultiTenantETL.Infrastructure.Migrations
                 name: "IX_pipeline_schedules_NextRunAt",
                 table: "pipeline_schedules",
                 column: "NextRunAt",
-                filter: "is_active = true");
+                filter: "\"IsActive\" = true");
 
             migrationBuilder.CreateIndex(
                 name: "IX_pipeline_schedules_PipelineId",

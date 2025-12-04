@@ -594,7 +594,7 @@ namespace MultiTenantETL.Infrastructure.Migrations
                     b.HasIndex("IsActive");
 
                     b.HasIndex("NextRunAt")
-                        .HasFilter("is_active = true");
+                        .HasFilter("\"IsActive\" = true");
 
                     b.HasIndex("PipelineId")
                         .IsUnique();

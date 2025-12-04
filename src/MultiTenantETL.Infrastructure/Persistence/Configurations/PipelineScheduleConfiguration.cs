@@ -30,7 +30,7 @@ public class PipelineScheduleConfiguration : IEntityTypeConfiguration<PipelineSc
         builder.HasIndex(s => s.PipelineId).IsUnique(); // One schedule per pipeline
         builder.HasIndex(s => s.IsActive);
         builder.HasIndex(s => s.NextRunAt)
-            .HasFilter("is_active = true"); // Partial index for active schedules
+            .HasFilter("\"IsActive\" = true"); // Partial index for active schedules
 
         // Composite index for scheduler polling
         builder.HasIndex(s => new { s.IsActive, s.NextRunAt });
