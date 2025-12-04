@@ -39,158 +39,31 @@ public class PipelineOrchestrator : IPipelineOrchestrator
         
         try
         {
-            // Load execution with pipeline and connectors
-            execution = await _context.PipelineExecutions
-                .Include(e => e.Pipeline)
-                    .ThenInclude(p => p!.SourceConnector)
-                .Include(e => e.Pipeline)
-                    .ThenInclude(p => p!.DestinationConnector)
-                .FirstOrDefaultAsync(e => e.Id == executionId, cancellationToken);
-
+            execution = await LoadExecutionAsync(executionId, cancellationToken);
             if (execution == null)
             {
                 _logger.LogError("Execution {ExecutionId} not found", executionId);
                 return;
             }
 
-            var pipeline = execution.Pipeline;
-            if (pipeline == null)
+            var validationError = ValidatePipelineConfiguration(execution);
+            if (validationError != null)
             {
-                await LogAndFailExecution(execution, "Pipeline not found", cancellationToken);
+                await LogAndFailExecution(execution, validationError, cancellationToken);
                 return;
             }
 
-            if (pipeline.SourceConnector == null)
-            {
-                await LogAndFailExecution(execution, "Source connector not found", cancellationToken);
-                return;
-            }
+            var pipeline = execution.Pipeline!;
+            await StartExecutionAsync(execution, cancellationToken);
 
-            if (pipeline.DestinationConnector == null)
-            {
-                await LogAndFailExecution(execution, "Destination connector not found", cancellationToken);
-                return;
-            }
-
-            // Update status to Running
-            execution.Status = ExecutionStatus.Running;
-            execution.StartTime = DateTimeOffset.UtcNow;
-            await _context.SaveChangesAsync(cancellationToken);
-            await AddLogEntry(execution, "Info", "System", "Pipeline execution started", cancellationToken);
-
-            // Create reader and writer
-            var reader = _readerFactory.CreateReader(pipeline.SourceConnector);
-            await using var writer = _writerFactory.CreateWriter(pipeline.DestinationConnector);
-
-            var readOptions = new ReadOptions { BatchSize = 1000 };
-            var writeOptions = ExtractWriteOptions(pipeline.DestinationConnector);
+            var result = await ProcessBatchesAsync(execution, pipeline, cancellationToken);
             
-            long totalProcessed = 0;
-            long totalSucceeded = 0;
-            long totalFailed = 0;
-            int batchIndex = 0;
-
-            // Stream data in batches
-            await foreach (var batch in reader.ReadAsync(pipeline.SourceConnector, readOptions, cancellationToken))
+            if (result.WasCancelled)
             {
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    await LogAndCancelExecution(execution, "Execution cancelled by user", cancellationToken);
-                    return;
-                }
-
-                batchIndex++;
-                
-                // Create batch tracking record
-                var executionBatch = new ExecutionBatch
-                {
-                    Id = Guid.NewGuid(),
-                    ExecutionId = executionId,
-                    TenantId = execution.TenantId,
-                    BatchIndex = batchIndex,
-                    RowsCount = batch.RowCount,
-                    RowsSucceeded = 0,
-                    RowsFailed = 0,
-                    Status = BatchStatus.Processing,
-                    StartedAt = DateTimeOffset.UtcNow,
-                    CreatedAt = DateTimeOffset.UtcNow
-                };
-                _context.ExecutionBatches.Add(executionBatch);
-                await _context.SaveChangesAsync(cancellationToken);
-
-                try
-                {
-                    // Apply field mappings (includes embedded transformations)
-                    // Transformations are now applied per-field within the field mapping process
-                    var mappedBatch = _fieldMappingService.ApplyFieldMappings(batch, pipeline.FieldMappingsJson);
-                    
-                    await AddLogEntry(execution, "Info", "FieldMapping",
-                        $"Batch {batchIndex}: Applied field mappings with transformations, " +
-                        $"{batch.RowCount} → {mappedBatch.RowCount} rows",
-                        cancellationToken);
-                    
-                    // Write batch
-                    var writeResult = await writer.WriteBatchAsync(
-                        pipeline.DestinationConnector,
-                        mappedBatch,
-                        writeOptions,
-                        cancellationToken);
-
-                    // Update batch status
-                    executionBatch.Status = BatchStatus.Completed;
-                    executionBatch.RowsSucceeded = writeResult.RowsWritten;
-                    executionBatch.RowsFailed = writeResult.RowsFailed;
-                    executionBatch.EndedAt = DateTimeOffset.UtcNow;
-
-                    totalProcessed += batch.RowCount;
-                    totalSucceeded += writeResult.RowsWritten;
-                    totalFailed += writeResult.RowsFailed;
-
-                    // Update execution progress
-                    execution.RecordsProcessed = totalProcessed;
-                    execution.RecordsSucceeded = totalSucceeded;
-                    execution.RecordsFailed = totalFailed;
-                    execution.BatchCount = batchIndex;
-                    
-                    await _context.SaveChangesAsync(cancellationToken);
-
-                    _logger.LogInformation(
-                        "Batch {BatchIndex} completed for execution {ExecutionId}: {Succeeded} succeeded, {Failed} failed",
-                        batchIndex, executionId, writeResult.RowsWritten, writeResult.RowsFailed);
-                }
-                catch (Exception batchEx)
-                {
-                    _logger.LogError(batchEx, "Error processing batch {BatchIndex} for execution {ExecutionId}", 
-                        batchIndex, executionId);
-                    
-                    executionBatch.Status = BatchStatus.Failed;
-                    executionBatch.RowsFailed = batch.RowCount;
-                    executionBatch.EndedAt = DateTimeOffset.UtcNow;
-                    
-                    totalFailed += batch.RowCount;
-                    execution.RecordsFailed = totalFailed;
-                    
-                    await _context.SaveChangesAsync(cancellationToken);
-                    await AddLogEntry(execution, "Error", "Batch", $"Batch {batchIndex} failed: {batchEx.Message}", cancellationToken);
-                    
-                    // Continue with next batch (fail-safe mode)
-                }
+                return; // Already handled in ProcessBatchesAsync
             }
 
-            // Complete execution
-            execution.Status = ExecutionStatus.Completed;
-            execution.EndTime = DateTimeOffset.UtcNow;
-            execution.Duration = execution.EndTime.Value - execution.StartTime;
-            execution.ProgressPercent = 100;
-
-            await _context.SaveChangesAsync(cancellationToken);
-            await AddLogEntry(execution, "Info", "System", 
-                $"Pipeline execution completed: {totalSucceeded} succeeded, {totalFailed} failed", 
-                cancellationToken);
-
-            _logger.LogInformation(
-                "Execution {ExecutionId} completed successfully: {TotalProcessed} records processed",
-                executionId, totalProcessed);
+            await CompleteExecutionAsync(execution, result, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -202,6 +75,206 @@ public class PipelineOrchestrator : IPipelineOrchestrator
             }
         }
     }
+
+    #region Execution Lifecycle
+
+    private async Task<PipelineExecution?> LoadExecutionAsync(Guid executionId, CancellationToken cancellationToken)
+    {
+        return await _context.PipelineExecutions
+            .Include(e => e.Pipeline)
+                .ThenInclude(p => p!.SourceConnector)
+            .Include(e => e.Pipeline)
+                .ThenInclude(p => p!.DestinationConnector)
+            .FirstOrDefaultAsync(e => e.Id == executionId, cancellationToken);
+    }
+
+    private static string? ValidatePipelineConfiguration(PipelineExecution execution)
+    {
+        if (execution.Pipeline == null)
+            return "Pipeline not found";
+        
+        if (execution.Pipeline.SourceConnector == null)
+            return "Source connector not found";
+        
+        if (execution.Pipeline.DestinationConnector == null)
+            return "Destination connector not found";
+        
+        return null;
+    }
+
+    private async Task StartExecutionAsync(PipelineExecution execution, CancellationToken cancellationToken)
+    {
+        execution.Status = ExecutionStatus.Running;
+        execution.StartTime = DateTimeOffset.UtcNow;
+        await _context.SaveChangesAsync(cancellationToken);
+        await AddLogEntry(execution, "Info", "System", "Pipeline execution started", cancellationToken);
+    }
+
+    private async Task CompleteExecutionAsync(
+        PipelineExecution execution, 
+        BatchProcessingResult result, 
+        CancellationToken cancellationToken)
+    {
+        execution.Status = ExecutionStatus.Completed;
+        execution.EndTime = DateTimeOffset.UtcNow;
+        execution.Duration = execution.EndTime.Value - execution.StartTime;
+        execution.ProgressPercent = 100;
+
+        await _context.SaveChangesAsync(cancellationToken);
+        await AddLogEntry(execution, "Info", "System", 
+            $"Pipeline execution completed: {result.TotalSucceeded} succeeded, {result.TotalFailed} failed", 
+            cancellationToken);
+
+        _logger.LogInformation(
+            "Execution {ExecutionId} completed successfully: {TotalProcessed} records processed",
+            execution.Id, result.TotalProcessed);
+    }
+
+    #endregion
+
+    #region Batch Processing
+
+    private async Task<BatchProcessingResult> ProcessBatchesAsync(
+        PipelineExecution execution,
+        Pipeline pipeline,
+        CancellationToken cancellationToken)
+    {
+        var reader = _readerFactory.CreateReader(pipeline.SourceConnector!);
+        await using var writer = _writerFactory.CreateWriter(pipeline.DestinationConnector!);
+
+        var readOptions = new ReadOptions { BatchSize = 1000 };
+        var writeOptions = ExtractWriteOptions(pipeline.DestinationConnector!);
+        
+        var result = new BatchProcessingResult();
+
+        await foreach (var batch in reader.ReadAsync(pipeline.SourceConnector!, readOptions, cancellationToken))
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                await LogAndCancelExecution(execution, "Execution cancelled by user", cancellationToken);
+                result.WasCancelled = true;
+                return result;
+            }
+
+            result.BatchIndex++;
+            
+            var executionBatch = await CreateBatchTrackingRecordAsync(execution, batch, result.BatchIndex, cancellationToken);
+
+            try
+            {
+                var batchResult = await ProcessSingleBatchAsync(
+                    execution, pipeline, writer, batch, writeOptions, result.BatchIndex, cancellationToken);
+
+                UpdateBatchSuccess(executionBatch, batchResult);
+                result.AddSuccess(batch.RowCount, batchResult.RowsWritten, batchResult.RowsFailed);
+
+                await UpdateExecutionProgressAsync(execution, result, cancellationToken);
+
+                _logger.LogInformation(
+                    "Batch {BatchIndex} completed for execution {ExecutionId}: {Succeeded} succeeded, {Failed} failed",
+                    result.BatchIndex, execution.Id, batchResult.RowsWritten, batchResult.RowsFailed);
+            }
+            catch (Exception batchEx)
+            {
+                _logger.LogError(batchEx, "Error processing batch {BatchIndex} for execution {ExecutionId}", 
+                    result.BatchIndex, execution.Id);
+                
+                UpdateBatchFailure(executionBatch, batch.RowCount);
+                result.AddFailure(batch.RowCount);
+
+                await _context.SaveChangesAsync(cancellationToken);
+                await AddLogEntry(execution, "Error", "Batch", 
+                    $"Batch {result.BatchIndex} failed: {batchEx.Message}", cancellationToken);
+                
+                // Continue with next batch (fail-safe mode)
+            }
+        }
+
+        return result;
+    }
+
+    private async Task<ExecutionBatch> CreateBatchTrackingRecordAsync(
+        PipelineExecution execution,
+        ReadBatch batch,
+        int batchIndex,
+        CancellationToken cancellationToken)
+    {
+        var executionBatch = new ExecutionBatch
+        {
+            Id = Guid.NewGuid(),
+            ExecutionId = execution.Id,
+            TenantId = execution.TenantId,
+            BatchIndex = batchIndex,
+            RowsCount = batch.RowCount,
+            RowsSucceeded = 0,
+            RowsFailed = 0,
+            Status = BatchStatus.Processing,
+            StartedAt = DateTimeOffset.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+        
+        _context.ExecutionBatches.Add(executionBatch);
+        await _context.SaveChangesAsync(cancellationToken);
+        
+        return executionBatch;
+    }
+
+    private async Task<DataWriteResult> ProcessSingleBatchAsync(
+        PipelineExecution execution,
+        Pipeline pipeline,
+        IDataWriter writer,
+        ReadBatch batch,
+        WriteOptions writeOptions,
+        int batchIndex,
+        CancellationToken cancellationToken)
+    {
+        // Apply field mappings (includes embedded transformations)
+        var mappedBatch = _fieldMappingService.ApplyFieldMappings(batch, pipeline.FieldMappingsJson);
+        
+        await AddLogEntry(execution, "Info", "FieldMapping",
+            $"Batch {batchIndex}: Applied field mappings with transformations, " +
+            $"{batch.RowCount} → {mappedBatch.RowCount} rows",
+            cancellationToken);
+        
+        // Write batch to destination
+        return await writer.WriteBatchAsync(
+            pipeline.DestinationConnector!,
+            mappedBatch,
+            writeOptions,
+            cancellationToken);
+    }
+
+    private static void UpdateBatchSuccess(ExecutionBatch executionBatch, DataWriteResult writeResult)
+    {
+        executionBatch.Status = BatchStatus.Completed;
+        executionBatch.RowsSucceeded = writeResult.RowsWritten;
+        executionBatch.RowsFailed = writeResult.RowsFailed;
+        executionBatch.EndedAt = DateTimeOffset.UtcNow;
+    }
+
+    private static void UpdateBatchFailure(ExecutionBatch executionBatch, int rowCount)
+    {
+        executionBatch.Status = BatchStatus.Failed;
+        executionBatch.RowsFailed = rowCount;
+        executionBatch.EndedAt = DateTimeOffset.UtcNow;
+    }
+
+    private async Task UpdateExecutionProgressAsync(
+        PipelineExecution execution,
+        BatchProcessingResult result,
+        CancellationToken cancellationToken)
+    {
+        execution.RecordsProcessed = result.TotalProcessed;
+        execution.RecordsSucceeded = result.TotalSucceeded;
+        execution.RecordsFailed = result.TotalFailed;
+        execution.BatchCount = result.BatchIndex;
+        
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    #endregion
+
+    #region Logging and Status Updates
 
     private async Task AddLogEntry(
         PipelineExecution execution, 
@@ -253,6 +326,10 @@ public class PipelineOrchestrator : IPipelineOrchestrator
         await AddLogEntry(execution, "Warning", "System", message, cancellationToken);
     }
 
+    #endregion
+
+    #region Configuration Parsing
+
     /// <summary>
     /// Extracts write options from the destination connector's configuration.
     /// Supports database connectors with writeConfig containing operation and primaryKeys.
@@ -271,38 +348,9 @@ public class PipelineOrchestrator : IPipelineOrchestrator
             using var doc = JsonDocument.Parse(destinationConnector.ConfigJson);
             var root = doc.RootElement;
 
-            // Check for writeConfig section (database connectors)
             if (root.TryGetProperty("writeConfig", out var writeConfig))
             {
-                // Check operation type
-                if (writeConfig.TryGetProperty("operation", out var operation))
-                {
-                    var operationValue = operation.GetString()?.ToUpperInvariant();
-                    options.UseUpsert = operationValue == "UPSERT";
-                    
-                    _logger.LogDebug("Destination connector operation: {Operation}, UseUpsert: {UseUpsert}", 
-                        operationValue, options.UseUpsert);
-                }
-
-                // Get primary keys for upsert
-                if (writeConfig.TryGetProperty("primaryKeys", out var primaryKeys) && 
-                    primaryKeys.ValueKind == JsonValueKind.Array)
-                {
-                    options.UpsertKeys = primaryKeys.EnumerateArray()
-                        .Select(k => k.GetString())
-                        .Where(k => !string.IsNullOrEmpty(k))
-                        .Cast<string>()
-                        .ToList();
-                    
-                    _logger.LogDebug("Destination connector primary keys: {PrimaryKeys}", 
-                        string.Join(", ", options.UpsertKeys));
-                }
-
-                // Check for truncate option
-                if (writeConfig.TryGetProperty("truncateBeforeLoad", out var truncate))
-                {
-                    options.TruncateBeforeLoad = truncate.GetBoolean();
-                }
+                ParseWriteConfig(writeConfig, options);
             }
         }
         catch (JsonException ex)
@@ -312,4 +360,67 @@ public class PipelineOrchestrator : IPipelineOrchestrator
 
         return options;
     }
+
+    private void ParseWriteConfig(JsonElement writeConfig, WriteOptions options)
+    {
+        // Parse operation type
+        if (writeConfig.TryGetProperty("operation", out var operation))
+        {
+            var operationValue = operation.GetString()?.ToUpperInvariant();
+            options.UseUpsert = operationValue == "UPSERT";
+            
+            _logger.LogDebug("Destination connector operation: {Operation}, UseUpsert: {UseUpsert}", 
+                operationValue, options.UseUpsert);
+        }
+
+        // Parse primary keys for upsert
+        if (writeConfig.TryGetProperty("primaryKeys", out var primaryKeys) && 
+            primaryKeys.ValueKind == JsonValueKind.Array)
+        {
+            options.UpsertKeys = primaryKeys.EnumerateArray()
+                .Select(k => k.GetString())
+                .Where(k => !string.IsNullOrEmpty(k))
+                .Cast<string>()
+                .ToList();
+            
+            _logger.LogDebug("Destination connector primary keys: {PrimaryKeys}", 
+                string.Join(", ", options.UpsertKeys));
+        }
+
+        // Parse truncate option
+        if (writeConfig.TryGetProperty("truncateBeforeLoad", out var truncate))
+        {
+            options.TruncateBeforeLoad = truncate.GetBoolean();
+        }
+    }
+
+    #endregion
+
+    #region Helper Types
+
+    /// <summary>
+    /// Tracks the cumulative results of batch processing.
+    /// </summary>
+    private sealed class BatchProcessingResult
+    {
+        public int BatchIndex { get; set; }
+        public long TotalProcessed { get; set; }
+        public long TotalSucceeded { get; set; }
+        public long TotalFailed { get; set; }
+        public bool WasCancelled { get; set; }
+
+        public void AddSuccess(int rowCount, long rowsWritten, long rowsFailed)
+        {
+            TotalProcessed += rowCount;
+            TotalSucceeded += rowsWritten;
+            TotalFailed += rowsFailed;
+        }
+
+        public void AddFailure(int rowCount)
+        {
+            TotalFailed += rowCount;
+        }
+    }
+
+    #endregion
 }
