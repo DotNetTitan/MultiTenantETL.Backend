@@ -5,11 +5,9 @@ using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Application.DataAccess;
 using MultiTenantETL.Application.Orchestration;
-using MultiTenantETL.Application.Transformations;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Domain.Enums;
 using MultiTenantETL.Infrastructure.Persistence;
-using static MultiTenantETL.Application.Transformations.TransformationPolicy;
 
 namespace MultiTenantETL.Infrastructure.Orchestration;
 
@@ -18,7 +16,6 @@ public class PipelineOrchestrator : IPipelineOrchestrator
     private readonly ApplicationDbContext _context;
     private readonly IDataReaderFactory _readerFactory;
     private readonly IDataWriterFactory _writerFactory;
-    private readonly ITransformationOrchestrator _transformationOrchestrator;
     private readonly IFieldMappingService _fieldMappingService;
     private readonly ILogger<PipelineOrchestrator> _logger;
 
@@ -26,14 +23,12 @@ public class PipelineOrchestrator : IPipelineOrchestrator
         ApplicationDbContext context,
         IDataReaderFactory readerFactory,
         IDataWriterFactory writerFactory,
-        ITransformationOrchestrator transformationOrchestrator,
         IFieldMappingService fieldMappingService,
         ILogger<PipelineOrchestrator> logger)
     {
         _context = context;
         _readerFactory = readerFactory;
         _writerFactory = writerFactory;
-        _transformationOrchestrator = transformationOrchestrator;
         _fieldMappingService = fieldMappingService;
         _logger = logger;
     }

@@ -359,8 +359,6 @@ builder.Services.AddScoped<MultiTenantETL.Application.Connectors.ISchemaDetector
 // Transformation Services
 builder.Services.AddScoped<MultiTenantETL.Application.Transformations.ITransformationService,
     MultiTenantETL.Infrastructure.Services.TransformationService>();
-builder.Services.AddScoped<MultiTenantETL.Application.Transformations.ITransformationOrchestrator,
-    MultiTenantETL.Infrastructure.Transformations.TransformationOrchestrator>();
 
 // Transformation Processors
 builder.Services.AddScoped<MultiTenantETL.Application.Transformations.ITransformationProcessor,
