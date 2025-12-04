@@ -39,9 +39,17 @@ public class CreateTransformationCommandValidator : AbstractValidator<CreateTran
             TransformationTypes.Filter, 
             TransformationTypes.Map, 
             TransformationTypes.String,
-            TransformationTypes.Script
+            TransformationTypes.Script,
+            // Legacy types for backward compatibility
+            TransformationTypes.FilterLegacy,
+            TransformationTypes.MapLegacy,
+            TransformationTypes.Trim,
+            TransformationTypes.CaseConvert,
+            TransformationTypes.Substring,
+            TransformationTypes.Replace,
+            TransformationTypes.ScriptLegacy
         };
-        return validTypes.Contains(type);
+        return validTypes.Contains(type, StringComparer.OrdinalIgnoreCase);
     }
 }
 

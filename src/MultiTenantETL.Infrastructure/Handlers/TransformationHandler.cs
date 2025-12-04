@@ -21,12 +21,6 @@ public class TransformationHandler
     private readonly ILogger<TransformationHandler> _logger;
     private readonly IAuditService _auditService;
 
-    private static readonly string[] ValidTransformationTypes = new[]
-    {
-        "Filter", "Map", "Trim", "Case Convert", "Substring", "Replace", "Script",
-        TransformationTypes.Filter, TransformationTypes.Map, TransformationTypes.String, TransformationTypes.Script
-    };
-
     public TransformationHandler(
         ApplicationDbContext context,
         ILogger<TransformationHandler> logger,
@@ -43,12 +37,6 @@ public class TransformationHandler
     public async Task<TransformationResponse> Handle(CreateTransformationCommand command)
     {
         _logger.LogInformation("Creating transformation {Name} for tenant {TenantId}", command.Name, command.TenantId);
-
-        // Validate transformation type
-        if (!ValidTransformationTypes.Contains(command.Type, StringComparer.OrdinalIgnoreCase))
-        {
-            throw new ArgumentException($"Invalid transformation type: {command.Type}. Valid types are: {string.Join(", ", ValidTransformationTypes)}");
-        }
 
         var transformation = new Transformation
         {
