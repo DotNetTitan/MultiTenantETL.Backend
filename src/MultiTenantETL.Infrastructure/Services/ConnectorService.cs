@@ -20,18 +20,6 @@ public class ConnectorService : IConnectorService
     private readonly IEncryptionService _encryptionService;
     private readonly IAuditService _auditService;
 
-    // Fields that should be encrypted in connector configurations
-    private static readonly string[] SensitiveFields = new[]
-    {
-        "password", "Password",
-        "apiKey", "ApiKey", "apiKeyValue", "ApiKeyValue",
-        "token", "Token", "authToken", "AuthToken",
-        "secretKey", "SecretKey", "s3SecretKey", "S3SecretKey",
-        "accountKey", "AccountKey", "azureAccountKey", "AzureAccountKey",
-        "ftpPassword", "FtpPassword",
-        "connectionString", "ConnectionString"
-    };
-
     public ConnectorService(
         ApplicationDbContext context,
         ILogger<ConnectorService> logger,
@@ -59,7 +47,7 @@ public class ConnectorService : IConnectorService
         var (isSource, isDestination) = ParseDirection(request.Direction);
 
         // Encrypt sensitive fields in config
-        var encryptedConfig = _encryptionService.EncryptJsonFields(request.Config, SensitiveFields);
+        var encryptedConfig = _encryptionService.EncryptJsonFields(request.Config, EncryptionConstants.SensitiveFields);
 
         var connector = new Connector
         {
@@ -194,7 +182,7 @@ public class ConnectorService : IConnectorService
         connector.IsDestination = isDestination;
         
         // Encrypt sensitive fields in config
-        var encryptedConfig = _encryptionService.EncryptJsonFields(request.Config, SensitiveFields);
+        var encryptedConfig = _encryptionService.EncryptJsonFields(request.Config, EncryptionConstants.SensitiveFields);
         connector.ConfigJson = JsonSerializer.Serialize(encryptedConfig);
         connector.SchemaJson = request.Schema.HasValue ? JsonSerializer.Serialize(request.Schema.Value) : connector.SchemaJson;
         
@@ -301,7 +289,7 @@ public class ConnectorService : IConnectorService
         var config = JsonSerializer.Deserialize<JsonElement>(connector.ConfigJson);
         
         // Decrypt sensitive fields before testing
-        var decryptedConfig = _encryptionService.DecryptJsonFields(config, SensitiveFields);
+        var decryptedConfig = _encryptionService.DecryptJsonFields(config, EncryptionConstants.SensitiveFields);
         var result = await _connectionTester.TestConnectionAsync(connector.Type, connector.Provider, decryptedConfig);
 
         // Update connector with test results
@@ -345,7 +333,7 @@ public class ConnectorService : IConnectorService
         var config = JsonSerializer.Deserialize<JsonElement>(connector.ConfigJson);
         
         // Decrypt sensitive fields before schema detection
-        var decryptedConfig = _encryptionService.DecryptJsonFields(config, SensitiveFields);
+        var decryptedConfig = _encryptionService.DecryptJsonFields(config, EncryptionConstants.SensitiveFields);
         var result = await _schemaDetector.DetectSchemaAsync(
             connector.Type,
             connector.Provider,
@@ -463,7 +451,7 @@ public class ConnectorService : IConnectorService
         var config = JsonSerializer.Deserialize<JsonElement>(connector.ConfigJson);
         
         // Decrypt sensitive fields for response
-        var decryptedConfig = _encryptionService.DecryptJsonFields(config, SensitiveFields);
+        var decryptedConfig = _encryptionService.DecryptJsonFields(config, EncryptionConstants.SensitiveFields);
         
         return new ConnectorResponse
         {

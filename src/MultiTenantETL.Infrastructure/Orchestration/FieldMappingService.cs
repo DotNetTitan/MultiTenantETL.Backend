@@ -2,10 +2,8 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Orchestration;
-using MultiTenantETL.Application.Transformations;
 using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.Transformations.FieldProcessors;
-using MultiTenantETL.Domain.Entities;
 
 namespace MultiTenantETL.Infrastructure.Orchestration;
 
@@ -13,16 +11,13 @@ public class FieldMappingService : IFieldMappingService
 {
     private readonly ILogger<FieldMappingService> _logger;
     private readonly IFieldTransformationProcessor _fieldProcessor;
-    private readonly IEnumerable<ITransformationProcessor> _batchProcessors;
 
     public FieldMappingService(
         ILogger<FieldMappingService> logger,
-        IFieldTransformationProcessor fieldProcessor,
-        IEnumerable<ITransformationProcessor> batchProcessors)
+        IFieldTransformationProcessor fieldProcessor)
     {
         _logger = logger;
         _fieldProcessor = fieldProcessor;
-        _batchProcessors = batchProcessors;
     }
 
     public ReadBatch ApplyFieldMappings(ReadBatch batch, string fieldMappingsJson)
@@ -40,12 +35,27 @@ public class FieldMappingService : IFieldMappingService
                 return batch;
             }
 
-            // HYBRID APPROACH: Separate simple vs complex mappings
-            var simpleMappings = mappings.Where(m => m.SourceFields.Count == 1).OrderBy(m => m.Order).ToList();
-            var complexMappings = mappings.Where(m => m.SourceFields.Count > 1).OrderBy(m => m.Order).ToList();
+            // HYBRID APPROACH: Separate simple vs complex mappings in a single pass
+            var simpleMappings = new List<FieldMapping>();
+            var complexMappings = new List<FieldMapping>();
+            var allDestinationFields = new HashSet<string>(mappings.Count);
             
-            // Collect all destination fields to know which fields should be preserved
-            var allDestinationFields = mappings.Select(m => m.DestinationField).ToHashSet();
+            foreach (var mapping in mappings)
+            {
+                allDestinationFields.Add(mapping.DestinationField);
+                if (mapping.SourceFields.Count == 1)
+                {
+                    simpleMappings.Add(mapping);
+                }
+                else
+                {
+                    complexMappings.Add(mapping);
+                }
+            }
+            
+            // Sort once, not per row
+            simpleMappings.Sort((a, b) => a.Order.CompareTo(b.Order));
+            complexMappings.Sort((a, b) => a.Order.CompareTo(b.Order));
 
             // STEP 1: Process simple mappings (1 source field -> 1 destination field)
             // Apply transformations per-field, not per-batch, to avoid filtering out rows
@@ -56,30 +66,47 @@ public class FieldMappingService : IFieldMappingService
                 // Apply transformations to each row's field value individually
                 if (mapping.Transformations != null && mapping.Transformations.Count > 0)
                 {
-                    foreach (var row in batch.Rows)
+                    // Pre-filter and sort transformations ONCE per mapping, not per row
+                    var enabledTransformations = mapping.Transformations
+                        .Where(t => t.IsEnabled)
+                        .OrderBy(t => t.Order)
+                        .ToList();
+                    
+                    if (enabledTransformations.Count > 0)
                     {
-                        if (row.TryGetValue(sourceField, out var fieldValue))
+                        foreach (var row in batch.Rows)
                         {
-                            object? transformedValue = fieldValue;
-                            
-                            foreach (var trans in mapping.Transformations.OrderBy(t => t.Order).Where(t => t.IsEnabled))
+                            if (row.TryGetValue(sourceField, out var fieldValue))
                             {
-                                transformedValue = ApplyFieldTransformation(transformedValue, trans, sourceField, row);
+                                object? transformedValue = fieldValue;
+                                
+                                foreach (var trans in enabledTransformations)
+                                {
+                                    transformedValue = ApplyFieldTransformation(transformedValue, trans, sourceField, row);
+                                }
+                                
+                                // Store the transformed value in the destination field
+                                row[mapping.DestinationField] = transformedValue;
+                                
+                                // Remove source field if different from destination
+                                if (sourceField != mapping.DestinationField)
+                                {
+                                    row.Remove(sourceField);
+                                }
                             }
-                            
-                            // Store the transformed value in the destination field
-                            row[mapping.DestinationField] = transformedValue;
-                            
-                            // Remove source field if different from destination
-                            if (sourceField != mapping.DestinationField)
+                            else
                             {
-                                row.Remove(sourceField);
+                                // Source field doesn't exist, set destination to null
+                                row[mapping.DestinationField] = null;
                             }
                         }
-                        else
+                    }
+                    else
+                    {
+                        // All transformations disabled, just rename field if needed
+                        if (sourceField != mapping.DestinationField)
                         {
-                            // Source field doesn't exist, set destination to null
-                            row[mapping.DestinationField] = null;
+                            batch = RenameFieldInBatch(batch, sourceField, mapping.DestinationField);
                         }
                     }
                 }
@@ -94,42 +121,51 @@ public class FieldMappingService : IFieldMappingService
             }
 
             // STEP 2: Process complex mappings ROW-BY-ROW (flexibility)
-            if (complexMappings.Any())
+            if (complexMappings.Count > 0)
             {
+                // Pre-compute enabled transformations for each complex mapping ONCE
+                var mappingTransformations = new List<(FieldMapping Mapping, List<TransformationDto> EnabledTransformations)>();
+                foreach (var mapping in complexMappings)
+                {
+                    List<TransformationDto> enabled;
+                    if (mapping.Transformations != null && mapping.Transformations.Count > 0)
+                    {
+                        enabled = mapping.Transformations
+                            .Where(t => t.IsEnabled)
+                            .OrderBy(t => t.Order)
+                            .ToList();
+                    }
+                    else
+                    {
+                        enabled = new List<TransformationDto>();
+                    }
+                    mappingTransformations.Add((mapping, enabled));
+                }
+                
                 foreach (var row in batch.Rows)
                 {
-                    foreach (var mapping in complexMappings)
+                    foreach (var (mapping, enabledTransformations) in mappingTransformations)
                     {
-                        // Get multiple source values
-                        var values = new List<object?>();
+                        // Get multiple source values - use capacity hint to avoid resizing
+                        var values = new List<object?>(mapping.SourceFields.Count);
                         foreach (var sourceField in mapping.SourceFields)
                         {
-                            if (row.TryGetValue(sourceField, out var fieldValue))
-                            {
-                                values.Add(fieldValue);
-                            }
-                            else
-                            {
-                                values.Add(null);
-                            }
+                            values.Add(row.TryGetValue(sourceField, out var fieldValue) ? fieldValue : null);
                         }
 
                         // Apply transformations to combined value
                         object? result = values;
-                        if (mapping.Transformations != null && mapping.Transformations.Count > 0)
+                        foreach (var trans in enabledTransformations)
                         {
-                            foreach (var trans in mapping.Transformations.OrderBy(t => t.Order).Where(t => t.IsEnabled))
+                            var transformationConfig = new TransformationConfig
                             {
-                                var transformationConfig = new Transformations.FieldProcessors.TransformationConfig
-                                {
-                                    Id = trans.Id,
-                                    Type = trans.Type,
-                                    Config = trans.Config,
-                                    Order = trans.Order,
-                                    IsEnabled = trans.IsEnabled
-                                };
-                                result = _fieldProcessor.ApplyTransformation(result, transformationConfig, mapping.SourceFields, row);
-                            }
+                                Id = trans.Id,
+                                Type = trans.Type,
+                                Config = trans.Config,
+                                Order = trans.Order,
+                                IsEnabled = trans.IsEnabled
+                            };
+                            result = _fieldProcessor.ApplyTransformation(result, transformationConfig, mapping.SourceFields, row);
                         }
 
                         row[mapping.DestinationField] = result;
@@ -156,57 +192,6 @@ public class FieldMappingService : IFieldMappingService
         }
     }
 
-    private ReadBatch ApplyBatchTransformation(ReadBatch batch, string fieldName, TransformationDto transformation)
-    {
-        try
-        {
-            // Find appropriate batch processor
-            var processor = _batchProcessors.FirstOrDefault(p =>
-                p.TransformationType.Equals(transformation.Type, StringComparison.OrdinalIgnoreCase));
-
-            if (processor == null)
-            {
-                _logger.LogWarning("No batch processor found for type {Type}, skipping", transformation.Type);
-                return batch;
-            }
-
-            // Parse transformation ID - use TryParse for robustness with legacy or frontend-generated IDs
-            // If parsing fails, generate a new GUID since the ID is only used for tracking/logging
-            if (!Guid.TryParse(transformation.Id, out var transformationId))
-            {
-                _logger.LogDebug("Transformation ID '{Id}' is not a valid GUID, generating new ID for execution", transformation.Id);
-                transformationId = Guid.NewGuid();
-            }
-
-            // Create transformation entity for processor
-            var transformationEntity = new Transformation
-            {
-                Id = transformationId,
-                TenantId = Guid.Empty, // Not needed for processing
-                Name = transformation.Type,
-                Type = transformation.Type,
-                ConfigJson = transformation.Config?.ToString() ?? "{}",
-                CreatedAt = DateTime.UtcNow,
-                CreatedBy = Guid.Empty
-            };
-
-            // Apply transformation synchronously (processors are fast)
-            var result = processor.ProcessBatchAsync(batch, transformationEntity, CancellationToken.None).GetAwaiter().GetResult();
-
-            return new ReadBatch
-            {
-                BatchId = batch.BatchId,
-                Rows = result.TransformedRows,
-                RowCount = result.TransformedRows.Count
-            };
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error applying batch transformation {Type} to field {Field}", transformation.Type, fieldName);
-            return batch;
-        }
-    }
-
     /// <summary>
     /// Applies a transformation to a single field value.
     /// This is used for per-field transformations in field mappings.
@@ -216,7 +201,7 @@ public class FieldMappingService : IFieldMappingService
     {
         try
         {
-            var transformationConfig = new Transformations.FieldProcessors.TransformationConfig
+            var transformationConfig = new TransformationConfig
             {
                 Id = transformation.Id,
                 Type = transformation.Type,
@@ -235,7 +220,7 @@ public class FieldMappingService : IFieldMappingService
         }
     }
 
-    private ReadBatch RenameFieldInBatch(ReadBatch batch, string oldName, string newName)
+    private static ReadBatch RenameFieldInBatch(ReadBatch batch, string oldName, string newName)
     {
         foreach (var row in batch.Rows)
         {
@@ -251,9 +236,7 @@ public class FieldMappingService : IFieldMappingService
         return batch;
     }
 
-
-
-    private class FieldMapping
+    private sealed class FieldMapping
     {
         public string Id { get; set; } = string.Empty;
         public int Order { get; set; }
@@ -262,7 +245,7 @@ public class FieldMappingService : IFieldMappingService
         public string DestinationField { get; set; } = string.Empty;
     }
 
-    private class TransformationDto
+    private sealed class TransformationDto
     {
         public string Id { get; set; } = string.Empty;
         public string Type { get; set; } = string.Empty;
@@ -270,6 +253,4 @@ public class FieldMappingService : IFieldMappingService
         public int Order { get; set; }
         public bool IsEnabled { get; set; } = true;
     }
-
-
 }

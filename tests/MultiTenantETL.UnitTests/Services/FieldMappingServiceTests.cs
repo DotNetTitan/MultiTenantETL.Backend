@@ -2,7 +2,6 @@ using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
-using MultiTenantETL.Application.Transformations;
 using MultiTenantETL.Infrastructure.Orchestration;
 using MultiTenantETL.Infrastructure.Transformations.FieldProcessors;
 using NSubstitute;
@@ -13,16 +12,14 @@ public class FieldMappingServiceTests
 {
     private readonly ILogger<FieldMappingService> _logger;
     private readonly IFieldTransformationProcessor _fieldProcessor;
-    private readonly IEnumerable<ITransformationProcessor> _batchProcessors;
     private readonly FieldMappingService _sut;
 
     public FieldMappingServiceTests()
     {
         _logger = Substitute.For<ILogger<FieldMappingService>>();
         _fieldProcessor = Substitute.For<IFieldTransformationProcessor>();
-        _batchProcessors = new List<ITransformationProcessor>();
 
-        _sut = new FieldMappingService(_logger, _fieldProcessor, _batchProcessors);
+        _sut = new FieldMappingService(_logger, _fieldProcessor);
     }
 
     [Fact]

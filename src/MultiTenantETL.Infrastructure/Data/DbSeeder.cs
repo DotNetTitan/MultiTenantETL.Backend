@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Identity;
 using MultiTenantETL.Infrastructure.Persistence;
@@ -15,15 +16,17 @@ public static class DbSeeder
 {
     public static async Task SeedAsync(IServiceProvider services)
     {
-        await SeedRolesAsync(services);
-        await SeedDefaultTenantAsync(services);
-        await SeedAdminUserAsync(services);
-        await SeedOAuthClientsAsync(services);
+        var logger = services.GetRequiredService<ILogger<ApplicationDbContext>>();
+        
+        await SeedRolesAsync(services, logger);
+        await SeedDefaultTenantAsync(services, logger);
+        await SeedAdminUserAsync(services, logger);
+        await SeedOAuthClientsAsync(services, logger);
 
-        Console.WriteLine("✅ Database seeding completed");
+        logger.LogInformation("Database seeding completed");
     }
 
-    private static async Task SeedRolesAsync(IServiceProvider services)
+    private static async Task SeedRolesAsync(IServiceProvider services, ILogger logger)
     {
         var roleManager = services.GetRequiredService<RoleManager<ApplicationRole>>();
 
@@ -105,12 +108,12 @@ public static class DbSeeder
             if (!await roleManager.RoleExistsAsync(role.Name!))
             {
                 await roleManager.CreateAsync(role);
-                Console.WriteLine($"✅ Created role: {role.Name}");
+                logger.LogInformation("Created role: {RoleName}", role.Name);
             }
         }
     }
 
-    private static async Task SeedDefaultTenantAsync(IServiceProvider services)
+    private static async Task SeedDefaultTenantAsync(IServiceProvider services, ILogger logger)
     {
         var dbContext = services.GetRequiredService<ApplicationDbContext>();
 
@@ -127,11 +130,11 @@ public static class DbSeeder
 
             dbContext.Tenants.Add(defaultTenant);
             await dbContext.SaveChangesAsync();
-            Console.WriteLine($"✅ Created default tenant: {defaultTenant.Name}");
+            logger.LogInformation("Created default tenant: {TenantName}", defaultTenant.Name);
         }
     }
 
-    private static async Task SeedAdminUserAsync(IServiceProvider services)
+    private static async Task SeedAdminUserAsync(IServiceProvider services, ILogger logger)
     {
         var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
         var dbContext = services.GetRequiredService<ApplicationDbContext>();
@@ -177,22 +180,18 @@ public static class DbSeeder
                     await dbContext.SaveChangesAsync();
                 }
 
-                Console.WriteLine($"✅ Created admin user: {adminEmail}");
-                Console.WriteLine($"   Password: {adminPassword}");
-                Console.WriteLine($"   ⚠️  Please change this password in production!");
+                logger.LogInformation("Created admin user: {AdminEmail}", adminEmail);
+                logger.LogWarning("Admin password is set to default. Please change this password in production!");
             }
             else
             {
-                Console.WriteLine($"❌ Failed to create admin user:");
-                foreach (var error in result.Errors)
-                {
-                    Console.WriteLine($"   - {error.Description}");
-                }
+                logger.LogError("Failed to create admin user. Errors: {Errors}", 
+                    string.Join(", ", result.Errors.Select(e => e.Description)));
             }
         }
     }
 
-    private static async Task SeedOAuthClientsAsync(IServiceProvider services)
+    private static async Task SeedOAuthClientsAsync(IServiceProvider services, ILogger logger)
     {
         var applicationManager = services.GetRequiredService<IOpenIddictApplicationManager>();
         var configuration = services.GetRequiredService<IConfiguration>();
@@ -233,7 +232,7 @@ public static class DbSeeder
                 }
             });
 
-            Console.WriteLine("✅ Created OAuth client: multitenant-etl-spa");
+            logger.LogInformation("Created OAuth client: multitenant-etl-spa");
         }
 
         if (await applicationManager.FindByClientIdAsync("multitenant-etl-postman") == null)
@@ -259,8 +258,7 @@ public static class DbSeeder
                 }
             });
 
-            Console.WriteLine("✅ Created OAuth client: multitenant-etl-postman");
-            Console.WriteLine("   Client Secret: postman-secret-key-change-in-production");
+            logger.LogInformation("Created OAuth client: multitenant-etl-postman");
         }
     }
 }

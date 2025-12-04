@@ -6,13 +6,13 @@ namespace MultiTenantETL.Application.Common.Models
     {
         public ErrorDetail Error { get; set; }
 
-        public ErrorResponse(AuthErrorCode code, string message, IEnumerable<string> errors = null)
+        public ErrorResponse(AuthErrorCode code, string message, IEnumerable<string>? errors = null)
         {
             Error = new ErrorDetail
             {
                 Code = code.ToString(),
                 Message = message,
-                Errors = errors?.ToList()
+                Errors = errors?.ToList() ?? new List<string>()
             };
         }
     }
