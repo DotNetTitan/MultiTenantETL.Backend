@@ -1,11 +1,13 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using MultiTenantETL.Application.Connectors;
-using MultiTenantETL.Application.Connectors.Models;
 using MultiTenantETL.Application.Common.Interfaces;
+using MultiTenantETL.Application.Connectors.Commands;
+using MultiTenantETL.Application.Connectors.Models;
+using MultiTenantETL.Application.Connectors.Queries;
 using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Infrastructure.Authorization.Requirements;
+using Wolverine;
 
 namespace MultiTenantETL.API.Controllers;
 
@@ -14,24 +16,21 @@ namespace MultiTenantETL.API.Controllers;
 [Authorize]
 public class ConnectorsController : ControllerBase
 {
-    private readonly IConnectorService _connectorService;
+    private readonly IMessageBus _bus;
     private readonly ICurrentUserService _currentUserService;
     private readonly IAuditService _auditService;
     private readonly IAuthorizationService _authorizationService;
-    private readonly ILogger<ConnectorsController> _logger;
 
     public ConnectorsController(
-        IConnectorService connectorService,
+        IMessageBus bus,
         ICurrentUserService currentUserService,
         IAuditService auditService,
-        IAuthorizationService authorizationService,
-        ILogger<ConnectorsController> logger)
+        IAuthorizationService authorizationService)
     {
-        _connectorService = connectorService;
+        _bus = bus;
         _currentUserService = currentUserService;
         _auditService = auditService;
         _authorizationService = authorizationService;
-        _logger = logger;
     }
 
     /// <summary>
@@ -42,7 +41,6 @@ public class ConnectorsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetAll()
     {
-        // Check permission
         var authResult = await _authorizationService.AuthorizeAsync(
             User, 
             null, 
@@ -54,7 +52,8 @@ public class ConnectorsController : ControllerBase
         }
 
         var tenantId = _currentUserService.GetTenantId();
-        var connectors = await _connectorService.GetAllAsync(tenantId);
+        var query = new GetAllConnectorsQuery(tenantId);
+        var connectors = await _bus.InvokeAsync<List<ConnectorListResponse>>(query);
         return Ok(connectors);
     }
 
@@ -66,42 +65,6 @@ public class ConnectorsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Search([FromBody] ConnectorSearchRequest request)
     {
-        try
-        {
-            // Check permission
-            var authResult = await _authorizationService.AuthorizeAsync(
-                User, 
-                null, 
-                new PermissionRequirement(Permissions.Connectors.Read));
-            
-            if (!authResult.Succeeded)
-            {
-                _logger.LogWarning("Authorization failed for connectors.read");
-                return Forbid();
-            }
-
-            var tenantId = _currentUserService.GetTenantId();
-            var result = await _connectorService.SearchAsync(request, tenantId);
-            
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error searching connectors");
-            return StatusCode(500, new { message = "An error occurred while searching connectors", error = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Get connector by ID
-    /// </summary>
-    [HttpGet("{id}")]
-    [ProducesResponseType(typeof(ConnectorResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    public async Task<IActionResult> GetById(Guid id)
-    {
-        // Check permission
         var authResult = await _authorizationService.AuthorizeAsync(
             User, 
             null, 
@@ -113,24 +76,52 @@ public class ConnectorsController : ControllerBase
         }
 
         var tenantId = _currentUserService.GetTenantId();
-        try
+        var query = new SearchConnectorsQuery(
+            request.Name,
+            request.Type,
+            request.Provider,
+            request.Direction,
+            request.IsActive,
+            request.Page,
+            request.PageSize,
+            tenantId);
+        
+        var result = await _bus.InvokeAsync<PagedConnectorResponse>(query);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Get connector by ID
+    /// </summary>
+    [HttpGet("{id}")]
+    [ProducesResponseType(typeof(ConnectorResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetById(Guid id)
+    {
+        var authResult = await _authorizationService.AuthorizeAsync(
+            User, 
+            null, 
+            new PermissionRequirement(Permissions.Connectors.Read));
+        
+        if (!authResult.Succeeded)
         {
-            var connector = await _connectorService.GetByIdAsync(id, tenantId);
-            
-            // Audit log for viewing sensitive connector details
-            await _auditService.LogAsync(
-                action: AuditActions.ConnectorViewed,
-                resourceType: "Connector",
-                resourceId: id.ToString(),
-                description: $"Viewed connector '{connector.Name}'"
-            );
-            
-            return Ok(connector);
+            return Forbid();
         }
-        catch (KeyNotFoundException)
-        {
-            return NotFound(new { message = $"Connector with ID {id} not found" });
-        }
+
+        var tenantId = _currentUserService.GetTenantId();
+        var query = new GetConnectorByIdQuery(id, tenantId);
+        var connector = await _bus.InvokeAsync<ConnectorResponse>(query);
+        
+        // Audit log for viewing sensitive connector details
+        await _auditService.LogAsync(
+            action: AuditActions.ConnectorViewed,
+            resourceType: "Connector",
+            resourceId: id.ToString(),
+            description: $"Viewed connector '{connector.Name}'"
+        );
+        
+        return Ok(connector);
     }
 
     /// <summary>
@@ -142,7 +133,6 @@ public class ConnectorsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Create([FromBody] CreateConnectorRequest request)
     {
-        // Check permission
         var authResult = await _authorizationService.AuthorizeAsync(
             User, 
             null, 
@@ -156,15 +146,19 @@ public class ConnectorsController : ControllerBase
         var tenantId = _currentUserService.GetTenantId();
         var userId = _currentUserService.GetUserId();
 
-        try
-        {
-            var connector = await _connectorService.CreateAsync(request, tenantId, userId);
-            return CreatedAtAction(nameof(GetById), new { id = connector.Id }, connector);
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        var command = new CreateConnectorCommand(
+            request.Name,
+            request.Description,
+            request.Type,
+            request.Provider,
+            request.Direction,
+            request.Config,
+            request.Schema,
+            tenantId,
+            userId);
+
+        var connector = await _bus.InvokeAsync<ConnectorResponse>(command);
+        return CreatedAtAction(nameof(GetById), new { id = connector.Id }, connector);
     }
 
     /// <summary>
@@ -176,7 +170,6 @@ public class ConnectorsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateConnectorRequest request)
     {
-        // Check permission
         var authResult = await _authorizationService.AuthorizeAsync(
             User, 
             null, 
@@ -190,19 +183,19 @@ public class ConnectorsController : ControllerBase
         var tenantId = _currentUserService.GetTenantId();
         var userId = _currentUserService.GetUserId();
 
-        try
-        {
-            var connector = await _connectorService.UpdateAsync(id, request, tenantId, userId);
-            return Ok(connector);
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound(new { message = $"Connector with ID {id} not found" });
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        var command = new UpdateConnectorCommand(
+            id,
+            request.Name,
+            request.Description,
+            request.Direction,
+            request.Config,
+            request.Schema,
+            request.IsActive,
+            tenantId,
+            userId);
+
+        var connector = await _bus.InvokeAsync<ConnectorResponse>(command);
+        return Ok(connector);
     }
 
     /// <summary>
@@ -214,7 +207,6 @@ public class ConnectorsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Delete(Guid id)
     {
-        // Check permission
         var authResult = await _authorizationService.AuthorizeAsync(
             User, 
             null, 
@@ -226,15 +218,9 @@ public class ConnectorsController : ControllerBase
         }
 
         var tenantId = _currentUserService.GetTenantId();
-        try
-        {
-            await _connectorService.DeleteAsync(id, tenantId);
-            return NoContent();
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound(new { message = $"Connector with ID {id} not found" });
-        }
+        var command = new DeleteConnectorCommand(id, tenantId);
+        await _bus.InvokeAsync(command);
+        return NoContent();
     }
 
     /// <summary>
@@ -245,7 +231,6 @@ public class ConnectorsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> TestConnection([FromBody] TestConnectionRequest request)
     {
-        // Check permission
         var authResult = await _authorizationService.AuthorizeAsync(
             User, 
             null, 
@@ -257,7 +242,13 @@ public class ConnectorsController : ControllerBase
         }
 
         var tenantId = _currentUserService.GetTenantId();
-        var result = await _connectorService.TestConnectionAsync(request, tenantId);
+        var command = new TestConnectionCommand(
+            request.Type,
+            request.Provider,
+            request.Config,
+            tenantId);
+
+        var result = await _bus.InvokeAsync<TestConnectionResponse>(command);
         return Ok(result);
     }
 
@@ -270,7 +261,6 @@ public class ConnectorsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> TestExistingConnection(Guid id)
     {
-        // Check permission
         var authResult = await _authorizationService.AuthorizeAsync(
             User, 
             null, 
@@ -282,15 +272,9 @@ public class ConnectorsController : ControllerBase
         }
 
         var tenantId = _currentUserService.GetTenantId();
-        try
-        {
-            var result = await _connectorService.TestExistingConnectionAsync(id, tenantId);
-            return Ok(result);
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound(new { message = $"Connector with ID {id} not found" });
-        }
+        var command = new TestExistingConnectionCommand(id, tenantId);
+        var result = await _bus.InvokeAsync<TestConnectionResponse>(command);
+        return Ok(result);
     }
 
     /// <summary>
@@ -302,7 +286,6 @@ public class ConnectorsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> DetectSchema([FromBody] DetectSchemaRequest request)
     {
-        // Check permission - requires update permission to modify schema
         var authResult = await _authorizationService.AuthorizeAsync(
             User, 
             null, 
@@ -314,15 +297,13 @@ public class ConnectorsController : ControllerBase
         }
 
         var tenantId = _currentUserService.GetTenantId();
-        try
-        {
-            var result = await _connectorService.DetectSchemaAsync(request, tenantId);
-            return Ok(result);
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound(new { message = $"Connector with ID {request.ConnectorId} not found" });
-        }
+        var command = new DetectSchemaCommand(
+            request.ConnectorId,
+            request.TableOrResourceName,
+            tenantId);
+
+        var result = await _bus.InvokeAsync<DetectSchemaResponse>(command);
+        return Ok(result);
     }
 
     /// <summary>
@@ -333,7 +314,6 @@ public class ConnectorsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> DetectSchemaPreview([FromBody] DetectSchemaPreviewRequest request)
     {
-        // Check permission
         var authResult = await _authorizationService.AuthorizeAsync(
             User, 
             null, 
@@ -345,7 +325,14 @@ public class ConnectorsController : ControllerBase
         }
 
         var tenantId = _currentUserService.GetTenantId();
-        var result = await _connectorService.DetectSchemaPreviewAsync(request, tenantId);
+        var command = new DetectSchemaPreviewCommand(
+            request.Type,
+            request.Provider,
+            request.Config,
+            request.TableOrResourceName,
+            tenantId);
+
+        var result = await _bus.InvokeAsync<DetectSchemaResponse>(command);
         return Ok(result);
     }
 }

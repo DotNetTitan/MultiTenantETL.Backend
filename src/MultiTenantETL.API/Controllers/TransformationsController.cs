@@ -1,11 +1,12 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using MultiTenantETL.Application.Common.Models;
-using MultiTenantETL.Application.Transformations;
+using MultiTenantETL.Application.Common.Interfaces;
+using MultiTenantETL.Application.Transformations.Commands;
 using MultiTenantETL.Application.Transformations.Models;
+using MultiTenantETL.Application.Transformations.Queries;
 using MultiTenantETL.Domain.Constants;
-using MultiTenantETL.Domain.Enums;
 using MultiTenantETL.Infrastructure.Authorization.Requirements;
+using Wolverine;
 
 namespace MultiTenantETL.API.Controllers;
 
@@ -14,18 +15,18 @@ namespace MultiTenantETL.API.Controllers;
 [Authorize]
 public class TransformationsController : ControllerBase
 {
-    private readonly ITransformationService _transformationService;
+    private readonly IMessageBus _bus;
+    private readonly ICurrentUserService _currentUserService;
     private readonly IAuthorizationService _authorizationService;
-    private readonly ILogger<TransformationsController> _logger;
 
     public TransformationsController(
-        ITransformationService transformationService,
-        IAuthorizationService authorizationService,
-        ILogger<TransformationsController> logger)
+        IMessageBus bus,
+        ICurrentUserService currentUserService,
+        IAuthorizationService authorizationService)
     {
-        _transformationService = transformationService;
+        _bus = bus;
+        _currentUserService = currentUserService;
         _authorizationService = authorizationService;
-        _logger = logger;
     }
 
     /// <summary>
@@ -36,31 +37,28 @@ public class TransformationsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetAll([FromQuery] TransformationSearchRequest request)
     {
-        try
-        {
-            // Check permission
-            var authResult = await _authorizationService.AuthorizeAsync(
-                User,
-                null,
-                new PermissionRequirement(Permissions.Transformations.Read));
+        var authResult = await _authorizationService.AuthorizeAsync(
+            User,
+            null,
+            new PermissionRequirement(Permissions.Transformations.Read));
 
-            if (!authResult.Succeeded)
-            {
-                return Forbid();
-            }
-
-            var result = await _transformationService.GetAllAsync(request);
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!authResult.Succeeded)
         {
-            _logger.LogError(ex, "Error retrieving transformations");
-            return StatusCode(500, new ErrorResponse(
-                AuthErrorCode.InternalError,
-                "An error occurred while retrieving transformations",
-                new[] { ex.Message }
-            ));
+            return Forbid();
         }
+
+        var tenantId = _currentUserService.GetTenantId();
+        var query = new SearchTransformationsQuery(
+            request.Name,
+            request.Type,
+            request.Search,
+            request.Sort,
+            request.Page,
+            request.PageSize,
+            tenantId);
+
+        var result = await _bus.InvokeAsync<PagedTransformationResponse>(query);
+        return Ok(result);
     }
 
     /// <summary>
@@ -72,38 +70,20 @@ public class TransformationsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetById(Guid id)
     {
-        try
-        {
-            // Check permission
-            var authResult = await _authorizationService.AuthorizeAsync(
-                User,
-                null,
-                new PermissionRequirement(Permissions.Transformations.Read));
+        var authResult = await _authorizationService.AuthorizeAsync(
+            User,
+            null,
+            new PermissionRequirement(Permissions.Transformations.Read));
 
-            if (!authResult.Succeeded)
-            {
-                return Forbid();
-            }
+        if (!authResult.Succeeded)
+        {
+            return Forbid();
+        }
 
-            var transformation = await _transformationService.GetByIdAsync(id);
-            return Ok(transformation);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new ErrorResponse(
-                AuthErrorCode.UserNotFound,
-                ex.Message
-            ));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving transformation {TransformationId}", id);
-            return StatusCode(500, new ErrorResponse(
-                AuthErrorCode.InternalError,
-                "An error occurred while retrieving the transformation",
-                new[] { ex.Message }
-            ));
-        }
+        var tenantId = _currentUserService.GetTenantId();
+        var query = new GetTransformationByIdQuery(id, tenantId);
+        var transformation = await _bus.InvokeAsync<TransformationResponse>(query);
+        return Ok(transformation);
     }
 
     /// <summary>
@@ -115,38 +95,29 @@ public class TransformationsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Create([FromBody] CreateTransformationRequest request)
     {
-        try
-        {
-            // Check permission
-            var authResult = await _authorizationService.AuthorizeAsync(
-                User,
-                null,
-                new PermissionRequirement(Permissions.Transformations.Create));
+        var authResult = await _authorizationService.AuthorizeAsync(
+            User,
+            null,
+            new PermissionRequirement(Permissions.Transformations.Create));
 
-            if (!authResult.Succeeded)
-            {
-                return Forbid();
-            }
+        if (!authResult.Succeeded)
+        {
+            return Forbid();
+        }
 
-            var transformation = await _transformationService.CreateAsync(request);
-            return CreatedAtAction(nameof(GetById), new { id = transformation.Id }, transformation);
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new ErrorResponse(
-                AuthErrorCode.ValidationError,
-                ex.Message
-            ));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating transformation");
-            return StatusCode(500, new ErrorResponse(
-                AuthErrorCode.InternalError,
-                "An error occurred while creating the transformation",
-                new[] { ex.Message }
-            ));
-        }
+        var tenantId = _currentUserService.GetTenantId();
+        var userId = _currentUserService.GetUserId();
+
+        var command = new CreateTransformationCommand(
+            request.Name,
+            request.Description,
+            request.Type,
+            request.Config,
+            tenantId,
+            userId);
+
+        var transformation = await _bus.InvokeAsync<TransformationResponse>(command);
+        return CreatedAtAction(nameof(GetById), new { id = transformation.Id }, transformation);
     }
 
     /// <summary>
@@ -159,45 +130,29 @@ public class TransformationsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateTransformationRequest request)
     {
-        try
-        {
-            // Check permission
-            var authResult = await _authorizationService.AuthorizeAsync(
-                User,
-                null,
-                new PermissionRequirement(Permissions.Transformations.Update));
+        var authResult = await _authorizationService.AuthorizeAsync(
+            User,
+            null,
+            new PermissionRequirement(Permissions.Transformations.Update));
 
-            if (!authResult.Succeeded)
-            {
-                return Forbid();
-            }
+        if (!authResult.Succeeded)
+        {
+            return Forbid();
+        }
 
-            var transformation = await _transformationService.UpdateAsync(id, request);
-            return Ok(transformation);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new ErrorResponse(
-                AuthErrorCode.UserNotFound,
-                ex.Message
-            ));
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new ErrorResponse(
-                AuthErrorCode.ValidationError,
-                ex.Message
-            ));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating transformation {TransformationId}", id);
-            return StatusCode(500, new ErrorResponse(
-                AuthErrorCode.InternalError,
-                "An error occurred while updating the transformation",
-                new[] { ex.Message }
-            ));
-        }
+        var tenantId = _currentUserService.GetTenantId();
+        var userId = _currentUserService.GetUserId();
+
+        var command = new UpdateTransformationCommand(
+            id,
+            request.Name,
+            request.Description,
+            request.Config,
+            tenantId,
+            userId);
+
+        var transformation = await _bus.InvokeAsync<TransformationResponse>(command);
+        return Ok(transformation);
     }
 
     /// <summary>
@@ -209,37 +164,19 @@ public class TransformationsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Delete(Guid id)
     {
-        try
-        {
-            // Check permission
-            var authResult = await _authorizationService.AuthorizeAsync(
-                User,
-                null,
-                new PermissionRequirement(Permissions.Transformations.Delete));
+        var authResult = await _authorizationService.AuthorizeAsync(
+            User,
+            null,
+            new PermissionRequirement(Permissions.Transformations.Delete));
 
-            if (!authResult.Succeeded)
-            {
-                return Forbid();
-            }
+        if (!authResult.Succeeded)
+        {
+            return Forbid();
+        }
 
-            await _transformationService.DeleteAsync(id);
-            return NoContent();
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new ErrorResponse(
-                AuthErrorCode.UserNotFound,
-                ex.Message
-            ));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deleting transformation {TransformationId}", id);
-            return StatusCode(500, new ErrorResponse(
-                AuthErrorCode.InternalError,
-                "An error occurred while deleting the transformation",
-                new[] { ex.Message }
-            ));
-        }
+        var tenantId = _currentUserService.GetTenantId();
+        var command = new DeleteTransformationCommand(id, tenantId);
+        await _bus.InvokeAsync(command);
+        return NoContent();
     }
 }

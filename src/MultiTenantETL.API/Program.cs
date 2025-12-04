@@ -1,5 +1,6 @@
 using System.Security.Cryptography.X509Certificates;
 using AspNetCoreRateLimit;
+using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -15,6 +16,8 @@ using MultiTenantETL.Infrastructure.Persistence;
 using MultiTenantETL.Infrastructure.Security;
 using MultiTenantETL.Infrastructure.Services;
 using OpenIddict.Abstractions;
+using Wolverine;
+using Wolverine.FluentValidation;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -459,6 +462,22 @@ builder.Services.AddScoped<MultiTenantETL.Infrastructure.Services.ConnectionTest
 // Global Exception Handler
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
+
+// FluentValidation - register all validators from Application assembly
+builder.Services.AddValidatorsFromAssemblyContaining<MultiTenantETL.Application.Connectors.Validators.CreateConnectorCommandValidator>();
+
+// Wolverine for CQRS pattern with FluentValidation middleware
+builder.Host.UseWolverine(opts =>
+{
+    // Configure FluentValidation middleware for all handlers
+    opts.UseFluentValidation();
+
+    // Discover handlers from Infrastructure assembly
+    opts.Discovery.IncludeAssembly(typeof(MultiTenantETL.Infrastructure.Handlers.ConnectorHandler).Assembly);
+    
+    // Local message execution without persistence
+    opts.Durability.Mode = DurabilityMode.MediatorOnly;
+});
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
