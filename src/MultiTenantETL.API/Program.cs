@@ -13,9 +13,11 @@ using MultiTenantETL.Infrastructure.Authorization.Requirements;
 using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.Identity;
 using MultiTenantETL.Infrastructure.Persistence;
+using MultiTenantETL.Infrastructure.Scheduling;
 using MultiTenantETL.Infrastructure.Security;
 using MultiTenantETL.Infrastructure.Services;
 using OpenIddict.Abstractions;
+using Quartz;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -62,6 +64,23 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 // Database
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Quartz.NET Scheduler - shared by OpenIddict and Pipeline Scheduling
+builder.Services.AddQuartz(q =>
+{
+    q.UseSimpleTypeLoader();
+    q.UseInMemoryStore();
+    q.UseDefaultThreadPool(tp => tp.MaxConcurrency = 10);
+    
+    // Register the pipeline schedule job
+    q.AddJob<PipelineScheduleJob>(opts => opts
+        .WithIdentity("PipelineScheduleJobTemplate")
+        .StoreDurably(true)
+        .WithDescription("Template job for scheduled pipeline executions"));
+});
+
+// Add Quartz hosted service for background scheduling
+builder.Services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
 
 // Identity
 builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
@@ -382,6 +401,11 @@ builder.Services.AddScoped<MultiTenantETL.Application.Pipelines.IPipelineService
 // Execution Services
 builder.Services.AddScoped<MultiTenantETL.Application.Executions.IExecutionService,
     MultiTenantETL.Infrastructure.Services.ExecutionService>();
+
+// Scheduling Services
+builder.Services.AddScoped<MultiTenantETL.Application.Scheduling.IScheduleService,
+    MultiTenantETL.Infrastructure.Scheduling.ScheduleService>();
+builder.Services.AddHostedService<MultiTenantETL.Infrastructure.Scheduling.ScheduleInitializerService>();
 
 // Messaging Services
 builder.Services.AddSingleton<MultiTenantETL.Application.Messaging.IMessagePublisher,

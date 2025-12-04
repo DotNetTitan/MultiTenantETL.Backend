@@ -78,6 +78,16 @@ public static class AuditActions
         public const string Deleted = "Transformation.Deleted";
     }
     
+    public static class Schedules
+    {
+        public const string Created = "Schedule.Created";
+        public const string Updated = "Schedule.Updated";
+        public const string Deleted = "Schedule.Deleted";
+        public const string Enabled = "Schedule.Enabled";
+        public const string Disabled = "Schedule.Disabled";
+        public const string TriggeredManually = "Schedule.TriggeredManually";
+    }
+    
     // Backward compatibility constants for transformations
     public const string TransformationCreated = "Transformation.Created";
     public const string TransformationUpdated = "Transformation.Updated";
