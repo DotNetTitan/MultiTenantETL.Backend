@@ -60,6 +60,18 @@ public class PipelineOrchestrator : IPipelineOrchestrator
                 return;
             }
 
+            if (pipeline.SourceConnector == null)
+            {
+                await LogAndFailExecution(execution, "Source connector not found", cancellationToken);
+                return;
+            }
+
+            if (pipeline.DestinationConnector == null)
+            {
+                await LogAndFailExecution(execution, "Destination connector not found", cancellationToken);
+                return;
+            }
+
             // Update status to Running
             execution.Status = ExecutionStatus.Running;
             execution.StartTime = DateTimeOffset.UtcNow;
@@ -67,11 +79,11 @@ public class PipelineOrchestrator : IPipelineOrchestrator
             await AddLogEntry(execution, "Info", "System", "Pipeline execution started", cancellationToken);
 
             // Create reader and writer
-            var reader = _readerFactory.CreateReader(pipeline.SourceConnector!);
-            var writer = _writerFactory.CreateWriter(pipeline.DestinationConnector!);
+            var reader = _readerFactory.CreateReader(pipeline.SourceConnector);
+            await using var writer = _writerFactory.CreateWriter(pipeline.DestinationConnector);
 
             var readOptions = new ReadOptions { BatchSize = 1000 };
-            var writeOptions = ExtractWriteOptions(pipeline.DestinationConnector!);
+            var writeOptions = ExtractWriteOptions(pipeline.DestinationConnector);
             
             long totalProcessed = 0;
             long totalSucceeded = 0;
@@ -79,7 +91,7 @@ public class PipelineOrchestrator : IPipelineOrchestrator
             int batchIndex = 0;
 
             // Stream data in batches
-            await foreach (var batch in reader.ReadAsync(pipeline.SourceConnector!, readOptions, cancellationToken))
+            await foreach (var batch in reader.ReadAsync(pipeline.SourceConnector, readOptions, cancellationToken))
             {
                 if (cancellationToken.IsCancellationRequested)
                 {
@@ -119,7 +131,7 @@ public class PipelineOrchestrator : IPipelineOrchestrator
                     
                     // Write batch
                     var writeResult = await writer.WriteBatchAsync(
-                        pipeline.DestinationConnector!,
+                        pipeline.DestinationConnector,
                         mappedBatch,
                         writeOptions,
                         cancellationToken);
