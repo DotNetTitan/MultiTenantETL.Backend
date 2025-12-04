@@ -2,8 +2,6 @@ using System.Net;
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
-using MultiTenantETL.Application.Common.Exceptions;
-using ValidationException = MultiTenantETL.Application.Common.Exceptions.ValidationException;
 
 namespace MultiTenantETL.API.Middleware;
 
@@ -30,16 +28,9 @@ public class GlobalExceptionHandler : IExceptionHandler
         CancellationToken cancellationToken)
     {
         // Handle FluentValidation exceptions specially
-        if (exception is FluentValidation.ValidationException fluentValidationException)
-        {
-            await HandleFluentValidationException(httpContext, fluentValidationException, cancellationToken);
-            return true;
-        }
-
-        // Handle custom ValidationException
         if (exception is ValidationException validationException)
         {
-            await HandleCustomValidationException(httpContext, validationException, cancellationToken);
+            await HandleValidationException(httpContext, validationException, cancellationToken);
             return true;
         }
 
@@ -79,9 +70,9 @@ public class GlobalExceptionHandler : IExceptionHandler
         return true;
     }
 
-    private async Task HandleFluentValidationException(
-        HttpContext httpContext, 
-        FluentValidation.ValidationException exception,
+    private async Task HandleValidationException(
+        HttpContext httpContext,
+        ValidationException exception,
         CancellationToken cancellationToken)
     {
         _logger.LogWarning(
@@ -101,33 +92,6 @@ public class GlobalExceptionHandler : IExceptionHandler
             Status = (int)HttpStatusCode.BadRequest,
             Title = "Validation Failed",
             Detail = "One or more validation errors occurred.",
-            Instance = httpContext.Request.Path,
-            Type = GetProblemType((int)HttpStatusCode.BadRequest)
-        };
-
-        problemDetails.Extensions["traceId"] = httpContext.TraceIdentifier;
-
-        httpContext.Response.StatusCode = (int)HttpStatusCode.BadRequest;
-        httpContext.Response.ContentType = "application/problem+json";
-
-        await httpContext.Response.WriteAsJsonAsync(problemDetails, cancellationToken);
-    }
-
-    private async Task HandleCustomValidationException(
-        HttpContext httpContext,
-        ValidationException exception,
-        CancellationToken cancellationToken)
-    {
-        _logger.LogWarning(
-            "Validation error occurred. TraceId: {TraceId}, Path: {Path}",
-            httpContext.TraceIdentifier,
-            httpContext.Request.Path);
-
-        var problemDetails = new ValidationProblemDetails(exception.Errors)
-        {
-            Status = (int)HttpStatusCode.BadRequest,
-            Title = "Validation Failed",
-            Detail = exception.Message,
             Instance = httpContext.Request.Path,
             Type = GetProblemType((int)HttpStatusCode.BadRequest)
         };

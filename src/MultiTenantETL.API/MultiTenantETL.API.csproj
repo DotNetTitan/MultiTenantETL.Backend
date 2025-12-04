@@ -19,8 +19,6 @@
     <PackageReference Include="OpenIddict.EntityFrameworkCore" Version="7.2.0" />
     <PackageReference Include="OpenIddict.Quartz" Version="7.2.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
-    <PackageReference Include="WolverineFx.FluentValidation" Version="5.5.0" />
-    <PackageReference Include="WolverineFx.Http" Version="5.5.0" />
   </ItemGroup>
 
   <ItemGroup>

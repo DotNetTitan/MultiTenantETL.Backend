@@ -1,13 +1,14 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MultiTenantETL.Application.Common.Interfaces;
+using MultiTenantETL.Application.Common.Models;
+using MultiTenantETL.Application.Executions;
 using MultiTenantETL.Application.Executions.Models;
-using MultiTenantETL.Application.Pipelines.Commands;
+using MultiTenantETL.Application.Pipelines;
 using MultiTenantETL.Application.Pipelines.Models;
-using MultiTenantETL.Application.Pipelines.Queries;
 using MultiTenantETL.Domain.Constants;
+using MultiTenantETL.Domain.Enums;
 using MultiTenantETL.Infrastructure.Authorization.Requirements;
-using Wolverine;
 
 namespace MultiTenantETL.API.Controllers;
 
@@ -16,18 +17,24 @@ namespace MultiTenantETL.API.Controllers;
 [Authorize]
 public class PipelinesController : ControllerBase
 {
-    private readonly IMessageBus _bus;
+    private readonly IPipelineService _pipelineService;
+    private readonly IExecutionService _executionService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IAuthorizationService _authorizationService;
+    private readonly ILogger<PipelinesController> _logger;
 
     public PipelinesController(
-        IMessageBus bus,
+        IPipelineService pipelineService,
+        IExecutionService executionService,
         ICurrentUserService currentUserService,
-        IAuthorizationService authorizationService)
+        IAuthorizationService authorizationService,
+        ILogger<PipelinesController> logger)
     {
-        _bus = bus;
+        _pipelineService = pipelineService;
+        _executionService = executionService;
         _currentUserService = currentUserService;
         _authorizationService = authorizationService;
+        _logger = logger;
     }
 
     /// <summary>
@@ -38,30 +45,30 @@ public class PipelinesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetAll([FromQuery] PipelineSearchRequest request)
     {
-        var authResult = await _authorizationService.AuthorizeAsync(
-            User,
-            null,
-            new PermissionRequirement(Permissions.Pipelines.Read));
-
-        if (!authResult.Succeeded)
+        try
         {
-            return Forbid();
+            var authResult = await _authorizationService.AuthorizeAsync(
+                User,
+                null,
+                new PermissionRequirement(Permissions.Pipelines.Read));
+
+            if (!authResult.Succeeded)
+            {
+                return Forbid();
+            }
+
+            var result = await _pipelineService.GetAllAsync(request);
+            return Ok(result);
         }
-
-        var tenantId = _currentUserService.GetTenantId();
-        var query = new SearchPipelinesQuery(
-            request.Name,
-            request.Status,
-            request.Search,
-            request.IsScheduled,
-            request.IsActive,
-            request.SortBy,
-            request.Page,
-            request.PageSize,
-            tenantId);
-
-        var result = await _bus.InvokeAsync<PagedPipelineResponse>(query);
-        return Ok(result);
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving pipelines");
+            return StatusCode(500, new ErrorResponse(
+                AuthErrorCode.InternalError,
+                "An error occurred while retrieving pipelines",
+                new[] { ex.Message }
+            ));
+        }
     }
 
     /// <summary>
@@ -73,20 +80,37 @@ public class PipelinesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetById(Guid id)
     {
-        var authResult = await _authorizationService.AuthorizeAsync(
-            User,
-            null,
-            new PermissionRequirement(Permissions.Pipelines.Read));
-
-        if (!authResult.Succeeded)
+        try
         {
-            return Forbid();
-        }
+            var authResult = await _authorizationService.AuthorizeAsync(
+                User,
+                null,
+                new PermissionRequirement(Permissions.Pipelines.Read));
 
-        var tenantId = _currentUserService.GetTenantId();
-        var query = new GetPipelineByIdQuery(id, tenantId);
-        var pipeline = await _bus.InvokeAsync<PipelineResponse>(query);
-        return Ok(pipeline);
+            if (!authResult.Succeeded)
+            {
+                return Forbid();
+            }
+
+            var pipeline = await _pipelineService.GetByIdAsync(id);
+            return Ok(pipeline);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new ErrorResponse(
+                AuthErrorCode.UserNotFound,
+                ex.Message
+            ));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving pipeline {PipelineId}", id);
+            return StatusCode(500, new ErrorResponse(
+                AuthErrorCode.InternalError,
+                "An error occurred while retrieving the pipeline",
+                new[] { ex.Message }
+            ));
+        }
     }
 
     /// <summary>
@@ -98,32 +122,44 @@ public class PipelinesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Create([FromBody] CreatePipelineRequest request)
     {
-        var authResult = await _authorizationService.AuthorizeAsync(
-            User,
-            null,
-            new PermissionRequirement(Permissions.Pipelines.Create));
-
-        if (!authResult.Succeeded)
+        try
         {
-            return Forbid();
+            var authResult = await _authorizationService.AuthorizeAsync(
+                User,
+                null,
+                new PermissionRequirement(Permissions.Pipelines.Create));
+
+            if (!authResult.Succeeded)
+            {
+                return Forbid();
+            }
+
+            var pipeline = await _pipelineService.CreateAsync(request);
+            return CreatedAtAction(nameof(GetById), new { id = pipeline.Id }, pipeline);
         }
-
-        var tenantId = _currentUserService.GetTenantId();
-        var userId = _currentUserService.GetUserId();
-
-        var command = new CreatePipelineCommand(
-            request.Name,
-            request.Description,
-            request.SourceConnectorId,
-            request.DestinationConnectorId,
-            request.FieldMappings,
-            request.Schedule,
-            request.IsScheduled,
-            tenantId,
-            userId);
-
-        var pipeline = await _bus.InvokeAsync<PipelineResponse>(command);
-        return CreatedAtAction(nameof(GetById), new { id = pipeline.Id }, pipeline);
+        catch (KeyNotFoundException ex)
+        {
+            return BadRequest(new ErrorResponse(
+                AuthErrorCode.ValidationError,
+                ex.Message
+            ));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new ErrorResponse(
+                AuthErrorCode.ValidationError,
+                ex.Message
+            ));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating pipeline");
+            return StatusCode(500, new ErrorResponse(
+                AuthErrorCode.InternalError,
+                "An error occurred while creating the pipeline",
+                new[] { ex.Message }
+            ));
+        }
     }
 
     /// <summary>
@@ -136,32 +172,44 @@ public class PipelinesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdatePipelineRequest request)
     {
-        var authResult = await _authorizationService.AuthorizeAsync(
-            User,
-            null,
-            new PermissionRequirement(Permissions.Pipelines.Update));
-
-        if (!authResult.Succeeded)
+        try
         {
-            return Forbid();
+            var authResult = await _authorizationService.AuthorizeAsync(
+                User,
+                null,
+                new PermissionRequirement(Permissions.Pipelines.Update));
+
+            if (!authResult.Succeeded)
+            {
+                return Forbid();
+            }
+
+            var pipeline = await _pipelineService.UpdateAsync(id, request);
+            return Ok(pipeline);
         }
-
-        var tenantId = _currentUserService.GetTenantId();
-        var userId = _currentUserService.GetUserId();
-
-        var command = new UpdatePipelineCommand(
-            id,
-            request.Name,
-            request.Description,
-            request.FieldMappings,
-            request.Schedule,
-            request.IsScheduled,
-            request.IsActive,
-            tenantId,
-            userId);
-
-        var pipeline = await _bus.InvokeAsync<PipelineResponse>(command);
-        return Ok(pipeline);
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new ErrorResponse(
+                AuthErrorCode.UserNotFound,
+                ex.Message
+            ));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new ErrorResponse(
+                AuthErrorCode.ValidationError,
+                ex.Message
+            ));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating pipeline {PipelineId}", id);
+            return StatusCode(500, new ErrorResponse(
+                AuthErrorCode.InternalError,
+                "An error occurred while updating the pipeline",
+                new[] { ex.Message }
+            ));
+        }
     }
 
     /// <summary>
@@ -173,20 +221,37 @@ public class PipelinesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Delete(Guid id)
     {
-        var authResult = await _authorizationService.AuthorizeAsync(
-            User,
-            null,
-            new PermissionRequirement(Permissions.Pipelines.Delete));
-
-        if (!authResult.Succeeded)
+        try
         {
-            return Forbid();
-        }
+            var authResult = await _authorizationService.AuthorizeAsync(
+                User,
+                null,
+                new PermissionRequirement(Permissions.Pipelines.Delete));
 
-        var tenantId = _currentUserService.GetTenantId();
-        var command = new DeletePipelineCommand(id, tenantId);
-        await _bus.InvokeAsync(command);
-        return NoContent();
+            if (!authResult.Succeeded)
+            {
+                return Forbid();
+            }
+
+            await _pipelineService.DeleteAsync(id);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new ErrorResponse(
+                AuthErrorCode.UserNotFound,
+                ex.Message
+            ));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting pipeline {PipelineId}", id);
+            return StatusCode(500, new ErrorResponse(
+                AuthErrorCode.InternalError,
+                "An error occurred while deleting the pipeline",
+                new[] { ex.Message }
+            ));
+        }
     }
 
     /// <summary>
@@ -198,21 +263,37 @@ public class PipelinesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> ToggleStatus(Guid id)
     {
-        var authResult = await _authorizationService.AuthorizeAsync(
-            User,
-            null,
-            new PermissionRequirement(Permissions.Pipelines.Update));
-
-        if (!authResult.Succeeded)
+        try
         {
-            return Forbid();
-        }
+            var authResult = await _authorizationService.AuthorizeAsync(
+                User,
+                null,
+                new PermissionRequirement(Permissions.Pipelines.Update));
 
-        var tenantId = _currentUserService.GetTenantId();
-        var userId = _currentUserService.GetUserId();
-        var command = new TogglePipelineStatusCommand(id, tenantId, userId);
-        var pipeline = await _bus.InvokeAsync<PipelineResponse>(command);
-        return Ok(pipeline);
+            if (!authResult.Succeeded)
+            {
+                return Forbid();
+            }
+
+            var pipeline = await _pipelineService.ToggleStatusAsync(id);
+            return Ok(pipeline);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new ErrorResponse(
+                AuthErrorCode.UserNotFound,
+                ex.Message
+            ));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error toggling pipeline status {PipelineId}", id);
+            return StatusCode(500, new ErrorResponse(
+                AuthErrorCode.InternalError,
+                "An error occurred while toggling the pipeline status",
+                new[] { ex.Message }
+            ));
+        }
     }
 
     /// <summary>
@@ -225,20 +306,49 @@ public class PipelinesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Execute(Guid id)
     {
-        var authResult = await _authorizationService.AuthorizeAsync(
-            User,
-            null,
-            new PermissionRequirement(Permissions.Pipelines.Execute));
+        try
+        {
+            var authResult = await _authorizationService.AuthorizeAsync(
+                User,
+                null,
+                new PermissionRequirement(Permissions.Pipelines.Execute));
 
-        if (!authResult.Succeeded)
+            if (!authResult.Succeeded)
+            {
+                return Forbid();
+            }
+
+            var userId = _currentUserService.GetUserId();
+            var execution = await _executionService.StartExecutionAsync(id, "Manual", userId);
+            
+            return Ok(execution);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new ErrorResponse(
+                AuthErrorCode.UserNotFound,
+                ex.Message
+            ));
+        }
+        catch (UnauthorizedAccessException)
         {
             return Forbid();
         }
-
-        var tenantId = _currentUserService.GetTenantId();
-        var userId = _currentUserService.GetUserId();
-        var command = new ExecutePipelineCommand(id, tenantId, userId);
-        var execution = await _bus.InvokeAsync<ExecutionResponse>(command);
-        return Ok(execution);
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ErrorResponse(
+                AuthErrorCode.ValidationError,
+                ex.Message
+            ));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error executing pipeline {PipelineId}", id);
+            return StatusCode(500, new ErrorResponse(
+                AuthErrorCode.InternalError,
+                "An error occurred while executing the pipeline",
+                new[] { ex.Message }
+            ));
+        }
     }
 }
