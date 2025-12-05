@@ -38,16 +38,6 @@ public class PipelineSchedule : ITenantResource
     public DateTimeOffset? NextRunAt { get; set; }
     
     /// <summary>
-    /// When the last execution was triggered by this schedule
-    /// </summary>
-    public DateTimeOffset? LastRunAt { get; set; }
-    
-    /// <summary>
-    /// Status of the last scheduled run (Completed, Failed, Cancelled)
-    /// </summary>
-    public string? LastRunStatus { get; set; }
-    
-    /// <summary>
     /// Count of consecutive failures - used to disable after threshold
     /// </summary>
     public int ConsecutiveFailures { get; set; }

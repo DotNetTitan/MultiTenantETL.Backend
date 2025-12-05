@@ -48,7 +48,7 @@ public record ScheduleResponse
     public string? Description { get; init; }
     public bool IsActive { get; init; }
     public DateTimeOffset? NextRunAt { get; init; }
-    public DateTimeOffset? LastRunAt { get; init; }
+    public DateTime? LastRunAt { get; init; }
     public string? LastRunStatus { get; init; }
     public int ConsecutiveFailures { get; init; }
     public int MaxConsecutiveFailures { get; init; }
@@ -66,7 +66,7 @@ public record ScheduleListResponse
     public required string Timezone { get; init; }
     public bool IsActive { get; init; }
     public DateTimeOffset? NextRunAt { get; init; }
-    public DateTimeOffset? LastRunAt { get; init; }
+    public DateTime? LastRunAt { get; init; }
     public string? LastRunStatus { get; init; }
     public string? CronDescription { get; init; }
     public DateTime CreatedAt { get; init; }
