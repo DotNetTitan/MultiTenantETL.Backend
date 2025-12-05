@@ -53,6 +53,11 @@ public class AzureBlobDataWriter : IDataWriter
                 throw new InvalidOperationException("Upload stream not initialized");
             }
 
+            if (_format == null)
+            {
+                throw new InvalidOperationException("Format not determined");
+            }
+
             // Write batch directly to upload stream based on format
             await WriteBatchToStreamAsync(_uploadStream, batch, _format, cancellationToken);
 

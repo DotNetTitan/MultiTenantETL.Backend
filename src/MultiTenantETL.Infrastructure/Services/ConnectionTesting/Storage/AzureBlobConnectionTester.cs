@@ -83,9 +83,9 @@ public class AzureBlobConnectionTester
             
             var details = new Dictionary<string, object>
             {
-                ["AccountName"] = config.AzureAccountName,
-                ["Container"] = config.AzureContainer,
-                ["BlobPath"] = config.Path,
+                ["AccountName"] = config.AzureAccountName ?? string.Empty,
+                ["Container"] = config.AzureContainer ?? string.Empty,
+                ["BlobPath"] = config.Path ?? string.Empty,
                 ["LastModified"] = properties.Value.LastModified,
                 ["HasImmutabilityPolicy"] = properties.Value.HasImmutabilityPolicy
             };

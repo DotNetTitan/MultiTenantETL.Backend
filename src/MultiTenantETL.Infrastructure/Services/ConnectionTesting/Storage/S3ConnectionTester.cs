@@ -86,10 +86,10 @@ public class S3ConnectionTester
             
             var details = new Dictionary<string, object>
             {
-                ["Bucket"] = config.S3Bucket,
-                ["Region"] = config.S3Region,
-                ["BucketLocation"] = bucketResponse.Location.Value,
-                ["ObjectKey"] = config.Path
+                ["Bucket"] = config.S3Bucket!,
+                ["Region"] = config.S3Region!,
+                ["BucketLocation"] = bucketResponse.Location.Value ?? string.Empty,
+                ["ObjectKey"] = config.Path ?? string.Empty
             };
 
             return new ConnectionTestResult
