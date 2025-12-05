@@ -20,6 +20,13 @@ public class IdentityConfiguration :
     public void Configure(EntityTypeBuilder<ApplicationUser> builder)
     {
         builder.ToTable("users");
+
+        // Configure the CurrentTenant relationship with SetNull on delete
+        // This ensures users aren't deleted when their current tenant is deleted
+        builder.HasOne(u => u.CurrentTenant)
+            .WithMany()
+            .HasForeignKey(u => u.CurrentTenantId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 
     public void Configure(EntityTypeBuilder<ApplicationRole> builder)
