@@ -71,12 +71,13 @@ public static class AuditActions
     public const string ConnectorSchemaDetected = "Connector.SchemaDetected";
     public const string ConnectorViewed = "Connector.Viewed";
     
-    public static class Transformations
-    {
-        public const string Created = "Transformation.Created";
-        public const string Updated = "Transformation.Updated";
-        public const string Deleted = "Transformation.Deleted";
-    }
+    // Backward compatibility constants for transformations (deprecated - transformations are now embedded in field mappings)
+    [Obsolete("Transformation entity has been removed. Transformations are now embedded in Pipeline.FieldMappingsJson.")]
+    public const string TransformationCreated = "Transformation.Created";
+    [Obsolete("Transformation entity has been removed. Transformations are now embedded in Pipeline.FieldMappingsJson.")]
+    public const string TransformationUpdated = "Transformation.Updated";
+    [Obsolete("Transformation entity has been removed. Transformations are now embedded in Pipeline.FieldMappingsJson.")]
+    public const string TransformationDeleted = "Transformation.Deleted";
     
     public static class Schedules
     {
@@ -87,9 +88,4 @@ public static class AuditActions
         public const string Disabled = "Schedule.Disabled";
         public const string TriggeredManually = "Schedule.TriggeredManually";
     }
-    
-    // Backward compatibility constants for transformations
-    public const string TransformationCreated = "Transformation.Created";
-    public const string TransformationUpdated = "Transformation.Updated";
-    public const string TransformationDeleted = "Transformation.Deleted";
 }

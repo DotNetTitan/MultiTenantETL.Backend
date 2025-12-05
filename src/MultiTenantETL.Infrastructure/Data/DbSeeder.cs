@@ -45,7 +45,6 @@ public static class DbSeeder
                     Permissions.Roles.All,
                     Permissions.Connectors.All,
                     Permissions.Pipelines.All,
-                    Permissions.Transformations.All,
                     Permissions.Executions.All,
                     Permissions.Dashboard.All
                 }
@@ -61,7 +60,6 @@ public static class DbSeeder
                     Permissions.TenantData.Manage,
                     Permissions.Connectors.All,
                     Permissions.Pipelines.All,
-                    Permissions.Transformations.All,
                     Permissions.Executions.All,
                     Permissions.Dashboard.Read,
                     Permissions.ETL.Manage
@@ -79,7 +77,6 @@ public static class DbSeeder
                     Permissions.Connectors.Test,
                     Permissions.Pipelines.Read,
                     Permissions.Pipelines.Execute,
-                    Permissions.Transformations.Read,
                     Permissions.Executions.View,
                     Permissions.Dashboard.Read,
                     Permissions.ETL.View,
@@ -95,7 +92,6 @@ public static class DbSeeder
                     Permissions.TenantData.Read,
                     Permissions.Connectors.Read,
                     Permissions.Pipelines.Read,
-                    Permissions.Transformations.Read,
                     Permissions.Executions.View,
                     Permissions.Dashboard.Read,
                     Permissions.ETL.View
