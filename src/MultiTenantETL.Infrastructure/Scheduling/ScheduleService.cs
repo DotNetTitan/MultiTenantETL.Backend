@@ -529,6 +529,9 @@ public class ScheduleService : IScheduleService
             return;
         }
 
+        // Get the pipeline name for audit logging (safe since we have at least one schedule)
+        var pipelineName = schedules[0].Pipeline?.Name ?? "Unknown";
+
         foreach (var schedule in schedules)
         {
             await UnregisterQuartzJobAsync(schedule, cancellationToken);
@@ -538,7 +541,7 @@ public class ScheduleService : IScheduleService
             action: AuditActions.Schedules.PausedForPipeline,
             resourceType: "Pipeline",
             resourceId: pipelineId.ToString(),
-            description: $"Paused {schedules.Count} schedule(s) for pipeline '{schedules.First().Pipeline?.Name}' due to pipeline deactivation",
+            description: $"Paused {schedules.Count} schedule(s) for pipeline '{pipelineName}' due to pipeline deactivation",
             metadata: new { ScheduleIds = schedules.Select(s => s.Id).ToList(), Count = schedules.Count }
         );
 
@@ -564,13 +567,24 @@ public class ScheduleService : IScheduleService
             return;
         }
 
+        // Get the pipeline name for audit logging (safe since we have at least one schedule)
+        var pipelineName = schedules[0].Pipeline?.Name ?? "Unknown";
+
         foreach (var schedule in schedules)
         {
             // Recalculate next run time
             var cronExpression = new CronExpression(schedule.CronExpression);
             schedule.NextRunAt = cronExpression.GetNextValidTimeAfter(DateTimeOffset.UtcNow);
             
-            await RegisterQuartzJobAsync(schedule, schedule.Pipeline!, cancellationToken);
+            // Pipeline should not be null after Include, but check for safety
+            if (schedule.Pipeline != null)
+            {
+                await RegisterQuartzJobAsync(schedule, schedule.Pipeline, cancellationToken);
+            }
+            else
+            {
+                _logger.LogWarning("Pipeline is null for schedule {ScheduleId}, skipping Quartz registration", schedule.Id);
+            }
         }
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -579,7 +593,7 @@ public class ScheduleService : IScheduleService
             action: AuditActions.Schedules.ResumedForPipeline,
             resourceType: "Pipeline",
             resourceId: pipelineId.ToString(),
-            description: $"Resumed {schedules.Count} schedule(s) for pipeline '{schedules.First().Pipeline?.Name}' due to pipeline activation",
+            description: $"Resumed {schedules.Count} schedule(s) for pipeline '{pipelineName}' due to pipeline activation",
             metadata: new { ScheduleIds = schedules.Select(s => s.Id).ToList(), Count = schedules.Count }
         );
 
