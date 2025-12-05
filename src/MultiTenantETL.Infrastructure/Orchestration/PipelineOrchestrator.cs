@@ -110,6 +110,14 @@ public class PipelineOrchestrator : IPipelineOrchestrator
         execution.Duration = execution.EndTime.Value - execution.StartTime;
         execution.ProgressPercent = 100;
 
+        // Update pipeline's last run tracking fields
+        if (execution.Pipeline != null)
+        {
+            execution.Pipeline.LastRunAt = DateTime.UtcNow;
+            execution.Pipeline.LastRunStatus = "Completed";
+            execution.Pipeline.LastRunRecordsProcessed = (int)result.TotalProcessed;
+        }
+
         await _context.SaveChangesAsync(cancellationToken);
         await AddLogEntryAsync(execution, "Info", "System", 
             $"Pipeline execution completed: {result.TotalSucceeded} succeeded, {result.TotalFailed} failed", 
@@ -126,6 +134,13 @@ public class PipelineOrchestrator : IPipelineOrchestrator
         execution.Duration = execution.EndTime.Value - execution.StartTime;
         execution.ErrorMessage = errorMessage;
 
+        // Update pipeline's last run tracking fields
+        if (execution.Pipeline != null)
+        {
+            execution.Pipeline.LastRunAt = DateTime.UtcNow;
+            execution.Pipeline.LastRunStatus = "Failed";
+        }
+
         await _context.SaveChangesAsync(cancellationToken);
         await AddLogEntryAsync(execution, "Error", "System", errorMessage, cancellationToken);
     }
@@ -135,6 +150,13 @@ public class PipelineOrchestrator : IPipelineOrchestrator
         execution.Status = ExecutionStatus.Cancelled;
         execution.EndTime = DateTimeOffset.UtcNow;
         execution.Duration = execution.EndTime.Value - execution.StartTime;
+
+        // Update pipeline's last run tracking fields
+        if (execution.Pipeline != null)
+        {
+            execution.Pipeline.LastRunAt = DateTime.UtcNow;
+            execution.Pipeline.LastRunStatus = "Cancelled";
+        }
 
         await _context.SaveChangesAsync(cancellationToken);
         await AddLogEntryAsync(execution, "Warning", "System", "Execution cancelled by user", cancellationToken);

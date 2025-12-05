@@ -254,6 +254,12 @@ public class ScheduleService : IScheduleService
         if (request.IsActive.HasValue)
         {
             schedule.IsActive = request.IsActive.Value;
+            
+            // Sync Pipeline.IsScheduled with schedule active status
+            if (schedule.Pipeline != null)
+            {
+                schedule.Pipeline.IsScheduled = request.IsActive.Value;
+            }
         }
 
         schedule.UpdatedAt = DateTime.UtcNow;
@@ -362,6 +368,12 @@ public class ScheduleService : IScheduleService
         schedule.UpdatedAt = DateTime.UtcNow;
         schedule.UpdatedBy = userId;
 
+        // Sync Pipeline.IsScheduled with schedule active status
+        if (schedule.Pipeline != null)
+        {
+            schedule.Pipeline.IsScheduled = true;
+        }
+
         // Recalculate next run time
         var cronExpression = new CronExpression(schedule.CronExpression);
         schedule.NextRunAt = cronExpression.GetNextValidTimeAfter(DateTimeOffset.UtcNow);
@@ -406,6 +418,12 @@ public class ScheduleService : IScheduleService
         schedule.IsActive = false;
         schedule.UpdatedAt = DateTime.UtcNow;
         schedule.UpdatedBy = userId;
+
+        // Sync Pipeline.IsScheduled with schedule active status
+        if (schedule.Pipeline != null)
+        {
+            schedule.Pipeline.IsScheduled = false;
+        }
 
         await _context.SaveChangesAsync(cancellationToken);
 
