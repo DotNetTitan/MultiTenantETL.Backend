@@ -725,4 +725,286 @@ public class PipelineServiceTests : IDisposable
         pipeline.Should().NotBeNull();
         pipeline!.FieldMappingsJson.Should().Be("[]");
     }
+
+    [Fact]
+    public async Task GetAllAsync_WithIsActiveTrue_ReturnsOnlyActivePipelines()
+    {
+        // Arrange
+        var (tenantId, userId) = await SetupTenantAsync();
+
+        // Create connectors first since pipelines need them
+        var sourceConnector = new Connector
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Source",
+            Type = "Database",
+            Provider = "PostgreSQL",
+            Direction = "Source",
+            IsSource = true,
+            IsDestination = false,
+            RequiresCredentials = true,
+            IsActive = true,
+            ConfigJson = "{}",
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        var destConnector = new Connector
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Dest",
+            Type = "Database",
+            Provider = "PostgreSQL",
+            Direction = "Destination",
+            IsSource = false,
+            IsDestination = true,
+            RequiresCredentials = true,
+            IsActive = true,
+            ConfigJson = "{}",
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        _context.Connectors.AddRange(sourceConnector, destConnector);
+
+        var activePipeline = new Pipeline
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Active Pipeline",
+            SourceConnectorId = sourceConnector.Id,
+            DestinationConnectorId = destConnector.Id,
+            Status = "Idle",
+            FieldMappingsJson = "[]",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        var inactivePipeline = new Pipeline
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Inactive Pipeline",
+            SourceConnectorId = sourceConnector.Id,
+            DestinationConnectorId = destConnector.Id,
+            Status = "Idle",
+            FieldMappingsJson = "[]",
+            IsActive = false,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        _context.Pipelines.AddRange(activePipeline, inactivePipeline);
+        await _context.SaveChangesAsync();
+
+        var request = new PipelineSearchRequest
+        {
+            IsActive = true
+        };
+
+        // Act
+        var result = await _sut.GetAllAsync(request);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.TotalCount.Should().Be(1);
+        result.Pipelines.Should().HaveCount(1);
+        result.Pipelines[0].Name.Should().Be("Active Pipeline");
+        result.Pipelines[0].IsActive.Should().BeTrue();
+    }
+
+    private Task<(Guid tenantId, Guid userId)> SetupTenantAsync()
+    {
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        _tenantProvider.TenantId.Returns(tenantId);
+        _currentUserService.GetTenantId().Returns(tenantId);
+        _currentUserService.GetUserId().Returns(userId);
+
+        return Task.FromResult((tenantId, userId));
+    }
+
+    [Fact]
+    public async Task GetAllAsync_WithIsActiveFalse_ReturnsOnlyInactivePipelines()
+    {
+        // Arrange
+        var (tenantId, userId) = await SetupTenantAsync();
+
+        // Create connectors first since pipelines need them
+        var sourceConnector = new Connector
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Source",
+            Type = "Database",
+            Provider = "PostgreSQL",
+            Direction = "Source",
+            IsSource = true,
+            IsDestination = false,
+            RequiresCredentials = true,
+            IsActive = true,
+            ConfigJson = "{}",
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        var destConnector = new Connector
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Dest",
+            Type = "Database",
+            Provider = "PostgreSQL",
+            Direction = "Destination",
+            IsSource = false,
+            IsDestination = true,
+            RequiresCredentials = true,
+            IsActive = true,
+            ConfigJson = "{}",
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        _context.Connectors.AddRange(sourceConnector, destConnector);
+
+        var activePipeline = new Pipeline
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Active Pipeline",
+            SourceConnectorId = sourceConnector.Id,
+            DestinationConnectorId = destConnector.Id,
+            Status = "Idle",
+            FieldMappingsJson = "[]",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        var inactivePipeline = new Pipeline
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Inactive Pipeline",
+            SourceConnectorId = sourceConnector.Id,
+            DestinationConnectorId = destConnector.Id,
+            Status = "Idle",
+            FieldMappingsJson = "[]",
+            IsActive = false,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        _context.Pipelines.AddRange(activePipeline, inactivePipeline);
+        await _context.SaveChangesAsync();
+
+        var request = new PipelineSearchRequest
+        {
+            IsActive = false
+        };
+
+        // Act
+        var result = await _sut.GetAllAsync(request);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.TotalCount.Should().Be(1);
+        result.Pipelines.Should().HaveCount(1);
+        result.Pipelines[0].Name.Should().Be("Inactive Pipeline");
+        result.Pipelines[0].IsActive.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GetAllAsync_WithoutIsActiveFilter_ReturnsAllPipelines()
+    {
+        // Arrange
+        var (tenantId, userId) = await SetupTenantAsync();
+
+        // Create connectors first since pipelines need them
+        var sourceConnector = new Connector
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Source",
+            Type = "Database",
+            Provider = "PostgreSQL",
+            Direction = "Source",
+            IsSource = true,
+            IsDestination = false,
+            RequiresCredentials = true,
+            IsActive = true,
+            ConfigJson = "{}",
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        var destConnector = new Connector
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Dest",
+            Type = "Database",
+            Provider = "PostgreSQL",
+            Direction = "Destination",
+            IsSource = false,
+            IsDestination = true,
+            RequiresCredentials = true,
+            IsActive = true,
+            ConfigJson = "{}",
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        _context.Connectors.AddRange(sourceConnector, destConnector);
+
+        var activePipeline = new Pipeline
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Active Pipeline",
+            SourceConnectorId = sourceConnector.Id,
+            DestinationConnectorId = destConnector.Id,
+            Status = "Idle",
+            FieldMappingsJson = "[]",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        var inactivePipeline = new Pipeline
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Inactive Pipeline",
+            SourceConnectorId = sourceConnector.Id,
+            DestinationConnectorId = destConnector.Id,
+            Status = "Idle",
+            FieldMappingsJson = "[]",
+            IsActive = false,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        _context.Pipelines.AddRange(activePipeline, inactivePipeline);
+        await _context.SaveChangesAsync();
+
+        var request = new PipelineSearchRequest
+        {
+            // IsActive is null - no filter applied
+        };
+
+        // Act
+        var result = await _sut.GetAllAsync(request);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.TotalCount.Should().Be(2);
+        result.Pipelines.Should().HaveCount(2);
+        result.Pipelines.Should().Contain(p => p.Name == "Active Pipeline" && p.IsActive);
+        result.Pipelines.Should().Contain(p => p.Name == "Inactive Pipeline" && !p.IsActive);
+    }
 }
