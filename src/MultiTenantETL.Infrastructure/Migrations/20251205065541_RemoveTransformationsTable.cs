@@ -5,6 +5,14 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace MultiTenantETL.Infrastructure.Migrations
 {
+    /// <summary>
+    /// Removes the transformations table as transformations are now embedded in Pipeline.FieldMappingsJson.
+    /// 
+    /// Data migration note: The transformation configurations were previously stored as standalone entities
+    /// that could be referenced by pipelines. With the refactoring, transformations are now stored directly
+    /// within field mappings in the pipeline's FieldMappingsJson column. Any existing transformation data
+    /// in the transformations table is no longer used and will be dropped.
+    /// </summary>
     /// <inheritdoc />
     public partial class RemoveTransformationsTable : Migration
     {
