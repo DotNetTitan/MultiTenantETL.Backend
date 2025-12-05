@@ -47,9 +47,6 @@ public class PipelineScheduleConfiguration : IEntityTypeConfiguration<PipelineSc
         builder.Property(s => s.Description)
             .HasMaxLength(500);
 
-        builder.Property(s => s.LastRunStatus)
-            .HasMaxLength(50);
-
         builder.Property(s => s.QuartzJobKey)
             .HasMaxLength(200);
 

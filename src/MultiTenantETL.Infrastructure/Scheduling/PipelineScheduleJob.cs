@@ -106,9 +106,6 @@ public class PipelineScheduleJob : IJob
 
             dbContext.PipelineExecutions.Add(execution);
 
-            // Update schedule's last run time
-            schedule.LastRunAt = DateTimeOffset.UtcNow;
-            
             // Calculate next run time
             var cronExpression = new CronExpression(schedule.CronExpression);
             var timeZone = TimeZoneInfo.FindSystemTimeZoneById(schedule.Timezone);
@@ -176,7 +173,6 @@ public class PipelineScheduleJob : IJob
                 if (schedule != null)
                 {
                     schedule.ConsecutiveFailures++;
-                    schedule.LastRunStatus = "Failed";
 
                     // Disable schedule if max failures reached
                     if (schedule.ConsecutiveFailures >= schedule.MaxConsecutiveFailures)
