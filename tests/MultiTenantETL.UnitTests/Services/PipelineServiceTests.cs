@@ -47,6 +47,63 @@ public class PipelineServiceTests : IDisposable
         _context.Dispose();
     }
 
+    #region Helper Methods
+
+    private Task<(Guid tenantId, Guid userId)> SetupTenantAsync()
+    {
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        _tenantProvider.TenantId.Returns(tenantId);
+        _currentUserService.GetTenantId().Returns(tenantId);
+        _currentUserService.GetUserId().Returns(userId);
+
+        return Task.FromResult((tenantId, userId));
+    }
+
+    private (Connector source, Connector destination) CreateConnectorPair(Guid tenantId, Guid userId)
+    {
+        var sourceConnector = new Connector
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Source",
+            Type = "Database",
+            Provider = "PostgreSQL",
+            Direction = "Source",
+            IsSource = true,
+            IsDestination = false,
+            RequiresCredentials = true,
+            IsActive = true,
+            ConfigJson = "{}",
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        var destConnector = new Connector
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Dest",
+            Type = "Database",
+            Provider = "PostgreSQL",
+            Direction = "Destination",
+            IsSource = false,
+            IsDestination = true,
+            RequiresCredentials = true,
+            IsActive = true,
+            ConfigJson = "{}",
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        _context.Connectors.AddRange(sourceConnector, destConnector);
+
+        return (sourceConnector, destConnector);
+    }
+
+    #endregion
+
     [Fact]
     public async Task CreateAsync_ValidInput_CreatesPipeline()
     {
@@ -731,43 +788,7 @@ public class PipelineServiceTests : IDisposable
     {
         // Arrange
         var (tenantId, userId) = await SetupTenantAsync();
-
-        // Create connectors first since pipelines need them
-        var sourceConnector = new Connector
-        {
-            Id = Guid.NewGuid(),
-            TenantId = tenantId,
-            Name = "Source",
-            Type = "Database",
-            Provider = "PostgreSQL",
-            Direction = "Source",
-            IsSource = true,
-            IsDestination = false,
-            RequiresCredentials = true,
-            IsActive = true,
-            ConfigJson = "{}",
-            CreatedAt = DateTime.UtcNow,
-            CreatedBy = userId
-        };
-
-        var destConnector = new Connector
-        {
-            Id = Guid.NewGuid(),
-            TenantId = tenantId,
-            Name = "Dest",
-            Type = "Database",
-            Provider = "PostgreSQL",
-            Direction = "Destination",
-            IsSource = false,
-            IsDestination = true,
-            RequiresCredentials = true,
-            IsActive = true,
-            ConfigJson = "{}",
-            CreatedAt = DateTime.UtcNow,
-            CreatedBy = userId
-        };
-
-        _context.Connectors.AddRange(sourceConnector, destConnector);
+        var (sourceConnector, destConnector) = CreateConnectorPair(tenantId, userId);
 
         var activePipeline = new Pipeline
         {
@@ -816,60 +837,12 @@ public class PipelineServiceTests : IDisposable
         result.Pipelines[0].IsActive.Should().BeTrue();
     }
 
-    private Task<(Guid tenantId, Guid userId)> SetupTenantAsync()
-    {
-        var tenantId = Guid.NewGuid();
-        var userId = Guid.NewGuid();
-
-        _tenantProvider.TenantId.Returns(tenantId);
-        _currentUserService.GetTenantId().Returns(tenantId);
-        _currentUserService.GetUserId().Returns(userId);
-
-        return Task.FromResult((tenantId, userId));
-    }
-
     [Fact]
     public async Task GetAllAsync_WithIsActiveFalse_ReturnsOnlyInactivePipelines()
     {
         // Arrange
         var (tenantId, userId) = await SetupTenantAsync();
-
-        // Create connectors first since pipelines need them
-        var sourceConnector = new Connector
-        {
-            Id = Guid.NewGuid(),
-            TenantId = tenantId,
-            Name = "Source",
-            Type = "Database",
-            Provider = "PostgreSQL",
-            Direction = "Source",
-            IsSource = true,
-            IsDestination = false,
-            RequiresCredentials = true,
-            IsActive = true,
-            ConfigJson = "{}",
-            CreatedAt = DateTime.UtcNow,
-            CreatedBy = userId
-        };
-
-        var destConnector = new Connector
-        {
-            Id = Guid.NewGuid(),
-            TenantId = tenantId,
-            Name = "Dest",
-            Type = "Database",
-            Provider = "PostgreSQL",
-            Direction = "Destination",
-            IsSource = false,
-            IsDestination = true,
-            RequiresCredentials = true,
-            IsActive = true,
-            ConfigJson = "{}",
-            CreatedAt = DateTime.UtcNow,
-            CreatedBy = userId
-        };
-
-        _context.Connectors.AddRange(sourceConnector, destConnector);
+        var (sourceConnector, destConnector) = CreateConnectorPair(tenantId, userId);
 
         var activePipeline = new Pipeline
         {
@@ -923,43 +896,7 @@ public class PipelineServiceTests : IDisposable
     {
         // Arrange
         var (tenantId, userId) = await SetupTenantAsync();
-
-        // Create connectors first since pipelines need them
-        var sourceConnector = new Connector
-        {
-            Id = Guid.NewGuid(),
-            TenantId = tenantId,
-            Name = "Source",
-            Type = "Database",
-            Provider = "PostgreSQL",
-            Direction = "Source",
-            IsSource = true,
-            IsDestination = false,
-            RequiresCredentials = true,
-            IsActive = true,
-            ConfigJson = "{}",
-            CreatedAt = DateTime.UtcNow,
-            CreatedBy = userId
-        };
-
-        var destConnector = new Connector
-        {
-            Id = Guid.NewGuid(),
-            TenantId = tenantId,
-            Name = "Dest",
-            Type = "Database",
-            Provider = "PostgreSQL",
-            Direction = "Destination",
-            IsSource = false,
-            IsDestination = true,
-            RequiresCredentials = true,
-            IsActive = true,
-            ConfigJson = "{}",
-            CreatedAt = DateTime.UtcNow,
-            CreatedBy = userId
-        };
-
-        _context.Connectors.AddRange(sourceConnector, destConnector);
+        var (sourceConnector, destConnector) = CreateConnectorPair(tenantId, userId);
 
         var activePipeline = new Pipeline
         {
