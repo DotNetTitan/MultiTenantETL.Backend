@@ -71,7 +71,7 @@ namespace MultiTenantETL.API.Controllers
             var request = HttpContext.GetOpenIddictServerRequest();
 
             // Retrieve the token from the request
-            if (string.IsNullOrEmpty(request.Token))
+            if (request == null || string.IsNullOrEmpty(request.Token))
             {
                 return BadRequest(new
                 {
@@ -124,7 +124,7 @@ namespace MultiTenantETL.API.Controllers
             // No credentials and not authenticated - return error
             return Forbid(
                 authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
-                properties: new AuthenticationProperties(new Dictionary<string, string>
+                properties: new AuthenticationProperties(new Dictionary<string, string?>
                 {
                     [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.LoginRequired,
                     [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = 
@@ -135,8 +135,8 @@ namespace MultiTenantETL.API.Controllers
         private async Task<IActionResult> HandleAuthorizationWithCredentials(OpenIddictRequest request)
         {
             // Find the user by username or email
-            var user = await _userManager.FindByNameAsync(request.Username) ??
-                       await _userManager.FindByEmailAsync(request.Username);
+            var user = await _userManager.FindByNameAsync(request.Username!) ??
+                       await _userManager.FindByEmailAsync(request.Username!);
 
             if (user == null)
             {
@@ -148,7 +148,7 @@ namespace MultiTenantETL.API.Controllers
 
                 return Forbid(
                     authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
-                    properties: new AuthenticationProperties(new Dictionary<string, string>
+                    properties: new AuthenticationProperties(new Dictionary<string, string?>
                     {
                         [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.InvalidGrant,
                         [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "Invalid credentials"
@@ -160,7 +160,7 @@ namespace MultiTenantETL.API.Controllers
             {
                 return Forbid(
                     authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
-                    properties: new AuthenticationProperties(new Dictionary<string, string>
+                    properties: new AuthenticationProperties(new Dictionary<string, string?>
                     {
                         [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.InvalidGrant,
                         [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = 
@@ -169,7 +169,7 @@ namespace MultiTenantETL.API.Controllers
             }
 
             // Verify the password
-            var result = await _signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
+            var result = await _signInManager.CheckPasswordSignInAsync(user, request.Password!, lockoutOnFailure: true);
 
             if (!result.Succeeded)
             {
@@ -187,7 +187,7 @@ namespace MultiTenantETL.API.Controllers
 
                 return Forbid(
                     authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
-                    properties: new AuthenticationProperties(new Dictionary<string, string>
+                    properties: new AuthenticationProperties(new Dictionary<string, string?>
                     {
                         [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.InvalidGrant,
                         [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = errorDescription
@@ -212,8 +212,8 @@ namespace MultiTenantETL.API.Controllers
 
         private async Task<IActionResult> HandlePasswordFlow(OpenIddictRequest request)
         {
-            var user = await _userManager.FindByNameAsync(request.Username) ??
-                       await _userManager.FindByEmailAsync(request.Username);
+            var user = await _userManager.FindByNameAsync(request.Username!) ??
+                       await _userManager.FindByEmailAsync(request.Username!);
 
             if (user == null)
             {
@@ -226,7 +226,7 @@ namespace MultiTenantETL.API.Controllers
 
                 return Forbid(
                     authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
-                    properties: new AuthenticationProperties(new Dictionary<string, string>
+                    properties: new AuthenticationProperties(new Dictionary<string, string?>
                     {
                         [OpenIddictServerAspNetCoreConstants.Properties.Error] =
                             OpenIddictConstants.Errors.InvalidGrant,
@@ -240,7 +240,7 @@ namespace MultiTenantETL.API.Controllers
             {
                 return Forbid(
                     authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
-                    properties: new AuthenticationProperties(new Dictionary<string, string>
+                    properties: new AuthenticationProperties(new Dictionary<string, string?>
                     {
                         [OpenIddictServerAspNetCoreConstants.Properties.Error] =
                             OpenIddictConstants.Errors.InvalidGrant,
@@ -249,7 +249,7 @@ namespace MultiTenantETL.API.Controllers
                     }));
             }
 
-            var result = await _signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
+            var result = await _signInManager.CheckPasswordSignInAsync(user, request.Password!, lockoutOnFailure: true);
 
             if (!result.Succeeded)
             {
@@ -268,7 +268,7 @@ namespace MultiTenantETL.API.Controllers
 
                 return Forbid(
                     authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
-                    properties: new AuthenticationProperties(new Dictionary<string, string>
+                    properties: new AuthenticationProperties(new Dictionary<string, string?>
                     {
                         [OpenIddictServerAspNetCoreConstants.Properties.Error] =
                             OpenIddictConstants.Errors.InvalidGrant,
@@ -296,12 +296,12 @@ namespace MultiTenantETL.API.Controllers
             var info = await HttpContext.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
 
             // Retrieve the user from the database
-            var user = await _userManager.GetUserAsync(info.Principal);
+            var user = info.Principal != null ? await _userManager.GetUserAsync(info.Principal) : null;
             if (user == null)
             {
                 return Forbid(
                     authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
-                    properties: new AuthenticationProperties(new Dictionary<string, string>
+                    properties: new AuthenticationProperties(new Dictionary<string, string?>
                     {
                         [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.InvalidGrant,
                         [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "The authorization code is no longer valid"
@@ -313,7 +313,7 @@ namespace MultiTenantETL.API.Controllers
             {
                 return Forbid(
                     authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
-                    properties: new AuthenticationProperties(new Dictionary<string, string>
+                    properties: new AuthenticationProperties(new Dictionary<string, string?>
                     {
                         [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.InvalidGrant,
                         [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "The user is not allowed to sign in"
@@ -325,7 +325,7 @@ namespace MultiTenantETL.API.Controllers
             {
                 return Forbid(
                     authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
-                    properties: new AuthenticationProperties(new Dictionary<string, string>
+                    properties: new AuthenticationProperties(new Dictionary<string, string?>
                     {
                         [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.InvalidGrant,
                         [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "Account is inactive"
@@ -342,13 +342,13 @@ namespace MultiTenantETL.API.Controllers
         private async Task<IActionResult> HandleRefreshTokenFlow(OpenIddictRequest request)
         {
             var info = await HttpContext.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-            var user = await _userManager.GetUserAsync(info.Principal);
+            var user = info.Principal != null ? await _userManager.GetUserAsync(info.Principal) : null;
 
             if (user == null || !await _signInManager.CanSignInAsync(user))
             {
                 return Forbid(
                     authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
-                    properties: new AuthenticationProperties(new Dictionary<string, string>
+                    properties: new AuthenticationProperties(new Dictionary<string, string?>
                     {
                         [OpenIddictServerAspNetCoreConstants.Properties.Error] =
                             OpenIddictConstants.Errors.InvalidGrant,

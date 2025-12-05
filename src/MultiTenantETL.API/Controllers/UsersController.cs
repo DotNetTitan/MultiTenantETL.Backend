@@ -7,7 +7,6 @@ using MultiTenantETL.Application.Tenants.Models;
 using MultiTenantETL.Application.Users.Models;
 using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Infrastructure.Interfaces;
-using MultiTenantETL.Infrastructure.Interfaces;
 
 namespace MultiTenantETL.API.Controllers;
 
@@ -34,7 +33,6 @@ public class UsersController : ControllerBase
         _currentUserService = currentUserService;
         _logger = logger;
         _auditService = auditService;
-        _logger = logger;
     }
 
     /// <summary>

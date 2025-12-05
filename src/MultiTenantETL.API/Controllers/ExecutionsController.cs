@@ -97,7 +97,7 @@ public class ExecutionsController : ControllerBase
                 ex.Message
             ));
         }
-        catch (UnauthorizedAccessException ex)
+        catch (UnauthorizedAccessException)
         {
             return Forbid();
         }
