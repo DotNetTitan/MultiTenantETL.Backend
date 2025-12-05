@@ -81,6 +81,8 @@ public class PipelineOrchestrator : IPipelineOrchestrator
                 .ThenInclude(p => p!.SourceConnector)
             .Include(e => e.Pipeline)
                 .ThenInclude(p => p!.DestinationConnector)
+            .Include(e => e.Pipeline)
+                .ThenInclude(p => p!.Schedule)
             .FirstOrDefaultAsync(e => e.Id == executionId, cancellationToken);
     }
 
@@ -116,6 +118,14 @@ public class PipelineOrchestrator : IPipelineOrchestrator
             execution.Pipeline.LastRunAt = DateTime.UtcNow;
             execution.Pipeline.LastRunStatus = "Completed";
             execution.Pipeline.LastRunRecordsProcessed = (int)result.TotalProcessed;
+
+            // Synchronize PipelineSchedule's last run fields if a schedule exists
+            if (execution.Pipeline.Schedule != null)
+            {
+                execution.Pipeline.Schedule.LastRunAt = DateTimeOffset.UtcNow;
+                execution.Pipeline.Schedule.LastRunStatus = "Completed";
+                execution.Pipeline.Schedule.ConsecutiveFailures = 0;
+            }
         }
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -139,6 +149,14 @@ public class PipelineOrchestrator : IPipelineOrchestrator
         {
             execution.Pipeline.LastRunAt = DateTime.UtcNow;
             execution.Pipeline.LastRunStatus = "Failed";
+
+            // Synchronize PipelineSchedule's last run fields if a schedule exists
+            if (execution.Pipeline.Schedule != null)
+            {
+                execution.Pipeline.Schedule.LastRunAt = DateTimeOffset.UtcNow;
+                execution.Pipeline.Schedule.LastRunStatus = "Failed";
+                execution.Pipeline.Schedule.ConsecutiveFailures++;
+            }
         }
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -156,6 +174,13 @@ public class PipelineOrchestrator : IPipelineOrchestrator
         {
             execution.Pipeline.LastRunAt = DateTime.UtcNow;
             execution.Pipeline.LastRunStatus = "Cancelled";
+
+            // Synchronize PipelineSchedule's last run fields if a schedule exists
+            if (execution.Pipeline.Schedule != null)
+            {
+                execution.Pipeline.Schedule.LastRunAt = DateTimeOffset.UtcNow;
+                execution.Pipeline.Schedule.LastRunStatus = "Cancelled";
+            }
         }
 
         await _context.SaveChangesAsync(cancellationToken);
