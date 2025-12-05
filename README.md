@@ -375,16 +375,6 @@ Two OAuth clients are seeded automatically by DbSeeder:
 | `/api/executions/{id}/cancel` | POST | Yes | Cancel running execution |
 | `/api/executions/stats` | GET | Yes | Get execution statistics |
 
-### Transformation Management
-
-| Endpoint | Method | Auth | Description |
-|----------|--------|------|-------------|
-| `/api/transformations` | GET | Yes | List transformations for tenant |
-| `/api/transformations/{id}` | GET | Yes | Get transformation by ID |
-| `/api/transformations` | POST | Yes | Create transformation |
-| `/api/transformations/{id}` | PUT | Yes | Update transformation |
-| `/api/transformations/{id}` | DELETE | Yes | Delete transformation |
-
 ### Metadata
 
 | Endpoint | Method | Auth | Description |
