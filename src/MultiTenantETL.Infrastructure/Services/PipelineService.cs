@@ -10,6 +10,7 @@ using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.Persistence;
+using Quartz;
 
 namespace MultiTenantETL.Infrastructure.Services;
 
@@ -19,17 +20,20 @@ public class PipelineService : IPipelineService
     private readonly ILogger<PipelineService> _logger;
     private readonly ICurrentUserService _currentUserService;
     private readonly IAuditService _auditService;
+    private readonly ISchedulerFactory _schedulerFactory;
 
     public PipelineService(
         ApplicationDbContext context,
         ILogger<PipelineService> logger,
         ICurrentUserService currentUserService,
-        IAuditService auditService)
+        IAuditService auditService,
+        ISchedulerFactory schedulerFactory)
     {
         _context = context;
         _logger = logger;
         _currentUserService = currentUserService;
         _auditService = auditService;
+        _schedulerFactory = schedulerFactory;
     }
 
     public async Task<PipelineResponse> CreateAsync(CreatePipelineRequest request, CancellationToken cancellationToken = default)
@@ -264,6 +268,7 @@ public class PipelineService : IPipelineService
         var userId = _currentUserService.GetUserId();
 
         var pipeline = await _context.Pipelines
+            .Include(p => p.Schedule)
             .Where(p => p.Id == id && p.TenantId == tenantId)
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -272,9 +277,16 @@ public class PipelineService : IPipelineService
             throw new KeyNotFoundException($"Pipeline with ID {id} not found");
         }
 
+        var wasActive = pipeline.IsActive;
         pipeline.IsActive = !pipeline.IsActive;
         pipeline.UpdatedAt = DateTime.UtcNow;
         pipeline.UpdatedBy = userId;
+
+        // If pipeline is being deactivated and has an active schedule, disable the schedule
+        if (wasActive && !pipeline.IsActive && pipeline.Schedule != null && pipeline.Schedule.IsActive)
+        {
+            await DisablePipelineScheduleAsync(pipeline.Schedule, userId, cancellationToken);
+        }
 
         await _context.SaveChangesAsync(cancellationToken);
 
