@@ -6,6 +6,7 @@ using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Application.Pipelines;
 using MultiTenantETL.Application.Pipelines.Models;
+using MultiTenantETL.Application.Scheduling;
 using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
@@ -19,17 +20,20 @@ public class PipelineService : IPipelineService
     private readonly ILogger<PipelineService> _logger;
     private readonly ICurrentUserService _currentUserService;
     private readonly IAuditService _auditService;
+    private readonly IScheduleService _scheduleService;
 
     public PipelineService(
         ApplicationDbContext context,
         ILogger<PipelineService> logger,
         ICurrentUserService currentUserService,
-        IAuditService auditService)
+        IAuditService auditService,
+        IScheduleService scheduleService)
     {
         _context = context;
         _logger = logger;
         _currentUserService = currentUserService;
         _auditService = auditService;
+        _scheduleService = scheduleService;
     }
 
     public async Task<PipelineResponse> CreateAsync(CreatePipelineRequest request, CancellationToken cancellationToken = default)
@@ -210,6 +214,21 @@ public class PipelineService : IPipelineService
 
         await _context.SaveChangesAsync(cancellationToken);
 
+        // Handle schedule pause/resume when IsActive changes
+        if (oldIsActive != pipeline.IsActive)
+        {
+            if (!pipeline.IsActive)
+            {
+                // Pipeline was deactivated - pause schedules
+                await _scheduleService.PauseSchedulesForPipelineAsync(id, cancellationToken);
+            }
+            else
+            {
+                // Pipeline was activated - resume schedules
+                await _scheduleService.ResumeSchedulesForPipelineAsync(id, cancellationToken);
+            }
+        }
+
         _logger.LogInformation("Pipeline {PipelineId} updated successfully", id);
 
         var changes = new List<string>();
@@ -272,11 +291,24 @@ public class PipelineService : IPipelineService
             throw new KeyNotFoundException($"Pipeline with ID {id} not found");
         }
 
+        var wasActive = pipeline.IsActive;
         pipeline.IsActive = !pipeline.IsActive;
         pipeline.UpdatedAt = DateTime.UtcNow;
         pipeline.UpdatedBy = userId;
 
         await _context.SaveChangesAsync(cancellationToken);
+
+        // Handle schedule pause/resume
+        if (wasActive && !pipeline.IsActive)
+        {
+            // Pipeline was deactivated - pause schedules
+            await _scheduleService.PauseSchedulesForPipelineAsync(id, cancellationToken);
+        }
+        else if (!wasActive && pipeline.IsActive)
+        {
+            // Pipeline was activated - resume schedules
+            await _scheduleService.ResumeSchedulesForPipelineAsync(id, cancellationToken);
+        }
 
         var action = pipeline.IsActive ? AuditActions.Pipelines.Activated : AuditActions.Pipelines.Deactivated;
         await _auditService.LogAsync(

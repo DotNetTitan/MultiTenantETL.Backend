@@ -6,6 +6,7 @@ using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Application.Pipelines;
 using MultiTenantETL.Application.Pipelines.Models;
+using MultiTenantETL.Application.Scheduling;
 using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Persistence;
@@ -20,6 +21,7 @@ public class PipelineServiceTests : IDisposable
     private readonly ILogger<PipelineService> _logger;
     private readonly ICurrentUserService _currentUserService;
     private readonly IAuditService _auditService;
+    private readonly IScheduleService _scheduleService;
     private readonly ITenantProvider _tenantProvider;
     private readonly PipelineService _sut;
 
@@ -34,12 +36,14 @@ public class PipelineServiceTests : IDisposable
         _logger = Substitute.For<ILogger<PipelineService>>();
         _currentUserService = Substitute.For<ICurrentUserService>();
         _auditService = Substitute.For<IAuditService>();
+        _scheduleService = Substitute.For<IScheduleService>();
 
         _sut = new PipelineService(
             _context,
             _logger,
             _currentUserService,
-            _auditService);
+            _auditService,
+            _scheduleService);
     }
 
     public void Dispose()
@@ -488,6 +492,80 @@ public class PipelineServiceTests : IDisposable
             pipelineId.ToString(),
             Arg.Any<string>(),
             Arg.Any<object>());
+        
+        // Verify schedule service was called
+        await _scheduleService.Received(1).PauseSchedulesForPipelineAsync(pipelineId, Arg.Any<CancellationToken>());
+        await _scheduleService.Received(1).ResumeSchedulesForPipelineAsync(pipelineId, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ToggleStatusAsync_WhenDeactivating_PausesSchedules()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var pipelineId = Guid.NewGuid();
+        _tenantProvider.TenantId.Returns(tenantId);
+        _currentUserService.GetTenantId().Returns(tenantId);
+
+        var pipeline = new Pipeline
+        {
+            Id = pipelineId,
+            TenantId = tenantId,
+            Name = "Active Pipeline",
+            SourceConnectorId = Guid.NewGuid(),
+            DestinationConnectorId = Guid.NewGuid(),
+            Status = "Idle",
+            FieldMappingsJson = "[]",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = Guid.NewGuid()
+        };
+
+        _context.Pipelines.Add(pipeline);
+        await _context.SaveChangesAsync();
+
+        // Act - Deactivate the pipeline
+        var result = await _sut.ToggleStatusAsync(pipelineId);
+
+        // Assert
+        result.IsActive.Should().BeFalse();
+        await _scheduleService.Received(1).PauseSchedulesForPipelineAsync(pipelineId, Arg.Any<CancellationToken>());
+        await _scheduleService.DidNotReceive().ResumeSchedulesForPipelineAsync(pipelineId, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ToggleStatusAsync_WhenActivating_ResumesSchedules()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var pipelineId = Guid.NewGuid();
+        _tenantProvider.TenantId.Returns(tenantId);
+        _currentUserService.GetTenantId().Returns(tenantId);
+
+        var pipeline = new Pipeline
+        {
+            Id = pipelineId,
+            TenantId = tenantId,
+            Name = "Inactive Pipeline",
+            SourceConnectorId = Guid.NewGuid(),
+            DestinationConnectorId = Guid.NewGuid(),
+            Status = "Idle",
+            FieldMappingsJson = "[]",
+            IsActive = false,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = Guid.NewGuid()
+        };
+
+        _context.Pipelines.Add(pipeline);
+        await _context.SaveChangesAsync();
+
+        // Act - Activate the pipeline
+        var result = await _sut.ToggleStatusAsync(pipelineId);
+
+        // Assert
+        result.IsActive.Should().BeTrue();
+        await _scheduleService.Received(1).ResumeSchedulesForPipelineAsync(pipelineId, Arg.Any<CancellationToken>());
+        await _scheduleService.DidNotReceive().PauseSchedulesForPipelineAsync(pipelineId, Arg.Any<CancellationToken>());
     }
 
     [Fact]
