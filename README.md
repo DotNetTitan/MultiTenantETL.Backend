@@ -205,7 +205,9 @@ MultiTenantETL/
 │   ├── MultiTenantETL.Application/     # Depends on Domain only - Interfaces & DTOs
 │   ├── MultiTenantETL.Infrastructure/  # Depends on Domain + Application - Implementations
 │   ├── MultiTenantETL.API/             # Depends on all layers - Controllers & Configuration
-│   └── MultiTenantETL.Worker/          # Background worker for pipeline execution
+│   ├── MultiTenantETL.Worker/          # Background worker for pipeline execution
+│   ├── MultiTenantETL.AppHost/         # .NET Aspire orchestration host
+│   └── MultiTenantETL.ServiceDefaults/ # Shared Aspire service defaults
 ├── tests/
 │   ├── MultiTenantETL.UnitTests/       # Unit tests
 │   └── MultiTenantETL.IntegrationTests/ # Integration tests
@@ -219,6 +221,8 @@ MultiTenantETL/
 - **Infrastructure Layer**: ApplicationDbContext, data readers/writers, transformation processors, service implementations, authorization handlers, RabbitMQ integration, migrations
 - **API Layer**: Controllers, middleware, OpenIddict configuration, rate limiting, CORS
 - **Worker Layer**: Background service consuming pipeline execution tasks from RabbitMQ
+- **AppHost Layer**: .NET Aspire orchestration for local development with automatic PostgreSQL and RabbitMQ container management
+- **ServiceDefaults Layer**: Shared Aspire service defaults including OpenTelemetry, health checks, and HTTP resilience patterns
 
 ### Pipeline Execution Flow
 
@@ -371,16 +375,6 @@ Two OAuth clients are seeded automatically by DbSeeder:
 | `/api/executions/{id}/cancel` | POST | Yes | Cancel running execution |
 | `/api/executions/stats` | GET | Yes | Get execution statistics |
 
-### Transformation Management
-
-| Endpoint | Method | Auth | Description |
-|----------|--------|------|-------------|
-| `/api/transformations` | GET | Yes | List transformations for tenant |
-| `/api/transformations/{id}` | GET | Yes | Get transformation by ID |
-| `/api/transformations` | POST | Yes | Create transformation |
-| `/api/transformations/{id}` | PUT | Yes | Update transformation |
-| `/api/transformations/{id}` | DELETE | Yes | Delete transformation |
-
 ### Metadata
 
 | Endpoint | Method | Auth | Description |
@@ -389,33 +383,6 @@ Two OAuth clients are seeded automatically by DbSeeder:
 | `/api/metadata/transformation-types` | GET | Yes | Get available transformation types |
 
 ## 🧪 Testing
-
-### Testing with SPA (Authorization Code + PKCE) - **Recommended**
-
-The recommended way to test is through the Vue.js frontend:
-
-1. Start the API: 
-   ```bash
-   cd src/MultiTenantETL.API
-   dotnet run
-   ```
-
-2. Start the frontend (in a separate terminal):
-   ```bash
-   cd MultiTenantETL.Vue
-   npm run dev
-   ```
-
-3. Navigate to `http://localhost:5173/login`
-
-4. Login with:
-   - **Email**: `admin@multitenant-etl.com`
-   - **Password**: Your `Seeding:AdminPassword` from user secrets
-
-The frontend implements the full OAuth 2.0 Authorization Code Flow with PKCE:
-- Login → Browser redirect → Authorization → Callback → Token exchange → Dashboard
-- PKCE utilities in `src/utils/pkce.js` generate code verifier/challenge
-- See `MultiTenantETL.Vue/docs/OAUTH_PKCE.md` for detailed implementation
 
 ### Testing with Postman (Password Grant)
 
@@ -460,7 +427,7 @@ token=YOUR_REFRESH_TOKEN
 
 ### Testing Authorization Code + PKCE with cURL
 
-See `MultiTenantETL.Vue/docs/OAUTH_PKCE.md` for manual testing instructions with cURL.
+For manual testing of the Authorization Code + PKCE flow, you can use cURL commands to simulate a SPA client.
 
 ## 🔒 Security Features
 
@@ -723,6 +690,17 @@ dotnet user-secrets list
 #### Worker Layer (`src/MultiTenantETL.Worker`)
 - **Background Service**: Consumes pipeline execution tasks from RabbitMQ
 - **Features**: Concurrent execution management, cancellation handling, retry with exponential backoff, graceful shutdown
+
+#### AppHost Layer (`src/MultiTenantETL.AppHost`)
+- **.NET Aspire Orchestration**: Manages PostgreSQL and RabbitMQ containers for local development
+- **Service Registration**: Registers API and Worker services with automatic connection string injection
+- **Dashboard**: Provides Aspire Dashboard for monitoring all services
+
+#### ServiceDefaults Layer (`src/MultiTenantETL.ServiceDefaults`)
+- **OpenTelemetry**: Distributed tracing and metrics configuration
+- **Health Checks**: Standardized health check endpoints
+- **HTTP Resilience**: Retry policies and circuit breakers for HTTP clients
+- **Service Discovery**: Built-in service discovery for inter-service communication
 
 ## 📖 Documentation
 

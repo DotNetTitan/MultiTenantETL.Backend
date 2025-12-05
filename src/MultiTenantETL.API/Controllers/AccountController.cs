@@ -189,7 +189,7 @@ namespace MultiTenantETL.API.Controllers
 
             try
             {
-                await _emailService.SendWelcomeEmailAsync(user.Email, user.FirstName);
+                await _emailService.SendWelcomeEmailAsync(user.Email!, user.FirstName);
             }
             catch (Exception ex)
             {
@@ -217,7 +217,7 @@ namespace MultiTenantETL.API.Controllers
 
             try
             {
-                await _emailService.SendPasswordResetAsync(user.Email, user.FirstName, resetUrl);
+                await _emailService.SendPasswordResetAsync(user.Email!, user.FirstName, resetUrl);
                 _logger.LogInformation("Password reset email sent to {Email}", user.Email);
             }
             catch (Exception ex)
@@ -261,7 +261,7 @@ namespace MultiTenantETL.API.Controllers
 
             try
             {
-                await _emailService.SendPasswordChangedNotificationAsync(user.Email, user.FirstName);
+                await _emailService.SendPasswordChangedNotificationAsync(user.Email!, user.FirstName);
             }
             catch (Exception ex)
             {
@@ -301,7 +301,7 @@ namespace MultiTenantETL.API.Controllers
             await RevokeUserTokensAsync(user.Id);
             _logger.LogInformation("Revoked all tokens for user {Email} after password change", user.Email);
             
-            await _emailService.SendPasswordChangedNotificationAsync(user.Email, user.FirstName);
+            await _emailService.SendPasswordChangedNotificationAsync(user.Email!, user.FirstName);
 
             return Ok(new { message = "Password changed successfully. Please log in again with your new password." });
         }
@@ -316,16 +316,16 @@ namespace MultiTenantETL.API.Controllers
                 // Revoke all refresh tokens for this user
                 await RevokeUserTokensAsync(user.Id);
                 _logger.LogInformation("Revoked all tokens for user {Email}", user.Email);
+                
+                // Audit log
+                await _auditService.LogAuthenticationAsync(
+                    Domain.Constants.AuditActions.Authentication.Logout,
+                    user.Email,
+                    success: true);
             }
             
             await _signInManager.SignOutAsync();
             _logger.LogInformation("User logged out");
-
-            // Audit log
-            await _auditService.LogAuthenticationAsync(
-                Domain.Constants.AuditActions.Authentication.Logout,
-                user.Email,
-                success: true);
             
             return Ok(new { success = true, message = "Logged out successfully. All refresh tokens have been revoked." });
         }

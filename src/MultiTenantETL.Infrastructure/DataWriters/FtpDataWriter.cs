@@ -46,6 +46,11 @@ public class FtpDataWriter : IDataWriter
                 throw new InvalidOperationException("Buffer stream not initialized");
             }
 
+            if (_format == null)
+            {
+                throw new InvalidOperationException("Format not determined");
+            }
+
             // Write batch to buffer stream based on format
             await WriteBatchToStreamAsync(_bufferStream, batch, _format, cancellationToken);
 

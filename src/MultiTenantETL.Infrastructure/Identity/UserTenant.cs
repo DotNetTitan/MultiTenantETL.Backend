@@ -10,7 +10,7 @@ namespace MultiTenantETL.Infrastructure.Identity
         public bool IsActive { get; set; }
 
         // Navigation properties
-        public virtual ApplicationUser User { get; set; }
-        public virtual Tenant Tenant { get; set; }
+        public virtual ApplicationUser? User { get; set; }
+        public virtual Tenant? Tenant { get; set; }
     }
 }

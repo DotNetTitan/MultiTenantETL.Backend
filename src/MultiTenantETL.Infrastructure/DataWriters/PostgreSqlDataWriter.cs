@@ -33,6 +33,12 @@ public class PostgreSqlDataWriter : IDataWriter
         try
         {
             var config = ParseConfig(connector.ConfigJson);
+            
+            if (string.IsNullOrEmpty(config.TableName))
+            {
+                throw new InvalidOperationException("Table name is required for PostgreSQL writer");
+            }
+            
             await using var connection = new NpgsqlConnection(config.ConnectionString);
             await connection.OpenAsync(cancellationToken);
 
