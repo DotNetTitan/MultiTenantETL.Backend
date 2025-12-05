@@ -724,6 +724,27 @@ dotnet user-secrets list
 - **Background Service**: Consumes pipeline execution tasks from RabbitMQ
 - **Features**: Concurrent execution management, cancellation handling, retry with exponential backoff, graceful shutdown
 
+## 📖 Documentation
+
+Detailed documentation is available in the [docs](./docs/) folder:
+
+- **[Setup & Development Guides](./docs/guides/)** - Deployment, local setup, and configuration guides
+  - [Azure Deployment Guide](./docs/guides/AZURE-DEPLOYMENT-GUIDE.md)
+  - [Local PostgreSQL Setup](./docs/guides/SETUP-LOCAL-POSTGRES.md)
+  - [Test Storage Servers](./docs/guides/TEST_STORAGE_SERVERS.md)
+
+- **[Architecture Documentation](./docs/architecture/)** - System design and technical architecture
+  - [Execution Engine](./docs/architecture/EXECUTION_ENGINE_IMPLEMENTATION.md)
+  - [Transformation Engine](./docs/architecture/PHASE3_TRANSFORMATION_ENGINE.md)
+  - [Audit Logging](./docs/architecture/AUDIT_LOGGING.md)
+
+- **[Authentication & Authorization](./docs/auth/)** - Complete auth documentation
+  - [Authentication Guide](./docs/auth/authentication-guide.md)
+  - [Security Features](./docs/auth/5-security.md)
+  - [Authorization](./docs/auth/6-authorization.md)
+
+- **[Development Notes](./docs/development/)** - Historical implementation notes and phase summaries
+
 ## 📝 License
 
 [Specify your license here]
