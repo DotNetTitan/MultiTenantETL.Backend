@@ -319,9 +319,12 @@ public class PipelineService : IPipelineService
         }
 
         // Load schedule if not already loaded
-        await _context.Entry(pipeline)
-            .Reference(p => p.Schedule)
-            .LoadAsync(cancellationToken);
+        if (!_context.Entry(pipeline).Reference(p => p.Schedule).IsLoaded)
+        {
+            await _context.Entry(pipeline)
+                .Reference(p => p.Schedule)
+                .LoadAsync(cancellationToken);
+        }
 
         return new PipelineResponse
         {
