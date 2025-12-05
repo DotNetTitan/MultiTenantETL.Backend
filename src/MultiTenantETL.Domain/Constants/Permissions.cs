@@ -105,19 +105,6 @@ public static class Permissions
     }
 
     /// <summary>
-    /// ETL Transformation permissions
-    /// </summary>
-    public static class Transformations
-    {
-        public const string Create = "transformations.create";
-        public const string Read = "transformations.read";
-        public const string Update = "transformations.update";
-        public const string Delete = "transformations.delete";
-        public const string Manage = "transformations.manage";
-        public const string All = "transformations.*";
-    }
-
-    /// <summary>
     /// ETL Execution permissions
     /// </summary>
     public static class Executions

@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.DataAccess;
 using MultiTenantETL.Application.Orchestration;
-using MultiTenantETL.Application.Transformations;
 using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.DataAccess.Readers;
 using MultiTenantETL.Infrastructure.DataAccess.Writers;
@@ -48,20 +47,6 @@ builder.Services.AddScoped<MultiTenantETL.Application.Interfaces.IAuditService,
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(connectionString));
-
-// Transformation Services
-builder.Services.AddScoped<MultiTenantETL.Application.Transformations.ITransformationService,
-    MultiTenantETL.Infrastructure.Services.TransformationService>();
-
-// Transformation Processors
-builder.Services.AddScoped<MultiTenantETL.Application.Transformations.ITransformationProcessor,
-    MultiTenantETL.Infrastructure.Transformations.Processors.FilterProcessor>();
-builder.Services.AddScoped<MultiTenantETL.Application.Transformations.ITransformationProcessor,
-    MultiTenantETL.Infrastructure.Transformations.Processors.MapProcessor>();
-builder.Services.AddScoped<MultiTenantETL.Application.Transformations.ITransformationProcessor,
-    MultiTenantETL.Infrastructure.Transformations.Processors.StringProcessor>();
-builder.Services.AddScoped<MultiTenantETL.Application.Transformations.ITransformationProcessor,
-    MultiTenantETL.Infrastructure.Transformations.Processors.ScriptProcessor>();
 
 // Field Transformation Processor (for complex field mappings)
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.Transformations.FieldProcessors.IFieldTransformationProcessor,

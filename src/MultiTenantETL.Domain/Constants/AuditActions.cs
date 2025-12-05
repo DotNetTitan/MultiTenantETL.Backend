@@ -71,13 +71,6 @@ public static class AuditActions
     public const string ConnectorSchemaDetected = "Connector.SchemaDetected";
     public const string ConnectorViewed = "Connector.Viewed";
     
-    public static class Transformations
-    {
-        public const string Created = "Transformation.Created";
-        public const string Updated = "Transformation.Updated";
-        public const string Deleted = "Transformation.Deleted";
-    }
-    
     public static class Schedules
     {
         public const string Created = "Schedule.Created";
@@ -87,9 +80,4 @@ public static class AuditActions
         public const string Disabled = "Schedule.Disabled";
         public const string TriggeredManually = "Schedule.TriggeredManually";
     }
-    
-    // Backward compatibility constants for transformations
-    public const string TransformationCreated = "Transformation.Created";
-    public const string TransformationUpdated = "Transformation.Updated";
-    public const string TransformationDeleted = "Transformation.Deleted";
 }
