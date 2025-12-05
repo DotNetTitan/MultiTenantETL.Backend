@@ -68,7 +68,6 @@ public class PipelineService : IPipelineService
             DestinationConnectorId = request.DestinationConnectorId,
             Status = "Idle",
             FieldMappingsJson = NormalizeFieldMappings(request.FieldMappings),
-            IsScheduled = false, // Managed via /api/schedules endpoints
             IsActive = true,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = userId
@@ -84,7 +83,7 @@ public class PipelineService : IPipelineService
             resourceType: "Pipeline",
             resourceId: pipeline.Id.ToString(),
             description: $"Created pipeline '{pipeline.Name}'",
-            metadata: new { pipeline.SourceConnectorId, pipeline.DestinationConnectorId, pipeline.IsScheduled }
+            metadata: new { pipeline.SourceConnectorId, pipeline.DestinationConnectorId }
         );
 
         return await MapToResponseAsync(pipeline, cancellationToken);
@@ -97,6 +96,7 @@ public class PipelineService : IPipelineService
         var pipeline = await _context.Pipelines
             .Include(p => p.SourceConnector)
             .Include(p => p.DestinationConnector)
+            .Include(p => p.Schedule)
             .Where(p => p.Id == id && p.TenantId == tenantId)
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -115,6 +115,7 @@ public class PipelineService : IPipelineService
         var query = _context.Pipelines
             .Include(p => p.SourceConnector)
             .Include(p => p.DestinationConnector)
+            .Include(p => p.Schedule)
             .Where(p => p.TenantId == tenantId);
 
         // Apply search filter
@@ -136,10 +137,17 @@ public class PipelineService : IPipelineService
             query = query.Where(p => p.Status == request.Status);
         }
 
-        // Apply scheduled filter
+        // Apply scheduled filter - IsScheduled is derived from having an active Schedule
         if (request.IsScheduled.HasValue)
         {
-            query = query.Where(p => p.IsScheduled == request.IsScheduled.Value);
+            if (request.IsScheduled.Value)
+            {
+                query = query.Where(p => p.Schedule != null && p.Schedule.IsActive);
+            }
+            else
+            {
+                query = query.Where(p => p.Schedule == null || !p.Schedule.IsActive);
+            }
         }
 
         // Apply active filter
@@ -191,7 +199,6 @@ public class PipelineService : IPipelineService
         pipeline.Name = request.Name;
         pipeline.Description = request.Description;
         pipeline.FieldMappingsJson = NormalizeFieldMappings(request.FieldMappings);
-        // Note: IsScheduled is managed via /api/schedules endpoints
 
         if (request.IsActive.HasValue)
         {
@@ -311,6 +318,14 @@ public class PipelineService : IPipelineService
                 .LoadAsync(cancellationToken);
         }
 
+        // Load schedule if not already loaded
+        if (!_context.Entry(pipeline).Reference(p => p.Schedule).IsLoaded)
+        {
+            await _context.Entry(pipeline)
+                .Reference(p => p.Schedule)
+                .LoadAsync(cancellationToken);
+        }
+
         return new PipelineResponse
         {
             Id = pipeline.Id,
@@ -323,7 +338,7 @@ public class PipelineService : IPipelineService
             DestinationConnectorName = pipeline.DestinationConnector?.Name,
             Status = pipeline.Status,
             FieldMappings = JsonSerializer.Deserialize<JsonElement>(pipeline.FieldMappingsJson),
-            IsScheduled = pipeline.IsScheduled,
+            IsScheduled = pipeline.Schedule?.IsActive ?? false,
             IsActive = pipeline.IsActive,
             LastRunAt = pipeline.LastRunAt,
             LastRunStatus = pipeline.LastRunStatus,
@@ -343,7 +358,7 @@ public class PipelineService : IPipelineService
             SourceConnectorName = pipeline.SourceConnector?.Name,
             DestinationConnectorName = pipeline.DestinationConnector?.Name,
             Status = pipeline.Status,
-            IsScheduled = pipeline.IsScheduled,
+            IsScheduled = pipeline.Schedule?.IsActive ?? false,
             IsActive = pipeline.IsActive,
             LastRunAt = pipeline.LastRunAt,
             LastRunStatus = pipeline.LastRunStatus,

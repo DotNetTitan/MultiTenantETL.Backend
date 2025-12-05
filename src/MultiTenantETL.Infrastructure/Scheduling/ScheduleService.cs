@@ -112,10 +112,6 @@ public class ScheduleService : IScheduleService
             await RegisterQuartzJobAsync(schedule, pipeline, cancellationToken);
         }
 
-        // Update pipeline's IsScheduled flag
-        pipeline.IsScheduled = true;
-        await _context.SaveChangesAsync(cancellationToken);
-
         await _auditService.LogAsync(
             action: AuditActions.Schedules.Created,
             resourceType: "PipelineSchedule",
@@ -317,12 +313,6 @@ public class ScheduleService : IScheduleService
 
         // Remove from Quartz
         await UnregisterQuartzJobAsync(schedule, cancellationToken);
-
-        // Update pipeline's IsScheduled flag
-        if (schedule.Pipeline != null)
-        {
-            schedule.Pipeline.IsScheduled = false;
-        }
 
         _context.PipelineSchedules.Remove(schedule);
         await _context.SaveChangesAsync(cancellationToken);
