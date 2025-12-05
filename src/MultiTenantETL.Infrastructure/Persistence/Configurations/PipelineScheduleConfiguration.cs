@@ -16,7 +16,7 @@ public class PipelineScheduleConfiguration : IEntityTypeConfiguration<PipelineSc
         builder.HasKey(s => s.Id);
 
         builder.HasOne(s => s.Pipeline)
-            .WithOne()
+            .WithOne(p => p.Schedule)
             .HasForeignKey<PipelineSchedule>(s => s.PipelineId)
             .OnDelete(DeleteBehavior.Cascade);
 

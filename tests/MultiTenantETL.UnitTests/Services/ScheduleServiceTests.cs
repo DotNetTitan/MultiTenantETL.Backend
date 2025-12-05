@@ -74,7 +74,6 @@ public class ScheduleServiceTests : IDisposable
             Status = "Idle",
             FieldMappingsJson = "[]",
             IsActive = true,
-            IsScheduled = false,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = userId
         };
@@ -116,10 +115,6 @@ public class ScheduleServiceTests : IDisposable
         schedule.Should().NotBeNull();
         schedule!.TenantId.Should().Be(tenantId);
         schedule.CreatedBy.Should().Be(userId);
-
-        // Verify pipeline's IsScheduled flag was updated
-        var updatedPipeline = await _context.Pipelines.FindAsync(pipeline.Id);
-        updatedPipeline!.IsScheduled.Should().BeTrue();
 
         // Verify audit log
         await _auditService.Received(1).LogAsync(
@@ -320,8 +315,6 @@ public class ScheduleServiceTests : IDisposable
     {
         // Arrange
         var (tenantId, userId, pipeline) = await SetupTestDataAsync();
-        pipeline.IsScheduled = true;
-        await _context.SaveChangesAsync();
 
         var schedule = new PipelineSchedule
         {
@@ -344,10 +337,6 @@ public class ScheduleServiceTests : IDisposable
         // Assert
         var deletedSchedule = await _context.PipelineSchedules.FindAsync(schedule.Id);
         deletedSchedule.Should().BeNull();
-
-        // Verify pipeline's IsScheduled flag was updated
-        var updatedPipeline = await _context.Pipelines.FindAsync(pipeline.Id);
-        updatedPipeline!.IsScheduled.Should().BeFalse();
 
         // Verify audit log
         await _auditService.Received(1).LogAsync(

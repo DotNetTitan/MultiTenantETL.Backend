@@ -112,10 +112,6 @@ public class ScheduleService : IScheduleService
             await RegisterQuartzJobAsync(schedule, pipeline, cancellationToken);
         }
 
-        // Update pipeline's IsScheduled flag
-        pipeline.IsScheduled = true;
-        await _context.SaveChangesAsync(cancellationToken);
-
         await _auditService.LogAsync(
             action: AuditActions.Schedules.Created,
             resourceType: "PipelineSchedule",
@@ -254,12 +250,6 @@ public class ScheduleService : IScheduleService
         if (request.IsActive.HasValue)
         {
             schedule.IsActive = request.IsActive.Value;
-            
-            // Sync Pipeline.IsScheduled with schedule active status
-            if (schedule.Pipeline != null)
-            {
-                schedule.Pipeline.IsScheduled = request.IsActive.Value;
-            }
         }
 
         schedule.UpdatedAt = DateTime.UtcNow;
@@ -324,12 +314,6 @@ public class ScheduleService : IScheduleService
         // Remove from Quartz
         await UnregisterQuartzJobAsync(schedule, cancellationToken);
 
-        // Update pipeline's IsScheduled flag
-        if (schedule.Pipeline != null)
-        {
-            schedule.Pipeline.IsScheduled = false;
-        }
-
         _context.PipelineSchedules.Remove(schedule);
         await _context.SaveChangesAsync(cancellationToken);
 
@@ -367,12 +351,6 @@ public class ScheduleService : IScheduleService
         schedule.ConsecutiveFailures = 0; // Reset on enable
         schedule.UpdatedAt = DateTime.UtcNow;
         schedule.UpdatedBy = userId;
-
-        // Sync Pipeline.IsScheduled with schedule active status
-        if (schedule.Pipeline != null)
-        {
-            schedule.Pipeline.IsScheduled = true;
-        }
 
         // Recalculate next run time
         var cronExpression = new CronExpression(schedule.CronExpression);
@@ -418,12 +396,6 @@ public class ScheduleService : IScheduleService
         schedule.IsActive = false;
         schedule.UpdatedAt = DateTime.UtcNow;
         schedule.UpdatedBy = userId;
-
-        // Sync Pipeline.IsScheduled with schedule active status
-        if (schedule.Pipeline != null)
-        {
-            schedule.Pipeline.IsScheduled = false;
-        }
 
         await _context.SaveChangesAsync(cancellationToken);
 

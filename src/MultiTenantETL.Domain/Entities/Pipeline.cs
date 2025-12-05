@@ -19,8 +19,7 @@ public class Pipeline : ITenantResource
     // JSON columns for flexible configuration (PostgreSQL JSONB)
     public required string FieldMappingsJson { get; set; } // Array of field mappings with transformations
     
-    // Scheduling (managed via PipelineSchedule entity and /api/schedules endpoints)
-    public bool IsScheduled { get; set; }
+    // Pipeline active state (can be used to disable a pipeline without deleting)
     public bool IsActive { get; set; }
     
     // Execution tracking
@@ -38,4 +37,5 @@ public class Pipeline : ITenantResource
     public Tenant? Tenant { get; set; }
     public Connector? SourceConnector { get; set; }
     public Connector? DestinationConnector { get; set; }
+    public PipelineSchedule? Schedule { get; set; }
 }
