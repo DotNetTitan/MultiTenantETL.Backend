@@ -869,4 +869,216 @@ public class ScheduleServiceTests : IDisposable
         var resumedSchedule = await _context.PipelineSchedules.FindAsync(schedule.Id);
         resumedSchedule!.IsActive.Should().BeTrue();
     }
+
+    [Fact]
+    public async Task CreateAsync_DeactivatedPipeline_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        _tenantProvider.TenantId.Returns(tenantId);
+        _currentUserService.GetTenantId().Returns(tenantId);
+        _currentUserService.GetUserId().Returns(userId);
+
+        // Create a deactivated pipeline
+        var pipeline = new Pipeline
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Deactivated Pipeline",
+            SourceConnectorId = Guid.NewGuid(),
+            DestinationConnectorId = Guid.NewGuid(),
+            Status = "Idle",
+            FieldMappingsJson = "[]",
+            IsActive = false, // Pipeline is deactivated
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        _context.Pipelines.Add(pipeline);
+        await _context.SaveChangesAsync();
+
+        var request = new CreateScheduleRequest
+        {
+            PipelineId = pipeline.Id,
+            CronExpression = "0 0 0 * * ?",
+            Timezone = "UTC",
+            IsActive = true
+        };
+
+        // Act
+        var act = async () => await _sut.CreateAsync(request);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage($"Cannot create schedule for pipeline {pipeline.Id} because it is deactivated");
+    }
+
+    [Fact]
+    public async Task EnableAsync_DeactivatedPipeline_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        _tenantProvider.TenantId.Returns(tenantId);
+        _currentUserService.GetTenantId().Returns(tenantId);
+        _currentUserService.GetUserId().Returns(userId);
+
+        // Create a deactivated pipeline
+        var pipeline = new Pipeline
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Deactivated Pipeline",
+            SourceConnectorId = Guid.NewGuid(),
+            DestinationConnectorId = Guid.NewGuid(),
+            Status = "Idle",
+            FieldMappingsJson = "[]",
+            IsActive = false, // Pipeline is deactivated
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        _context.Pipelines.Add(pipeline);
+
+        var schedule = new PipelineSchedule
+        {
+            Id = Guid.NewGuid(),
+            PipelineId = pipeline.Id,
+            TenantId = tenantId,
+            CronExpression = "0 0 0 * * ?",
+            Timezone = "UTC",
+            IsActive = false, // Schedule is disabled
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+        _context.PipelineSchedules.Add(schedule);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var act = async () => await _sut.EnableAsync(schedule.Id);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage($"Cannot enable schedule because pipeline 'Deactivated Pipeline' is deactivated");
+    }
+
+    [Fact]
+    public async Task UpdateAsync_ActivateScheduleForDeactivatedPipeline_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        _tenantProvider.TenantId.Returns(tenantId);
+        _currentUserService.GetTenantId().Returns(tenantId);
+        _currentUserService.GetUserId().Returns(userId);
+
+        // Create a deactivated pipeline
+        var pipeline = new Pipeline
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Deactivated Pipeline",
+            SourceConnectorId = Guid.NewGuid(),
+            DestinationConnectorId = Guid.NewGuid(),
+            Status = "Idle",
+            FieldMappingsJson = "[]",
+            IsActive = false, // Pipeline is deactivated
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        _context.Pipelines.Add(pipeline);
+
+        var schedule = new PipelineSchedule
+        {
+            Id = Guid.NewGuid(),
+            PipelineId = pipeline.Id,
+            TenantId = tenantId,
+            CronExpression = "0 0 0 * * ?",
+            Timezone = "UTC",
+            IsActive = false, // Schedule is disabled
+            QuartzJobKey = $"pipeline-{pipeline.Id}-test",
+            QuartzTriggerKey = $"trigger-{pipeline.Id}-test",
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+        _context.PipelineSchedules.Add(schedule);
+        await _context.SaveChangesAsync();
+
+        var request = new UpdateScheduleRequest
+        {
+            CronExpression = "0 0 12 * * ?",
+            Timezone = "UTC",
+            IsActive = true // Trying to activate
+        };
+
+        // Act
+        var act = async () => await _sut.UpdateAsync(schedule.Id, request);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage($"Cannot activate schedule because pipeline 'Deactivated Pipeline' is deactivated");
+    }
+
+    [Fact]
+    public async Task UpdateAsync_DeactivateScheduleForDeactivatedPipeline_Succeeds()
+    {
+        // Arrange - Even if pipeline is deactivated, we should be able to deactivate the schedule
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        _tenantProvider.TenantId.Returns(tenantId);
+        _currentUserService.GetTenantId().Returns(tenantId);
+        _currentUserService.GetUserId().Returns(userId);
+
+        // Create a deactivated pipeline
+        var pipeline = new Pipeline
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Deactivated Pipeline",
+            SourceConnectorId = Guid.NewGuid(),
+            DestinationConnectorId = Guid.NewGuid(),
+            Status = "Idle",
+            FieldMappingsJson = "[]",
+            IsActive = false, // Pipeline is deactivated
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        _context.Pipelines.Add(pipeline);
+
+        var schedule = new PipelineSchedule
+        {
+            Id = Guid.NewGuid(),
+            PipelineId = pipeline.Id,
+            TenantId = tenantId,
+            CronExpression = "0 0 0 * * ?",
+            Timezone = "UTC",
+            IsActive = true, // Schedule is currently active
+            QuartzJobKey = $"pipeline-{pipeline.Id}-test",
+            QuartzTriggerKey = $"trigger-{pipeline.Id}-test",
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+        _context.PipelineSchedules.Add(schedule);
+        await _context.SaveChangesAsync();
+
+        var request = new UpdateScheduleRequest
+        {
+            CronExpression = "0 0 12 * * ?",
+            Timezone = "UTC",
+            IsActive = false // Deactivating the schedule - should be allowed
+        };
+
+        // Act
+        var result = await _sut.UpdateAsync(schedule.Id, request);
+
+        // Assert
+        result.IsActive.Should().BeFalse();
+    }
 }
