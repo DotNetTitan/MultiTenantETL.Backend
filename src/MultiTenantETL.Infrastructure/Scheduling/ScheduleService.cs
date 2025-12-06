@@ -53,6 +53,12 @@ public class ScheduleService : IScheduleService
             throw new KeyNotFoundException($"Pipeline with ID {request.PipelineId} not found");
         }
 
+        // Check if pipeline is active - cannot schedule a deactivated pipeline
+        if (!pipeline.IsActive)
+        {
+            throw new InvalidOperationException($"Cannot create schedule for pipeline {request.PipelineId} because it is deactivated");
+        }
+
         // Check if schedule already exists for this pipeline
         var existingSchedule = await _context.PipelineSchedules
             .FirstOrDefaultAsync(s => s.PipelineId == request.PipelineId, cancellationToken);
@@ -249,6 +255,11 @@ public class ScheduleService : IScheduleService
         
         if (request.IsActive.HasValue)
         {
+            // Check if trying to activate schedule for a deactivated pipeline
+            if (request.IsActive.Value && schedule.Pipeline != null && !schedule.Pipeline.IsActive)
+            {
+                throw new InvalidOperationException($"Cannot activate schedule because pipeline '{schedule.Pipeline.Name}' is deactivated");
+            }
             schedule.IsActive = request.IsActive.Value;
         }
 
@@ -345,6 +356,12 @@ public class ScheduleService : IScheduleService
         if (schedule.IsActive)
         {
             return await MapToResponseAsync(schedule, schedule.Pipeline, cancellationToken);
+        }
+
+        // Check if pipeline is active - cannot enable schedule for a deactivated pipeline
+        if (schedule.Pipeline != null && !schedule.Pipeline.IsActive)
+        {
+            throw new InvalidOperationException($"Cannot enable schedule because pipeline '{schedule.Pipeline.Name}' is deactivated");
         }
 
         schedule.IsActive = true;
