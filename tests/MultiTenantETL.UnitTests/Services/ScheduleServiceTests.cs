@@ -693,4 +693,180 @@ public class ScheduleServiceTests : IDisposable
         // Assert
         await act.Should().ThrowAsync<KeyNotFoundException>();
     }
+
+    [Fact]
+    public async Task PauseSchedulesForPipelineAsync_ActiveSchedule_SetsIsActiveToFalse()
+    {
+        // Arrange
+        var (tenantId, userId, pipeline) = await SetupTestDataAsync();
+
+        // Setup Quartz mock to report job exists
+        _scheduler.CheckExists(Arg.Any<JobKey>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        var schedule = new PipelineSchedule
+        {
+            Id = Guid.NewGuid(),
+            PipelineId = pipeline.Id,
+            TenantId = tenantId,
+            CronExpression = "0 0 0 * * ?",
+            Timezone = "UTC",
+            IsActive = true,
+            QuartzJobKey = $"pipeline-{pipeline.Id}-test",
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+        _context.PipelineSchedules.Add(schedule);
+        await _context.SaveChangesAsync();
+
+        // Act
+        await _sut.PauseSchedulesForPipelineAsync(pipeline.Id);
+
+        // Assert
+        var pausedSchedule = await _context.PipelineSchedules.FindAsync(schedule.Id);
+        pausedSchedule.Should().NotBeNull();
+        pausedSchedule!.IsActive.Should().BeFalse();
+        pausedSchedule.UpdatedAt.Should().NotBeNull();
+
+        // Verify Quartz job was deleted
+        await _scheduler.Received(1).DeleteJob(Arg.Any<JobKey>(), Arg.Any<CancellationToken>());
+
+        // Verify audit log
+        await _auditService.Received(1).LogAsync(
+            Arg.Is<string>(s => s == AuditActions.Schedules.PausedForPipeline),
+            "Pipeline",
+            pipeline.Id.ToString(),
+            Arg.Any<string>(),
+            Arg.Any<object>());
+    }
+
+    [Fact]
+    public async Task PauseSchedulesForPipelineAsync_NoActiveSchedules_DoesNothing()
+    {
+        // Arrange
+        var (tenantId, userId, pipeline) = await SetupTestDataAsync();
+
+        var schedule = new PipelineSchedule
+        {
+            Id = Guid.NewGuid(),
+            PipelineId = pipeline.Id,
+            TenantId = tenantId,
+            CronExpression = "0 0 0 * * ?",
+            Timezone = "UTC",
+            IsActive = false, // Already inactive
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+        _context.PipelineSchedules.Add(schedule);
+        await _context.SaveChangesAsync();
+
+        // Act
+        await _sut.PauseSchedulesForPipelineAsync(pipeline.Id);
+
+        // Assert - no audit log should be called
+        await _auditService.DidNotReceive().LogAsync(
+            Arg.Is<string>(s => s == AuditActions.Schedules.PausedForPipeline),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<object>());
+    }
+
+    [Fact]
+    public async Task ResumeSchedulesForPipelineAsync_InactiveSchedule_SetsIsActiveToTrue()
+    {
+        // Arrange
+        var (tenantId, userId, pipeline) = await SetupTestDataAsync();
+
+        var schedule = new PipelineSchedule
+        {
+            Id = Guid.NewGuid(),
+            PipelineId = pipeline.Id,
+            TenantId = tenantId,
+            CronExpression = "0 0 0 * * ?",
+            Timezone = "UTC",
+            IsActive = false, // Was paused
+            QuartzJobKey = $"pipeline-{pipeline.Id}-test",
+            QuartzTriggerKey = $"trigger-{pipeline.Id}-test",
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+        _context.PipelineSchedules.Add(schedule);
+        await _context.SaveChangesAsync();
+
+        // Act
+        await _sut.ResumeSchedulesForPipelineAsync(pipeline.Id);
+
+        // Assert
+        var resumedSchedule = await _context.PipelineSchedules.FindAsync(schedule.Id);
+        resumedSchedule.Should().NotBeNull();
+        resumedSchedule!.IsActive.Should().BeTrue();
+        resumedSchedule.UpdatedAt.Should().NotBeNull();
+        resumedSchedule.NextRunAt.Should().NotBeNull();
+
+        // Verify audit log
+        await _auditService.Received(1).LogAsync(
+            Arg.Is<string>(s => s == AuditActions.Schedules.ResumedForPipeline),
+            "Pipeline",
+            pipeline.Id.ToString(),
+            Arg.Any<string>(),
+            Arg.Any<object>());
+    }
+
+    [Fact]
+    public async Task ResumeSchedulesForPipelineAsync_NoSchedules_DoesNothing()
+    {
+        // Arrange
+        var (_, _, pipeline) = await SetupTestDataAsync();
+
+        // Act
+        await _sut.ResumeSchedulesForPipelineAsync(pipeline.Id);
+
+        // Assert - no audit log should be called
+        await _auditService.DidNotReceive().LogAsync(
+            Arg.Is<string>(s => s == AuditActions.Schedules.ResumedForPipeline),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<object>());
+    }
+
+    [Fact]
+    public async Task PauseAndResumeSchedules_RoundTrip_RestoresScheduleState()
+    {
+        // Arrange
+        var (tenantId, userId, pipeline) = await SetupTestDataAsync();
+
+        // Setup Quartz mock to report job exists
+        _scheduler.CheckExists(Arg.Any<JobKey>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        var schedule = new PipelineSchedule
+        {
+            Id = Guid.NewGuid(),
+            PipelineId = pipeline.Id,
+            TenantId = tenantId,
+            CronExpression = "0 0 0 * * ?",
+            Timezone = "UTC",
+            IsActive = true,
+            QuartzJobKey = $"pipeline-{pipeline.Id}-test",
+            QuartzTriggerKey = $"trigger-{pipeline.Id}-test",
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+        _context.PipelineSchedules.Add(schedule);
+        await _context.SaveChangesAsync();
+
+        // Act - Pause the schedule
+        await _sut.PauseSchedulesForPipelineAsync(pipeline.Id);
+
+        // Verify schedule is inactive
+        var pausedSchedule = await _context.PipelineSchedules.FindAsync(schedule.Id);
+        pausedSchedule!.IsActive.Should().BeFalse();
+
+        // Act - Resume the schedule
+        await _sut.ResumeSchedulesForPipelineAsync(pipeline.Id);
+
+        // Assert - Schedule should be active again
+        var resumedSchedule = await _context.PipelineSchedules.FindAsync(schedule.Id);
+        resumedSchedule!.IsActive.Should().BeTrue();
+    }
 }

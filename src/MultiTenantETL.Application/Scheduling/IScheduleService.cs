@@ -58,14 +58,14 @@ public interface IScheduleService
     Task<CronValidationResult> ValidateCronExpressionAsync(string cronExpression, string timezone, CancellationToken cancellationToken = default);
     
     /// <summary>
-    /// Pauses all active schedules for a pipeline by unregistering Quartz jobs.
-    /// Called when a pipeline is disabled. Does not change Schedule.IsActive in the database.
+    /// Pauses all active schedules for a pipeline by unregistering Quartz jobs and setting IsActive to false.
+    /// Called when a pipeline is disabled.
     /// </summary>
     Task PauseSchedulesForPipelineAsync(Guid pipelineId, CancellationToken cancellationToken = default);
     
     /// <summary>
-    /// Resumes schedules for a pipeline by re-registering Quartz jobs.
-    /// Called when a pipeline is re-enabled. Only resumes schedules where Schedule.IsActive is true.
+    /// Resumes all schedules for a pipeline by re-registering Quartz jobs and setting IsActive to true.
+    /// Called when a pipeline is re-enabled.
     /// </summary>
     Task ResumeSchedulesForPipelineAsync(Guid pipelineId, CancellationToken cancellationToken = default);
 }
