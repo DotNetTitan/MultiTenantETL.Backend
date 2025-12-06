@@ -308,6 +308,7 @@ public class SchedulesController : ControllerBase
     [HttpPost("{id}/enable")]
     [ProducesResponseType(typeof(ScheduleResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Enable(Guid id)
     {
