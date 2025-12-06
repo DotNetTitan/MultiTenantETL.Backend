@@ -36,30 +36,18 @@ public class SchedulesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetAll([FromQuery] ScheduleSearchRequest request)
     {
-        try
-        {
-            var authResult = await _authorizationService.AuthorizeAsync(
-                User,
-                null,
-                new PermissionRequirement(Permissions.Pipelines.Read));
+        var authResult = await _authorizationService.AuthorizeAsync(
+            User,
+            null,
+            new PermissionRequirement(Permissions.Pipelines.Read));
 
-            if (!authResult.Succeeded)
-            {
-                return Forbid();
-            }
-
-            var result = await _scheduleService.GetAllAsync(request);
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!authResult.Succeeded)
         {
-            _logger.LogError(ex, "Error retrieving schedules");
-            return StatusCode(500, new ErrorResponse(
-                AuthErrorCode.InternalError,
-                "An error occurred while retrieving schedules",
-                new[] { ex.Message }
-            ));
+            return Forbid();
         }
+
+        var result = await _scheduleService.GetAllAsync(request);
+        return Ok(result);
     }
 
     /// <summary>
@@ -71,37 +59,18 @@ public class SchedulesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetById(Guid id)
     {
-        try
-        {
-            var authResult = await _authorizationService.AuthorizeAsync(
-                User,
-                null,
-                new PermissionRequirement(Permissions.Pipelines.Read));
+        var authResult = await _authorizationService.AuthorizeAsync(
+            User,
+            null,
+            new PermissionRequirement(Permissions.Pipelines.Read));
 
-            if (!authResult.Succeeded)
-            {
-                return Forbid();
-            }
+        if (!authResult.Succeeded)
+        {
+            return Forbid();
+        }
 
-            var schedule = await _scheduleService.GetByIdAsync(id);
-            return Ok(schedule);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new ErrorResponse(
-                AuthErrorCode.UserNotFound,
-                ex.Message
-            ));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving schedule {ScheduleId}", id);
-            return StatusCode(500, new ErrorResponse(
-                AuthErrorCode.InternalError,
-                "An error occurred while retrieving the schedule",
-                new[] { ex.Message }
-            ));
-        }
+        var schedule = await _scheduleService.GetByIdAsync(id);
+        return Ok(schedule);
     }
 
     /// <summary>
@@ -113,38 +82,23 @@ public class SchedulesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetByPipelineId(Guid pipelineId)
     {
-        try
+        var authResult = await _authorizationService.AuthorizeAsync(
+            User,
+            null,
+            new PermissionRequirement(Permissions.Pipelines.Read));
+
+        if (!authResult.Succeeded)
         {
-            var authResult = await _authorizationService.AuthorizeAsync(
-                User,
-                null,
-                new PermissionRequirement(Permissions.Pipelines.Read));
-
-            if (!authResult.Succeeded)
-            {
-                return Forbid();
-            }
-
-            var schedule = await _scheduleService.GetByPipelineIdAsync(pipelineId);
-            if (schedule == null)
-            {
-                return NotFound(new ErrorResponse(
-                    AuthErrorCode.UserNotFound,
-                    $"No schedule found for pipeline {pipelineId}"
-                ));
-            }
-
-            return Ok(schedule);
+            return Forbid();
         }
-        catch (Exception ex)
+
+        var schedule = await _scheduleService.GetByPipelineIdAsync(pipelineId);
+        if (schedule == null)
         {
-            _logger.LogError(ex, "Error retrieving schedule for pipeline {PipelineId}", pipelineId);
-            return StatusCode(500, new ErrorResponse(
-                AuthErrorCode.InternalError,
-                "An error occurred while retrieving the schedule",
-                new[] { ex.Message }
-            ));
+            throw new KeyNotFoundException($"No schedule found for pipeline {pipelineId}");
         }
+
+        return Ok(schedule);
     }
 
     /// <summary>
@@ -156,51 +110,18 @@ public class SchedulesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Create([FromBody] CreateScheduleRequest request)
     {
-        try
-        {
-            var authResult = await _authorizationService.AuthorizeAsync(
-                User,
-                null,
-                new PermissionRequirement(Permissions.Pipelines.Update));
+        var authResult = await _authorizationService.AuthorizeAsync(
+            User,
+            null,
+            new PermissionRequirement(Permissions.Pipelines.Update));
 
-            if (!authResult.Succeeded)
-            {
-                return Forbid();
-            }
+        if (!authResult.Succeeded)
+        {
+            return Forbid();
+        }
 
-            var schedule = await _scheduleService.CreateAsync(request);
-            return CreatedAtAction(nameof(GetById), new { id = schedule.Id }, schedule);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return BadRequest(new ErrorResponse(
-                AuthErrorCode.ValidationError,
-                ex.Message
-            ));
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new ErrorResponse(
-                AuthErrorCode.ValidationError,
-                ex.Message
-            ));
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new ErrorResponse(
-                AuthErrorCode.ValidationError,
-                ex.Message
-            ));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating schedule");
-            return StatusCode(500, new ErrorResponse(
-                AuthErrorCode.InternalError,
-                "An error occurred while creating the schedule",
-                new[] { ex.Message }
-            ));
-        }
+        var schedule = await _scheduleService.CreateAsync(request);
+        return CreatedAtAction(nameof(GetById), new { id = schedule.Id }, schedule);
     }
 
     /// <summary>
@@ -213,51 +134,18 @@ public class SchedulesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateScheduleRequest request)
     {
-        try
-        {
-            var authResult = await _authorizationService.AuthorizeAsync(
-                User,
-                null,
-                new PermissionRequirement(Permissions.Pipelines.Update));
+        var authResult = await _authorizationService.AuthorizeAsync(
+            User,
+            null,
+            new PermissionRequirement(Permissions.Pipelines.Update));
 
-            if (!authResult.Succeeded)
-            {
-                return Forbid();
-            }
+        if (!authResult.Succeeded)
+        {
+            return Forbid();
+        }
 
-            var schedule = await _scheduleService.UpdateAsync(id, request);
-            return Ok(schedule);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new ErrorResponse(
-                AuthErrorCode.UserNotFound,
-                ex.Message
-            ));
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new ErrorResponse(
-                AuthErrorCode.ValidationError,
-                ex.Message
-            ));
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new ErrorResponse(
-                AuthErrorCode.ValidationError,
-                ex.Message
-            ));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating schedule {ScheduleId}", id);
-            return StatusCode(500, new ErrorResponse(
-                AuthErrorCode.InternalError,
-                "An error occurred while updating the schedule",
-                new[] { ex.Message }
-            ));
-        }
+        var schedule = await _scheduleService.UpdateAsync(id, request);
+        return Ok(schedule);
     }
 
     /// <summary>
@@ -269,37 +157,18 @@ public class SchedulesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Delete(Guid id)
     {
-        try
-        {
-            var authResult = await _authorizationService.AuthorizeAsync(
-                User,
-                null,
-                new PermissionRequirement(Permissions.Pipelines.Update));
+        var authResult = await _authorizationService.AuthorizeAsync(
+            User,
+            null,
+            new PermissionRequirement(Permissions.Pipelines.Update));
 
-            if (!authResult.Succeeded)
-            {
-                return Forbid();
-            }
+        if (!authResult.Succeeded)
+        {
+            return Forbid();
+        }
 
-            await _scheduleService.DeleteAsync(id);
-            return NoContent();
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new ErrorResponse(
-                AuthErrorCode.UserNotFound,
-                ex.Message
-            ));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deleting schedule {ScheduleId}", id);
-            return StatusCode(500, new ErrorResponse(
-                AuthErrorCode.InternalError,
-                "An error occurred while deleting the schedule",
-                new[] { ex.Message }
-            ));
-        }
+        await _scheduleService.DeleteAsync(id);
+        return NoContent();
     }
 
     /// <summary>
@@ -312,44 +181,18 @@ public class SchedulesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Enable(Guid id)
     {
-        try
-        {
-            var authResult = await _authorizationService.AuthorizeAsync(
-                User,
-                null,
-                new PermissionRequirement(Permissions.Pipelines.Update));
+        var authResult = await _authorizationService.AuthorizeAsync(
+            User,
+            null,
+            new PermissionRequirement(Permissions.Pipelines.Update));
 
-            if (!authResult.Succeeded)
-            {
-                return Forbid();
-            }
+        if (!authResult.Succeeded)
+        {
+            return Forbid();
+        }
 
-            var schedule = await _scheduleService.EnableAsync(id);
-            return Ok(schedule);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new ErrorResponse(
-                AuthErrorCode.UserNotFound,
-                ex.Message
-            ));
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new ErrorResponse(
-                AuthErrorCode.ValidationError,
-                ex.Message
-            ));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error enabling schedule {ScheduleId}", id);
-            return StatusCode(500, new ErrorResponse(
-                AuthErrorCode.InternalError,
-                "An error occurred while enabling the schedule",
-                new[] { ex.Message }
-            ));
-        }
+        var schedule = await _scheduleService.EnableAsync(id);
+        return Ok(schedule);
     }
 
     /// <summary>
@@ -361,37 +204,18 @@ public class SchedulesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Disable(Guid id)
     {
-        try
-        {
-            var authResult = await _authorizationService.AuthorizeAsync(
-                User,
-                null,
-                new PermissionRequirement(Permissions.Pipelines.Update));
+        var authResult = await _authorizationService.AuthorizeAsync(
+            User,
+            null,
+            new PermissionRequirement(Permissions.Pipelines.Update));
 
-            if (!authResult.Succeeded)
-            {
-                return Forbid();
-            }
+        if (!authResult.Succeeded)
+        {
+            return Forbid();
+        }
 
-            var schedule = await _scheduleService.DisableAsync(id);
-            return Ok(schedule);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new ErrorResponse(
-                AuthErrorCode.UserNotFound,
-                ex.Message
-            ));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error disabling schedule {ScheduleId}", id);
-            return StatusCode(500, new ErrorResponse(
-                AuthErrorCode.InternalError,
-                "An error occurred while disabling the schedule",
-                new[] { ex.Message }
-            ));
-        }
+        var schedule = await _scheduleService.DisableAsync(id);
+        return Ok(schedule);
     }
 
     /// <summary>
@@ -403,37 +227,18 @@ public class SchedulesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> TriggerNow(Guid id)
     {
-        try
-        {
-            var authResult = await _authorizationService.AuthorizeAsync(
-                User,
-                null,
-                new PermissionRequirement(Permissions.Pipelines.Execute));
+        var authResult = await _authorizationService.AuthorizeAsync(
+            User,
+            null,
+            new PermissionRequirement(Permissions.Pipelines.Execute));
 
-            if (!authResult.Succeeded)
-            {
-                return Forbid();
-            }
+        if (!authResult.Succeeded)
+        {
+            return Forbid();
+        }
 
-            var schedule = await _scheduleService.TriggerNowAsync(id);
-            return Ok(schedule);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new ErrorResponse(
-                AuthErrorCode.UserNotFound,
-                ex.Message
-            ));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error triggering schedule {ScheduleId}", id);
-            return StatusCode(500, new ErrorResponse(
-                AuthErrorCode.InternalError,
-                "An error occurred while triggering the schedule",
-                new[] { ex.Message }
-            ));
-        }
+        var schedule = await _scheduleService.TriggerNowAsync(id);
+        return Ok(schedule);
     }
 
     /// <summary>
@@ -443,22 +248,10 @@ public class SchedulesController : ControllerBase
     [ProducesResponseType(typeof(CronValidationResult), StatusCodes.Status200OK)]
     public async Task<IActionResult> ValidateCron([FromBody] ValidateCronRequest request)
     {
-        try
-        {
-            var result = await _scheduleService.ValidateCronExpressionAsync(
-                request.CronExpression, 
-                request.Timezone);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error validating cron expression");
-            return Ok(new CronValidationResult
-            {
-                IsValid = false,
-                ErrorMessage = ex.Message
-            });
-        }
+        var result = await _scheduleService.ValidateCronExpressionAsync(
+            request.CronExpression, 
+            request.Timezone);
+        return Ok(result);
     }
 }
 

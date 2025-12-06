@@ -66,30 +66,22 @@ public class ConnectorsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Search([FromBody] ConnectorSearchRequest request)
     {
-        try
+        // Check permission
+        var authResult = await _authorizationService.AuthorizeAsync(
+            User, 
+            null, 
+            new PermissionRequirement(Permissions.Connectors.Read));
+        
+        if (!authResult.Succeeded)
         {
-            // Check permission
-            var authResult = await _authorizationService.AuthorizeAsync(
-                User, 
-                null, 
-                new PermissionRequirement(Permissions.Connectors.Read));
-            
-            if (!authResult.Succeeded)
-            {
-                _logger.LogWarning("Authorization failed for connectors.read");
-                return Forbid();
-            }
+            _logger.LogWarning("Authorization failed for connectors.read");
+            return Forbid();
+        }
 
-            var tenantId = _currentUserService.GetTenantId();
-            var result = await _connectorService.SearchAsync(request, tenantId);
-            
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error searching connectors");
-            return StatusCode(500, new { message = "An error occurred while searching connectors", error = ex.Message });
-        }
+        var tenantId = _currentUserService.GetTenantId();
+        var result = await _connectorService.SearchAsync(request, tenantId);
+        
+        return Ok(result);
     }
 
     /// <summary>
@@ -113,24 +105,17 @@ public class ConnectorsController : ControllerBase
         }
 
         var tenantId = _currentUserService.GetTenantId();
-        try
-        {
-            var connector = await _connectorService.GetByIdAsync(id, tenantId);
-            
-            // Audit log for viewing sensitive connector details
-            await _auditService.LogAsync(
-                action: AuditActions.ConnectorViewed,
-                resourceType: "Connector",
-                resourceId: id.ToString(),
-                description: $"Viewed connector '{connector.Name}'"
-            );
-            
-            return Ok(connector);
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound(new { message = $"Connector with ID {id} not found" });
-        }
+        var connector = await _connectorService.GetByIdAsync(id, tenantId);
+        
+        // Audit log for viewing sensitive connector details
+        await _auditService.LogAsync(
+            action: AuditActions.ConnectorViewed,
+            resourceType: "Connector",
+            resourceId: id.ToString(),
+            description: $"Viewed connector '{connector.Name}'"
+        );
+        
+        return Ok(connector);
     }
 
     /// <summary>
@@ -156,15 +141,8 @@ public class ConnectorsController : ControllerBase
         var tenantId = _currentUserService.GetTenantId();
         var userId = _currentUserService.GetUserId();
 
-        try
-        {
-            var connector = await _connectorService.CreateAsync(request, tenantId, userId);
-            return CreatedAtAction(nameof(GetById), new { id = connector.Id }, connector);
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        var connector = await _connectorService.CreateAsync(request, tenantId, userId);
+        return CreatedAtAction(nameof(GetById), new { id = connector.Id }, connector);
     }
 
     /// <summary>
@@ -190,19 +168,8 @@ public class ConnectorsController : ControllerBase
         var tenantId = _currentUserService.GetTenantId();
         var userId = _currentUserService.GetUserId();
 
-        try
-        {
-            var connector = await _connectorService.UpdateAsync(id, request, tenantId, userId);
-            return Ok(connector);
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound(new { message = $"Connector with ID {id} not found" });
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        var connector = await _connectorService.UpdateAsync(id, request, tenantId, userId);
+        return Ok(connector);
     }
 
     /// <summary>
@@ -226,15 +193,8 @@ public class ConnectorsController : ControllerBase
         }
 
         var tenantId = _currentUserService.GetTenantId();
-        try
-        {
-            await _connectorService.DeleteAsync(id, tenantId);
-            return NoContent();
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound(new { message = $"Connector with ID {id} not found" });
-        }
+        await _connectorService.DeleteAsync(id, tenantId);
+        return NoContent();
     }
 
     /// <summary>
@@ -282,15 +242,8 @@ public class ConnectorsController : ControllerBase
         }
 
         var tenantId = _currentUserService.GetTenantId();
-        try
-        {
-            var result = await _connectorService.TestExistingConnectionAsync(id, tenantId);
-            return Ok(result);
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound(new { message = $"Connector with ID {id} not found" });
-        }
+        var result = await _connectorService.TestExistingConnectionAsync(id, tenantId);
+        return Ok(result);
     }
 
     /// <summary>
@@ -314,15 +267,8 @@ public class ConnectorsController : ControllerBase
         }
 
         var tenantId = _currentUserService.GetTenantId();
-        try
-        {
-            var result = await _connectorService.DetectSchemaAsync(request, tenantId);
-            return Ok(result);
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound(new { message = $"Connector with ID {request.ConnectorId} not found" });
-        }
+        var result = await _connectorService.DetectSchemaAsync(request, tenantId);
+        return Ok(result);
     }
 
     /// <summary>

@@ -40,30 +40,18 @@ public class ExecutionsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetAll([FromQuery] ExecutionSearchRequest request)
     {
-        try
-        {
-            var authResult = await _authorizationService.AuthorizeAsync(
-                User,
-                null,
-                new PermissionRequirement(Permissions.Pipelines.Read));
+        var authResult = await _authorizationService.AuthorizeAsync(
+            User,
+            null,
+            new PermissionRequirement(Permissions.Pipelines.Read));
 
-            if (!authResult.Succeeded)
-            {
-                return Forbid();
-            }
-
-            var result = await _executionService.GetAllAsync(request);
-            return Ok(result);
-        }
-        catch (Exception ex)
+        if (!authResult.Succeeded)
         {
-            _logger.LogError(ex, "Error retrieving executions");
-            return StatusCode(500, new ErrorResponse(
-                AuthErrorCode.InternalError,
-                "An error occurred while retrieving executions",
-                new[] { ex.Message }
-            ));
+            return Forbid();
         }
+
+        var result = await _executionService.GetAllAsync(request);
+        return Ok(result);
     }
 
     /// <summary>
@@ -75,41 +63,18 @@ public class ExecutionsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetById(Guid id)
     {
-        try
-        {
-            var authResult = await _authorizationService.AuthorizeAsync(
-                User,
-                null,
-                new PermissionRequirement(Permissions.Pipelines.Read));
+        var authResult = await _authorizationService.AuthorizeAsync(
+            User,
+            null,
+            new PermissionRequirement(Permissions.Pipelines.Read));
 
-            if (!authResult.Succeeded)
-            {
-                return Forbid();
-            }
-
-            var execution = await _executionService.GetByIdAsync(id);
-            return Ok(execution);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new ErrorResponse(
-                AuthErrorCode.UserNotFound,
-                ex.Message
-            ));
-        }
-        catch (UnauthorizedAccessException)
+        if (!authResult.Succeeded)
         {
             return Forbid();
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving execution {ExecutionId}", id);
-            return StatusCode(500, new ErrorResponse(
-                AuthErrorCode.InternalError,
-                "An error occurred while retrieving the execution",
-                new[] { ex.Message }
-            ));
-        }
+
+        var execution = await _executionService.GetByIdAsync(id);
+        return Ok(execution);
     }
 
     /// <summary>
@@ -122,48 +87,18 @@ public class ExecutionsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Cancel(Guid id)
     {
-        try
-        {
-            var authResult = await _authorizationService.AuthorizeAsync(
-                User,
-                null,
-                new PermissionRequirement(Permissions.Pipelines.Execute));
+        var authResult = await _authorizationService.AuthorizeAsync(
+            User,
+            null,
+            new PermissionRequirement(Permissions.Pipelines.Execute));
 
-            if (!authResult.Succeeded)
-            {
-                return Forbid();
-            }
-
-            var execution = await _executionService.CancelExecutionAsync(id);
-            return Ok(execution);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new ErrorResponse(
-                AuthErrorCode.UserNotFound,
-                ex.Message
-            ));
-        }
-        catch (UnauthorizedAccessException)
+        if (!authResult.Succeeded)
         {
             return Forbid();
         }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new ErrorResponse(
-                AuthErrorCode.ValidationError,
-                ex.Message
-            ));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error cancelling execution {ExecutionId}", id);
-            return StatusCode(500, new ErrorResponse(
-                AuthErrorCode.InternalError,
-                "An error occurred while cancelling the execution",
-                new[] { ex.Message }
-            ));
-        }
+
+        var execution = await _executionService.CancelExecutionAsync(id);
+        return Ok(execution);
     }
 
     /// <summary>
@@ -174,29 +109,17 @@ public class ExecutionsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetStats([FromQuery] Guid? pipelineId = null)
     {
-        try
-        {
-            var authResult = await _authorizationService.AuthorizeAsync(
-                User,
-                null,
-                new PermissionRequirement(Permissions.Pipelines.Read));
+        var authResult = await _authorizationService.AuthorizeAsync(
+            User,
+            null,
+            new PermissionRequirement(Permissions.Pipelines.Read));
 
-            if (!authResult.Succeeded)
-            {
-                return Forbid();
-            }
-
-            var stats = await _executionService.GetStatsAsync(pipelineId);
-            return Ok(stats);
-        }
-        catch (Exception ex)
+        if (!authResult.Succeeded)
         {
-            _logger.LogError(ex, "Error retrieving execution stats");
-            return StatusCode(500, new ErrorResponse(
-                AuthErrorCode.InternalError,
-                "An error occurred while retrieving execution statistics",
-                new[] { ex.Message }
-            ));
+            return Forbid();
         }
+
+        var stats = await _executionService.GetStatsAsync(pipelineId);
+        return Ok(stats);
     }
 }
