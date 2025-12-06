@@ -242,6 +242,13 @@ public class SchedulesController : ControllerBase
                 ex.Message
             ));
         }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ErrorResponse(
+                AuthErrorCode.ValidationError,
+                ex.Message
+            ));
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error updating schedule {ScheduleId}", id);
@@ -323,6 +330,13 @@ public class SchedulesController : ControllerBase
         {
             return NotFound(new ErrorResponse(
                 AuthErrorCode.UserNotFound,
+                ex.Message
+            ));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ErrorResponse(
+                AuthErrorCode.ValidationError,
                 ex.Message
             ));
         }
