@@ -534,8 +534,15 @@ public class ScheduleService : IScheduleService
 
         foreach (var schedule in schedules)
         {
+            // Unregister from Quartz
             await UnregisterQuartzJobAsync(schedule, cancellationToken);
+            
+            // Set schedule to inactive so it appears correctly in the UI
+            schedule.IsActive = false;
+            schedule.UpdatedAt = DateTime.UtcNow;
         }
+
+        await _context.SaveChangesAsync(cancellationToken);
 
         await _auditService.LogAsync(
             action: AuditActions.Schedules.PausedForPipeline,
@@ -555,15 +562,15 @@ public class ScheduleService : IScheduleService
         _logger.LogInformation("Resuming schedules for pipeline {PipelineId} in tenant {TenantId}", 
             pipelineId, tenantId);
 
-        // Find all active schedules for this pipeline (only resume schedules that are marked active)
+        // Find all schedules for this pipeline (including inactive ones that were paused)
         var schedules = await _context.PipelineSchedules
             .Include(s => s.Pipeline)
-            .Where(s => s.PipelineId == pipelineId && s.TenantId == tenantId && s.IsActive)
+            .Where(s => s.PipelineId == pipelineId && s.TenantId == tenantId)
             .ToListAsync(cancellationToken);
 
         if (schedules.Count == 0)
         {
-            _logger.LogInformation("No active schedules found for pipeline {PipelineId} to resume", pipelineId);
+            _logger.LogInformation("No schedules found for pipeline {PipelineId} to resume", pipelineId);
             return;
         }
 
@@ -575,6 +582,10 @@ public class ScheduleService : IScheduleService
             // Recalculate next run time
             var cronExpression = new CronExpression(schedule.CronExpression);
             schedule.NextRunAt = cronExpression.GetNextValidTimeAfter(DateTimeOffset.UtcNow);
+            
+            // Set schedule to active
+            schedule.IsActive = true;
+            schedule.UpdatedAt = DateTime.UtcNow;
             
             // Pipeline should not be null after Include, but check for safety
             if (schedule.Pipeline != null)
