@@ -242,6 +242,13 @@ public class SchedulesController : ControllerBase
                 ex.Message
             ));
         }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ErrorResponse(
+                AuthErrorCode.ValidationError,
+                ex.Message
+            ));
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error updating schedule {ScheduleId}", id);
@@ -301,6 +308,7 @@ public class SchedulesController : ControllerBase
     [HttpPost("{id}/enable")]
     [ProducesResponseType(typeof(ScheduleResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Enable(Guid id)
     {
@@ -323,6 +331,13 @@ public class SchedulesController : ControllerBase
         {
             return NotFound(new ErrorResponse(
                 AuthErrorCode.UserNotFound,
+                ex.Message
+            ));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ErrorResponse(
+                AuthErrorCode.ValidationError,
                 ex.Message
             ));
         }
