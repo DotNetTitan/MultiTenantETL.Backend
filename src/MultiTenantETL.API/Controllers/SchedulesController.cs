@@ -95,7 +95,7 @@ public class SchedulesController : ControllerBase
         var schedule = await _scheduleService.GetByPipelineIdAsync(pipelineId);
         if (schedule == null)
         {
-            throw new KeyNotFoundException($"No schedule found for pipeline {pipelineId}");
+            return NotFound();
         }
 
         return Ok(schedule);
