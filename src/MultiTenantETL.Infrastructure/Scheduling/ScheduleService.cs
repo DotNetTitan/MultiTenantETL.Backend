@@ -510,6 +510,96 @@ public class ScheduleService : IScheduleService
         }
     }
 
+    public async Task PauseSchedulesForPipelineAsync(Guid pipelineId, CancellationToken cancellationToken = default)
+    {
+        var tenantId = _currentUserService.GetTenantId();
+
+        _logger.LogInformation("Pausing schedules for pipeline {PipelineId} in tenant {TenantId}", 
+            pipelineId, tenantId);
+
+        // Find all active schedules for this pipeline
+        var schedules = await _context.PipelineSchedules
+            .Include(s => s.Pipeline)
+            .Where(s => s.PipelineId == pipelineId && s.TenantId == tenantId && s.IsActive)
+            .ToListAsync(cancellationToken);
+
+        if (schedules.Count == 0)
+        {
+            _logger.LogInformation("No active schedules found for pipeline {PipelineId}", pipelineId);
+            return;
+        }
+
+        // Get the pipeline name for audit logging (safe since we have at least one schedule)
+        var pipelineName = schedules[0].Pipeline?.Name ?? "Unknown";
+
+        foreach (var schedule in schedules)
+        {
+            await UnregisterQuartzJobAsync(schedule, cancellationToken);
+        }
+
+        await _auditService.LogAsync(
+            action: AuditActions.Schedules.PausedForPipeline,
+            resourceType: "Pipeline",
+            resourceId: pipelineId.ToString(),
+            description: $"Paused {schedules.Count} schedule(s) for pipeline '{pipelineName}' due to pipeline deactivation",
+            metadata: new { ScheduleIds = schedules.Select(s => s.Id).ToList(), Count = schedules.Count }
+        );
+
+        _logger.LogInformation("Paused {Count} schedule(s) for pipeline {PipelineId}", schedules.Count, pipelineId);
+    }
+
+    public async Task ResumeSchedulesForPipelineAsync(Guid pipelineId, CancellationToken cancellationToken = default)
+    {
+        var tenantId = _currentUserService.GetTenantId();
+
+        _logger.LogInformation("Resuming schedules for pipeline {PipelineId} in tenant {TenantId}", 
+            pipelineId, tenantId);
+
+        // Find all active schedules for this pipeline (only resume schedules that are marked active)
+        var schedules = await _context.PipelineSchedules
+            .Include(s => s.Pipeline)
+            .Where(s => s.PipelineId == pipelineId && s.TenantId == tenantId && s.IsActive)
+            .ToListAsync(cancellationToken);
+
+        if (schedules.Count == 0)
+        {
+            _logger.LogInformation("No active schedules found for pipeline {PipelineId} to resume", pipelineId);
+            return;
+        }
+
+        // Get the pipeline name for audit logging (safe since we have at least one schedule)
+        var pipelineName = schedules[0].Pipeline?.Name ?? "Unknown";
+
+        foreach (var schedule in schedules)
+        {
+            // Recalculate next run time
+            var cronExpression = new CronExpression(schedule.CronExpression);
+            schedule.NextRunAt = cronExpression.GetNextValidTimeAfter(DateTimeOffset.UtcNow);
+            
+            // Pipeline should not be null after Include, but check for safety
+            if (schedule.Pipeline != null)
+            {
+                await RegisterQuartzJobAsync(schedule, schedule.Pipeline, cancellationToken);
+            }
+            else
+            {
+                _logger.LogWarning("Pipeline is null for schedule {ScheduleId}, skipping Quartz registration", schedule.Id);
+            }
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        await _auditService.LogAsync(
+            action: AuditActions.Schedules.ResumedForPipeline,
+            resourceType: "Pipeline",
+            resourceId: pipelineId.ToString(),
+            description: $"Resumed {schedules.Count} schedule(s) for pipeline '{pipelineName}' due to pipeline activation",
+            metadata: new { ScheduleIds = schedules.Select(s => s.Id).ToList(), Count = schedules.Count }
+        );
+
+        _logger.LogInformation("Resumed {Count} schedule(s) for pipeline {PipelineId}", schedules.Count, pipelineId);
+    }
+
     private async Task RegisterQuartzJobAsync(PipelineSchedule schedule, Pipeline pipeline, CancellationToken cancellationToken)
     {
         var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);

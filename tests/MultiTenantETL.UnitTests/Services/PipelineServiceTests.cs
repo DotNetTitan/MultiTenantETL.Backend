@@ -6,6 +6,7 @@ using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Application.Pipelines;
 using MultiTenantETL.Application.Pipelines.Models;
+using MultiTenantETL.Application.Scheduling;
 using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Persistence;
@@ -20,6 +21,7 @@ public class PipelineServiceTests : IDisposable
     private readonly ILogger<PipelineService> _logger;
     private readonly ICurrentUserService _currentUserService;
     private readonly IAuditService _auditService;
+    private readonly IScheduleService _scheduleService;
     private readonly ITenantProvider _tenantProvider;
     private readonly PipelineService _sut;
 
@@ -34,18 +36,77 @@ public class PipelineServiceTests : IDisposable
         _logger = Substitute.For<ILogger<PipelineService>>();
         _currentUserService = Substitute.For<ICurrentUserService>();
         _auditService = Substitute.For<IAuditService>();
+        _scheduleService = Substitute.For<IScheduleService>();
 
         _sut = new PipelineService(
             _context,
             _logger,
             _currentUserService,
-            _auditService);
+            _auditService,
+            _scheduleService);
     }
 
     public void Dispose()
     {
         _context.Dispose();
     }
+
+    #region Helper Methods
+
+    private Task<(Guid tenantId, Guid userId)> SetupTenantAsync()
+    {
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        _tenantProvider.TenantId.Returns(tenantId);
+        _currentUserService.GetTenantId().Returns(tenantId);
+        _currentUserService.GetUserId().Returns(userId);
+
+        return Task.FromResult((tenantId, userId));
+    }
+
+    private (Connector source, Connector destination) CreateConnectorPair(Guid tenantId, Guid userId)
+    {
+        var sourceConnector = new Connector
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Source",
+            Type = "Database",
+            Provider = "PostgreSQL",
+            Direction = "Source",
+            IsSource = true,
+            IsDestination = false,
+            RequiresCredentials = true,
+            IsActive = true,
+            ConfigJson = "{}",
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        var destConnector = new Connector
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Dest",
+            Type = "Database",
+            Provider = "PostgreSQL",
+            Direction = "Destination",
+            IsSource = false,
+            IsDestination = true,
+            RequiresCredentials = true,
+            IsActive = true,
+            ConfigJson = "{}",
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        _context.Connectors.AddRange(sourceConnector, destConnector);
+
+        return (sourceConnector, destConnector);
+    }
+
+    #endregion
 
     [Fact]
     public async Task CreateAsync_ValidInput_CreatesPipeline()
@@ -431,6 +492,80 @@ public class PipelineServiceTests : IDisposable
             pipelineId.ToString(),
             Arg.Any<string>(),
             Arg.Any<object>());
+        
+        // Verify schedule service was called
+        await _scheduleService.Received(1).PauseSchedulesForPipelineAsync(pipelineId, Arg.Any<CancellationToken>());
+        await _scheduleService.Received(1).ResumeSchedulesForPipelineAsync(pipelineId, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ToggleStatusAsync_WhenDeactivating_PausesSchedules()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var pipelineId = Guid.NewGuid();
+        _tenantProvider.TenantId.Returns(tenantId);
+        _currentUserService.GetTenantId().Returns(tenantId);
+
+        var pipeline = new Pipeline
+        {
+            Id = pipelineId,
+            TenantId = tenantId,
+            Name = "Active Pipeline",
+            SourceConnectorId = Guid.NewGuid(),
+            DestinationConnectorId = Guid.NewGuid(),
+            Status = "Idle",
+            FieldMappingsJson = "[]",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = Guid.NewGuid()
+        };
+
+        _context.Pipelines.Add(pipeline);
+        await _context.SaveChangesAsync();
+
+        // Act - Deactivate the pipeline
+        var result = await _sut.ToggleStatusAsync(pipelineId);
+
+        // Assert
+        result.IsActive.Should().BeFalse();
+        await _scheduleService.Received(1).PauseSchedulesForPipelineAsync(pipelineId, Arg.Any<CancellationToken>());
+        await _scheduleService.DidNotReceive().ResumeSchedulesForPipelineAsync(pipelineId, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ToggleStatusAsync_WhenActivating_ResumesSchedules()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var pipelineId = Guid.NewGuid();
+        _tenantProvider.TenantId.Returns(tenantId);
+        _currentUserService.GetTenantId().Returns(tenantId);
+
+        var pipeline = new Pipeline
+        {
+            Id = pipelineId,
+            TenantId = tenantId,
+            Name = "Inactive Pipeline",
+            SourceConnectorId = Guid.NewGuid(),
+            DestinationConnectorId = Guid.NewGuid(),
+            Status = "Idle",
+            FieldMappingsJson = "[]",
+            IsActive = false,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = Guid.NewGuid()
+        };
+
+        _context.Pipelines.Add(pipeline);
+        await _context.SaveChangesAsync();
+
+        // Act - Activate the pipeline
+        var result = await _sut.ToggleStatusAsync(pipelineId);
+
+        // Assert
+        result.IsActive.Should().BeTrue();
+        await _scheduleService.Received(1).ResumeSchedulesForPipelineAsync(pipelineId, Arg.Any<CancellationToken>());
+        await _scheduleService.DidNotReceive().PauseSchedulesForPipelineAsync(pipelineId, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -724,5 +859,167 @@ public class PipelineServiceTests : IDisposable
         var pipeline = await _context.Pipelines.FirstOrDefaultAsync(p => p.Id == result.Id);
         pipeline.Should().NotBeNull();
         pipeline!.FieldMappingsJson.Should().Be("[]");
+    }
+
+    [Fact]
+    public async Task GetAllAsync_WithIsActiveTrue_ReturnsOnlyActivePipelines()
+    {
+        // Arrange
+        var (tenantId, userId) = await SetupTenantAsync();
+        var (sourceConnector, destConnector) = CreateConnectorPair(tenantId, userId);
+
+        var activePipeline = new Pipeline
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Active Pipeline",
+            SourceConnectorId = sourceConnector.Id,
+            DestinationConnectorId = destConnector.Id,
+            Status = "Idle",
+            FieldMappingsJson = "[]",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        var inactivePipeline = new Pipeline
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Inactive Pipeline",
+            SourceConnectorId = sourceConnector.Id,
+            DestinationConnectorId = destConnector.Id,
+            Status = "Idle",
+            FieldMappingsJson = "[]",
+            IsActive = false,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        _context.Pipelines.AddRange(activePipeline, inactivePipeline);
+        await _context.SaveChangesAsync();
+
+        var request = new PipelineSearchRequest
+        {
+            IsActive = true
+        };
+
+        // Act
+        var result = await _sut.GetAllAsync(request);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.TotalCount.Should().Be(1);
+        result.Pipelines.Should().HaveCount(1);
+        result.Pipelines[0].Name.Should().Be("Active Pipeline");
+        result.Pipelines[0].IsActive.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task GetAllAsync_WithIsActiveFalse_ReturnsOnlyInactivePipelines()
+    {
+        // Arrange
+        var (tenantId, userId) = await SetupTenantAsync();
+        var (sourceConnector, destConnector) = CreateConnectorPair(tenantId, userId);
+
+        var activePipeline = new Pipeline
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Active Pipeline",
+            SourceConnectorId = sourceConnector.Id,
+            DestinationConnectorId = destConnector.Id,
+            Status = "Idle",
+            FieldMappingsJson = "[]",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        var inactivePipeline = new Pipeline
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Inactive Pipeline",
+            SourceConnectorId = sourceConnector.Id,
+            DestinationConnectorId = destConnector.Id,
+            Status = "Idle",
+            FieldMappingsJson = "[]",
+            IsActive = false,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        _context.Pipelines.AddRange(activePipeline, inactivePipeline);
+        await _context.SaveChangesAsync();
+
+        var request = new PipelineSearchRequest
+        {
+            IsActive = false
+        };
+
+        // Act
+        var result = await _sut.GetAllAsync(request);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.TotalCount.Should().Be(1);
+        result.Pipelines.Should().HaveCount(1);
+        result.Pipelines[0].Name.Should().Be("Inactive Pipeline");
+        result.Pipelines[0].IsActive.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GetAllAsync_WithoutIsActiveFilter_ReturnsAllPipelines()
+    {
+        // Arrange
+        var (tenantId, userId) = await SetupTenantAsync();
+        var (sourceConnector, destConnector) = CreateConnectorPair(tenantId, userId);
+
+        var activePipeline = new Pipeline
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Active Pipeline",
+            SourceConnectorId = sourceConnector.Id,
+            DestinationConnectorId = destConnector.Id,
+            Status = "Idle",
+            FieldMappingsJson = "[]",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        var inactivePipeline = new Pipeline
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Inactive Pipeline",
+            SourceConnectorId = sourceConnector.Id,
+            DestinationConnectorId = destConnector.Id,
+            Status = "Idle",
+            FieldMappingsJson = "[]",
+            IsActive = false,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        _context.Pipelines.AddRange(activePipeline, inactivePipeline);
+        await _context.SaveChangesAsync();
+
+        var request = new PipelineSearchRequest
+        {
+            // IsActive is null - no filter applied
+        };
+
+        // Act
+        var result = await _sut.GetAllAsync(request);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.TotalCount.Should().Be(2);
+        result.Pipelines.Should().HaveCount(2);
+        result.Pipelines.Should().Contain(p => p.Name == "Active Pipeline" && p.IsActive);
+        result.Pipelines.Should().Contain(p => p.Name == "Inactive Pipeline" && !p.IsActive);
     }
 }

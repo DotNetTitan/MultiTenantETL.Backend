@@ -87,5 +87,7 @@ public static class AuditActions
         public const string Enabled = "Schedule.Enabled";
         public const string Disabled = "Schedule.Disabled";
         public const string TriggeredManually = "Schedule.TriggeredManually";
+        public const string PausedForPipeline = "Schedule.PausedForPipeline";
+        public const string ResumedForPipeline = "Schedule.ResumedForPipeline";
     }
 }
