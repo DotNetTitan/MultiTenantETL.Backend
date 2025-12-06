@@ -480,6 +480,10 @@ builder.Services.AddControllers()
     {
         JsonSerializerOptionsProvider.Configure(options.JsonSerializerOptions);
     });
+
+// Add Razor Pages for OAuth login page
+builder.Services.AddRazorPages();
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -501,6 +505,9 @@ app.UseSecurityHeaders();
 // CORS - must be before response caching to ensure headers are always present
 app.UseCors("AllowFrontend");
 
+// Static files for OAuth login page CSS
+app.UseStaticFiles();
+
 // Response caching - after CORS to cache responses with CORS headers
 app.UseResponseCaching();
 
@@ -521,6 +528,9 @@ app.UseTenantContext();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Map Razor Pages for OAuth login
+app.MapRazorPages();
 
 // Map Aspire default endpoints (health checks)
 app.MapDefaultEndpoints();

@@ -29,12 +29,13 @@ public class SecurityHeadersMiddleware
             "max-age=31536000; includeSubDomains; preload";
 
         // Content Security Policy - restrict resource loading
+        // Allow Google Fonts and jsDelivr CDN for the auth login page
         context.Response.Headers["Content-Security-Policy"] =
             "default-src 'self'; " +
-            "script-src 'self'; " +
-            "style-src 'self' 'unsafe-inline'; " +
+            "script-src 'self' 'unsafe-inline'; " +
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; " +
             "img-src 'self' data: https:; " +
-            "font-src 'self' data:; " +
+            "font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; " +
             "connect-src 'self'; " +
             "frame-ancestors 'none';";
 

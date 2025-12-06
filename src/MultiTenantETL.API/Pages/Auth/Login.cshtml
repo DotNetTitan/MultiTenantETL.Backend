@@ -1,0 +1,147 @@
+@page "/auth/login"
+@model MultiTenantETL.API.Pages.Auth.LoginModel
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login - ETL Portal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@@mdi/font@7.4.47/css/materialdesignicons.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/css/auth.css" />
+</head>
+<body class="dark-theme">
+    <div class="login-container">
+        <div class="login-wrapper">
+            <div class="login-card">
+                <!-- Header Section with Icon -->
+                <div class="login-header">
+                    <div class="avatar">
+                        <span class="mdi mdi-database-sync"></span>
+                    </div>
+                    <h1 class="title">ETL Portal</h1>
+                    <p class="subtitle">Multi-Tenant ETL Platform</p>
+                </div>
+
+                <div class="divider"></div>
+
+                <!-- Form Section -->
+                <div class="login-form-container">
+                    <form method="post" id="loginForm">
+                        <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
+                        @Html.AntiForgeryToken()
+
+                        <div class="form-group">
+                            <div class="input-wrapper">
+                                <span class="mdi mdi-email input-icon"></span>
+                                <input 
+                                    type="email" 
+                                    id="email" 
+                                    name="Email" 
+                                    value="@Model.Email"
+                                    placeholder="Email"
+                                    class="form-input @(ViewData.ModelState["Email"]?.Errors.Count > 0 ? "input-error" : "")"
+                                    required 
+                                    autocomplete="email" />
+                            </div>
+                            @if (ViewData.ModelState["Email"]?.Errors.Count > 0)
+                            {
+                                <span class="error-text">@ViewData.ModelState["Email"]?.Errors[0].ErrorMessage</span>
+                            }
+                        </div>
+
+                        <div class="form-group">
+                            <div class="input-wrapper">
+                                <span class="mdi mdi-lock input-icon"></span>
+                                <input 
+                                    type="password" 
+                                    id="password" 
+                                    name="Password" 
+                                    placeholder="Password"
+                                    class="form-input @(ViewData.ModelState["Password"]?.Errors.Count > 0 ? "input-error" : "")"
+                                    required 
+                                    autocomplete="current-password" />
+                                <button type="button" class="toggle-password" onclick="togglePassword()">
+                                    <span class="mdi mdi-eye" id="toggleIcon"></span>
+                                </button>
+                            </div>
+                            @if (ViewData.ModelState["Password"]?.Errors.Count > 0)
+                            {
+                                <span class="error-text">@ViewData.ModelState["Password"]?.Errors[0].ErrorMessage</span>
+                            }
+                        </div>
+
+                        <div class="form-group checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="RememberMe" value="true" @(Model.RememberMe ? "checked" : "") />
+                                <span class="checkbox-custom"></span>
+                                <span class="checkbox-text">Remember me</span>
+                            </label>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+                        {
+                            <div class="alert alert-error">
+                                <span class="mdi mdi-alert-circle"></span>
+                                <span>@Model.ErrorMessage</span>
+                            </div>
+                        }
+
+                        <button type="submit" class="btn-login" id="submitBtn">
+                            <span class="btn-text">Sign In</span>
+                            <span class="btn-loader" style="display: none;">
+                                <span class="mdi mdi-loading mdi-spin"></span>
+                            </span>
+                        </button>
+
+                        <div class="form-links">
+                            <a href="@Model.FrontendUrl/forgot-password" class="link-primary">Forgot password?</a>
+                        </div>
+                        <div class="form-links">
+                            <span class="text-muted">Don't have an account?</span>
+                            <a href="@Model.FrontendUrl/register" class="link-primary">Sign up</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Footer Info -->
+            <div class="footer-info">
+                <p>Your connection is secure and encrypted</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function togglePassword() {
+            const passwordInput = document.getElementById('password');
+            const toggleIcon = document.getElementById('toggleIcon');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleIcon.classList.remove('mdi-eye');
+                toggleIcon.classList.add('mdi-eye-off');
+            } else {
+                passwordInput.type = 'password';
+                toggleIcon.classList.remove('mdi-eye-off');
+                toggleIcon.classList.add('mdi-eye');
+            }
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', function() {
+            const btn = document.getElementById('submitBtn');
+            const btnText = btn.querySelector('.btn-text');
+            const btnLoader = btn.querySelector('.btn-loader');
+            
+            btnText.style.display = 'none';
+            btnLoader.style.display = 'inline-flex';
+            btn.disabled = true;
+        });
+    </script>
+</body>
+</html>

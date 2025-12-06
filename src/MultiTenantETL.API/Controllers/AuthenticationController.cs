@@ -101,14 +101,7 @@ namespace MultiTenantETL.API.Controllers
             var request = HttpContext.GetOpenIddictServerRequest() ??
                 throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
 
-            // For SPAs with PKCE, we accept credentials directly in the authorization request
-            // This is a pragmatic approach that avoids needing a separate login UI
-            if (!string.IsNullOrEmpty(request.Username) && !string.IsNullOrEmpty(request.Password))
-            {
-                return await HandleAuthorizationWithCredentials(request);
-            }
-
-            // Standard flow: check if user is already authenticated via cookie
+            // Standard OAuth flow: check if user is already authenticated via cookie
             var result = await HttpContext.AuthenticateAsync(IdentityConstants.ApplicationScheme);
             if (result.Succeeded)
             {
@@ -121,93 +114,10 @@ namespace MultiTenantETL.API.Controllers
                 }
             }
 
-            // No credentials and not authenticated - return error
-            return Forbid(
-                authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
-                properties: new AuthenticationProperties(new Dictionary<string, string?>
-                {
-                    [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.LoginRequired,
-                    [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = 
-                        "User authentication is required"
-                }));
-        }
-
-        private async Task<IActionResult> HandleAuthorizationWithCredentials(OpenIddictRequest request)
-        {
-            // Find the user by username or email
-            var user = await _userManager.FindByNameAsync(request.Username!) ??
-                       await _userManager.FindByEmailAsync(request.Username!);
-
-            if (user == null)
-            {
-                await _auditService.LogAuthenticationAsync(
-                    Domain.Constants.AuditActions.Authentication.LoginFailed,
-                    request.Username,
-                    success: false,
-                    errorMessage: "Invalid credentials");
-
-                return Forbid(
-                    authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
-                    properties: new AuthenticationProperties(new Dictionary<string, string?>
-                    {
-                        [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.InvalidGrant,
-                        [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "Invalid credentials"
-                    }));
-            }
-
-            // Check if user account is active
-            if (!user.IsActive)
-            {
-                return Forbid(
-                    authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
-                    properties: new AuthenticationProperties(new Dictionary<string, string?>
-                    {
-                        [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.InvalidGrant,
-                        [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = 
-                            "Account is inactive. Please contact your administrator."
-                    }));
-            }
-
-            // Verify the password
-            var result = await _signInManager.CheckPasswordSignInAsync(user, request.Password!, lockoutOnFailure: true);
-
-            if (!result.Succeeded)
-            {
-                var errorDescription = result.IsLockedOut
-                    ? "Account is locked due to multiple failed login attempts"
-                    : result.IsNotAllowed
-                    ? "Email confirmation is required"
-                    : "Invalid credentials";
-
-                await _auditService.LogAuthenticationAsync(
-                    Domain.Constants.AuditActions.Authentication.LoginFailed,
-                    user.Email,
-                    success: false,
-                    errorMessage: errorDescription);
-
-                return Forbid(
-                    authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
-                    properties: new AuthenticationProperties(new Dictionary<string, string?>
-                    {
-                        [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.InvalidGrant,
-                        [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = errorDescription
-                    }));
-            }
-
-            // Create the claims principal
-            var principal = await CreateClaimsPrincipalAsync(user, request.GetScopes());
-
-            // Set the scopes
-            principal.SetScopes(request.GetScopes());
-
-            // Audit successful login
-            await _auditService.LogAuthenticationAsync(
-                Domain.Constants.AuditActions.Authentication.Login,
-                user.Email,
-                success: true);
-
-            // Sign in and return the authorization code (will redirect to redirect_uri)
-            return SignIn(principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+            // User is not authenticated - redirect to login page
+            // Store the current authorization request URL so we can return to it after login
+            var returnUrl = HttpContext.Request.PathBase + HttpContext.Request.Path + HttpContext.Request.QueryString;
+            return Redirect($"/auth/login?returnUrl={Uri.EscapeDataString(returnUrl)}");
         }
 
         private async Task<IActionResult> HandlePasswordFlow(OpenIddictRequest request)
