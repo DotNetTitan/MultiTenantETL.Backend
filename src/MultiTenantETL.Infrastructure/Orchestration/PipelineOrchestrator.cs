@@ -184,6 +184,7 @@ public class PipelineOrchestrator : IPipelineOrchestrator
             }
 
             result.BatchIndex++;
+            await AddLogEntryAsync(execution, "Info", "DataReader", $"Batch {result.BatchIndex}: Read {batch.RowCount} rows from source", cancellationToken);
             await ProcessBatchAsync(execution, pipeline, writer, batch, writeOptions, result, cancellationToken);
         }
 
@@ -221,6 +222,7 @@ public class PipelineOrchestrator : IPipelineOrchestrator
                 $"Batch {result.BatchIndex}: Applied field mappings, {batch.RowCount} → {mappedBatch.RowCount} rows",
                 cancellationToken);
 
+            await AddLogEntryAsync(execution, "Info", "DataWriter", $"Batch {result.BatchIndex}: Writing {mappedBatch.RowCount} rows to destination", cancellationToken);
             var writeResult = await writer.WriteBatchAsync(pipeline.DestinationConnector!, mappedBatch, writeOptions, cancellationToken);
 
             executionBatch.Status = BatchStatus.Completed;
@@ -238,6 +240,10 @@ public class PipelineOrchestrator : IPipelineOrchestrator
             execution.BatchCount = result.BatchIndex;
 
             await _context.SaveChangesAsync(cancellationToken);
+
+            await AddLogEntryAsync(execution, "Info", "Batch", 
+                $"Batch {result.BatchIndex} completed: {writeResult.RowsWritten} rows written, {writeResult.RowsFailed} rows failed", 
+                cancellationToken);
 
             _logger.LogInformation("Batch {BatchIndex} completed for execution {ExecutionId}: {Succeeded} succeeded, {Failed} failed",
                 result.BatchIndex, execution.Id, writeResult.RowsWritten, writeResult.RowsFailed);
