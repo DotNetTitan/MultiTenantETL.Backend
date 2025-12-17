@@ -417,7 +417,7 @@ public class ConnectorService : IConnectorService
 
         var validProviders = type switch
         {
-            ConnectorTypes.Database => new[] { ConnectorProviders.SqlServer, ConnectorProviders.PostgreSQL, ConnectorProviders.MySQL },
+            ConnectorTypes.Database => new[] { ConnectorProviders.SqlServer, ConnectorProviders.PostgreSQL, ConnectorProviders.MySQL, ConnectorProviders.Oracle },
             ConnectorTypes.File => new[] { ConnectorProviders.Local, ConnectorProviders.FTP, ConnectorProviders.SFTP, ConnectorProviders.S3, ConnectorProviders.AzureBlob },
             ConnectorTypes.Api => new[] { ConnectorProviders.REST },
             _ => Array.Empty<string>()

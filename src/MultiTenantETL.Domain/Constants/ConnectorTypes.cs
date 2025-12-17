@@ -13,6 +13,7 @@ public static class ConnectorProviders
     public const string SqlServer = "SqlServer";
     public const string PostgreSQL = "PostgreSQL";
     public const string MySQL = "MySQL";
+    public const string Oracle = "Oracle";
     
     // File providers (storage locations)
     public const string Local = "Local";

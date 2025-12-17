@@ -7,6 +7,7 @@ using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Infrastructure.Configuration;
 using Npgsql;
 using MySqlConnector;
+using Oracle.ManagedDataAccess.Client;
 
 namespace MultiTenantETL.Infrastructure.Services.ConnectionTesting.Database;
 
@@ -63,6 +64,7 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
                 ConnectorProviders.SqlServer => await TestSqlServerConnectionAsync(dbConfig),
                 ConnectorProviders.PostgreSQL => await TestPostgreSqlConnectionAsync(dbConfig),
                 ConnectorProviders.MySQL => await TestMySqlConnectionAsync(dbConfig),
+                ConnectorProviders.Oracle => await TestOracleConnectionAsync(dbConfig),
                 _ => new ConnectionTestResult
                 {
                     Success = false,
@@ -141,6 +143,26 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
         };
     }
 
+    private static async Task<ConnectionTestResult> TestOracleConnectionAsync(DatabaseConfig config)
+    {
+        using var connection = new OracleConnection(BuildOracleConnectionString(config));
+        await connection.OpenAsync();
+
+        var details = new Dictionary<string, object>
+        {
+            ["ServerVersion"] = connection.ServerVersion,
+            ["Database"] = connection.DatabaseName ?? "Unknown",
+            ["State"] = connection.State.ToString()
+        };
+
+        return new ConnectionTestResult
+        {
+            Success = true,
+            Message = "Successfully connected to Oracle database",
+            Details = details
+        };
+    }
+
     private static string BuildSqlServerConnectionString(DatabaseConfig config)
     {
         if (!string.IsNullOrEmpty(config.ConnectionString))
@@ -199,6 +221,26 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
             UserID = config.Username!,
             Password = config.Password!,
             SslMode = config.UseSsl ? MySqlSslMode.Required : MySqlSslMode.Preferred
+        };
+
+        return builder.ConnectionString;
+    }
+
+    private static string BuildOracleConnectionString(DatabaseConfig config)
+    {
+        if (!string.IsNullOrEmpty(config.ConnectionString))
+        {
+            return config.ConnectionString;
+        }
+
+        var port = config.Port > 0 ? config.Port : 1521;
+        var dataSource = $"(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST={config.Host})(PORT={port}))(CONNECT_DATA=(SERVICE_NAME={config.Database})))";
+
+        var builder = new OracleConnectionStringBuilder
+        {
+            DataSource = dataSource,
+            UserID = config.Username!,
+            Password = config.Password!
         };
 
         return builder.ConnectionString;

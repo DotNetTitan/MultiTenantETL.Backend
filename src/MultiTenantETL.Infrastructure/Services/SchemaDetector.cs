@@ -8,6 +8,7 @@ using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Infrastructure.Configuration;
 using Npgsql;
 using MySqlConnector;
+using Oracle.ManagedDataAccess.Client;
 
 namespace MultiTenantETL.Infrastructure.Services;
 
@@ -82,6 +83,7 @@ public class SchemaDetector : ISchemaDetector
                 ConnectorProviders.SqlServer => await DetectSqlServerSchemaAsync(dbConfig, tableName),
                 ConnectorProviders.PostgreSQL => await DetectPostgreSqlSchemaAsync(dbConfig, tableName),
                 ConnectorProviders.MySQL => await DetectMySqlSchemaAsync(dbConfig, tableName),
+                ConnectorProviders.Oracle => await DetectOracleSchemaAsync(dbConfig, tableName),
                 _ => throw new NotSupportedException($"Database provider {provider} is not supported")
             };
 
@@ -268,6 +270,58 @@ public class SchemaDetector : ISchemaDetector
                 MaxLength = reader.IsDBNull(3) ? null : Convert.ToInt32(reader.GetInt64(3)),
                 Precision = reader.IsDBNull(4) ? null : Convert.ToInt32(reader.GetUInt64(4)),
                 Scale = reader.IsDBNull(5) ? null : Convert.ToInt32(reader.GetUInt64(5)),
+                DefaultValue = reader.IsDBNull(6) ? null : reader.GetString(6)
+            });
+        }
+
+        return fields;
+    }
+
+    private async Task<List<SchemaField>> DetectOracleSchemaAsync(DatabaseConfig config, string tableName)
+    {
+        using var connection = new OracleConnection(BuildOracleConnectionString(config));
+        await connection.OpenAsync();
+
+        var query = @"
+            SELECT
+                c.COLUMN_NAME as Name,
+                c.DATA_TYPE as DataType,
+                c.NULLABLE as IsNullable,
+                c.DATA_LENGTH as MaxLength,
+                c.DATA_PRECISION as Precision,
+                c.DATA_SCALE as Scale,
+                c.DATA_DEFAULT as DefaultValue,
+                CASE WHEN pk.COLUMN_NAME IS NOT NULL THEN 1 ELSE 0 END as IsPrimaryKey
+            FROM ALL_TAB_COLUMNS c
+            LEFT JOIN (
+                SELECT acc.COLUMN_NAME
+                FROM ALL_CONSTRAINTS ac
+                INNER JOIN ALL_CONS_COLUMNS acc
+                    ON ac.CONSTRAINT_TYPE = 'P'
+                    AND ac.CONSTRAINT_NAME = acc.CONSTRAINT_NAME
+                    AND ac.OWNER = acc.OWNER
+                    AND ac.TABLE_NAME = :TableName
+            ) pk ON c.COLUMN_NAME = pk.COLUMN_NAME AND c.TABLE_NAME = :TableName
+            WHERE c.TABLE_NAME = :TableName
+                AND c.OWNER = USER
+            ORDER BY c.COLUMN_ID";
+
+        using var command = new OracleCommand(query, connection);
+        command.Parameters.Add(new OracleParameter(":TableName", tableName));
+
+        var fields = new List<SchemaField>();
+        using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            fields.Add(new SchemaField
+            {
+                Name = reader.GetString(0),
+                DataType = reader.GetString(1),
+                IsNullable = reader.GetString(2) == "Y",
+                IsPrimaryKey = reader.GetInt32(7) == 1,
+                MaxLength = reader.IsDBNull(3) ? null : Convert.ToInt32(reader.GetInt64(3)),
+                Precision = reader.IsDBNull(4) ? null : Convert.ToInt32(reader.GetInt64(4)),
+                Scale = reader.IsDBNull(5) ? null : Convert.ToInt32(reader.GetInt64(5)),
                 DefaultValue = reader.IsDBNull(6) ? null : reader.GetString(6)
             });
         }
@@ -680,6 +734,26 @@ public class SchemaDetector : ISchemaDetector
             Database = config.Database,
             UserID = config.Username,
             Password = config.Password
+        };
+
+        return builder.ConnectionString;
+    }
+
+    private static string BuildOracleConnectionString(DatabaseConfig config)
+    {
+        if (!string.IsNullOrEmpty(config.ConnectionString))
+        {
+            return config.ConnectionString;
+        }
+
+        var port = config.Port > 0 ? config.Port : 1521;
+        var dataSource = $"(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST={config.Host})(PORT={port}))(CONNECT_DATA=(SERVICE_NAME={config.Database})))";
+
+        var builder = new OracleConnectionStringBuilder
+        {
+            DataSource = dataSource,
+            UserID = config.Username!,
+            Password = config.Password!
         };
 
         return builder.ConnectionString;

@@ -14,17 +14,20 @@ public class DatabaseDataReaderFactory : IDatabaseDataReaderFactory
     private readonly SqlServerDataReader _sqlServerReader;
     private readonly PostgreSqlDataReader _postgreSqlReader;
     private readonly MySqlDataReader _mySqlReader;
+    private readonly OracleDataReader _oracleReader;
     private readonly ILogger<DatabaseDataReaderFactory> _logger;
 
     public DatabaseDataReaderFactory(
         SqlServerDataReader sqlServerReader,
         PostgreSqlDataReader postgreSqlReader,
         MySqlDataReader mySqlReader,
+        OracleDataReader oracleReader,
         ILogger<DatabaseDataReaderFactory> logger)
     {
         _sqlServerReader = sqlServerReader;
         _postgreSqlReader = postgreSqlReader;
         _mySqlReader = mySqlReader;
+        _oracleReader = oracleReader;
         _logger = logger;
     }
 
@@ -37,6 +40,7 @@ public class DatabaseDataReaderFactory : IDatabaseDataReaderFactory
             ConnectorProviders.SqlServer => _sqlServerReader,
             ConnectorProviders.PostgreSQL => _postgreSqlReader,
             ConnectorProviders.MySQL => _mySqlReader,
+            ConnectorProviders.Oracle => _oracleReader,
             _ => throw new NotSupportedException($"Database provider '{connector.Provider}' is not supported")
         };
     }

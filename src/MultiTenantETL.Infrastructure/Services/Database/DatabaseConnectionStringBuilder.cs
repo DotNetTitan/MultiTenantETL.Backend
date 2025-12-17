@@ -1,6 +1,7 @@
 using Microsoft.Data.SqlClient;
 using MySqlConnector;
 using Npgsql;
+using Oracle.ManagedDataAccess.Client;
 
 namespace MultiTenantETL.Infrastructure.Services.Database;
 
@@ -9,6 +10,7 @@ public interface IDatabaseConnectionStringBuilder
     string BuildSqlServerConnectionString(string host, int port, string database, string username, string password, bool useSsl);
     string BuildPostgreSqlConnectionString(string host, int port, string database, string username, string password, bool useSsl);
     string BuildMySqlConnectionString(string host, int port, string database, string username, string password, bool useSsl);
+    string BuildOracleConnectionString(string host, int port, string database, string username, string password, bool useSsl);
 }
 
 public class DatabaseConnectionStringBuilder : IDatabaseConnectionStringBuilder
@@ -59,6 +61,21 @@ public class DatabaseConnectionStringBuilder : IDatabaseConnectionStringBuilder
             Password = password,
             SslMode = useSsl ? MySqlSslMode.Required : MySqlSslMode.Preferred,
             ConnectionTimeout = 30
+        };
+
+        return builder.ConnectionString;
+    }
+
+    public string BuildOracleConnectionString(string host, int port, string database, string username, string password, bool useSsl)
+    {
+        var actualPort = port > 0 ? port : 1521;
+        var dataSource = $"(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST={host})(PORT={actualPort}))(CONNECT_DATA=(SERVICE_NAME={database})))";
+
+        var builder = new OracleConnectionStringBuilder
+        {
+            DataSource = dataSource,
+            UserID = username,
+            Password = password
         };
 
         return builder.ConnectionString;

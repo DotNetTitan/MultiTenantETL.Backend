@@ -408,6 +408,7 @@ builder.Services.AddScoped<MultiTenantETL.Application.Orchestration.IFieldMappin
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.SqlServerDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.PostgreSqlDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.MySqlDataReader>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.OracleDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.CsvDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.JsonDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.JsonLinesDataReader>();
@@ -421,6 +422,7 @@ builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.FtpDataRead
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.SqlServerDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.PostgreSqlDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.MySqlDataWriter>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.OracleDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.CsvDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.JsonDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.JsonLinesDataWriter>();

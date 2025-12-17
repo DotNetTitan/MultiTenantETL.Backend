@@ -26,7 +26,8 @@ public static class MetadataConstants
                 { 
                     Constants.ConnectorProviders.SqlServer, 
                     Constants.ConnectorProviders.PostgreSQL, 
-                    Constants.ConnectorProviders.MySQL 
+                    Constants.ConnectorProviders.MySQL,
+                    Constants.ConnectorProviders.Oracle
                 } 
             },
             { 
