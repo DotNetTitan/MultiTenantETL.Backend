@@ -90,8 +90,8 @@ jobs:
     - name: Generate HTML Test Report
       if: always()
       run: |
-        dotnet tool install --global trx2html
-        trx2html **/*.trx --output test-report.html
+        # Generate HTML test report from TRX files
+        pwsh ./generate-test-report.ps1
 
     - name: Publish HTML Test Report
       if: always()
