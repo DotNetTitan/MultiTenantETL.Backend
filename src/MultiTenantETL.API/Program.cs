@@ -99,7 +99,7 @@ builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
 
     // User settings
     options.User.RequireUniqueEmail = true;
-    options.SignIn.RequireConfirmedEmail = false; // Set to true in production
+    options.SignIn.RequireConfirmedEmail = builder.Configuration.GetValue<bool>("Authentication:RequireEmailConfirmation");
 })
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
@@ -142,7 +142,7 @@ builder.Services.AddOpenIddict()
         );
         
         // Allow offline_access scope to be granted without explicit consent
-        options.AllowRefreshTokenFlow();
+        // options.AllowRefreshTokenFlow(); // Already allowed above
 
         // Register claims to include in tokens
         options.RegisterClaims(
@@ -159,8 +159,8 @@ builder.Services.AddOpenIddict()
         else
         {
             // Production certificates
-            options.AddEncryptionCertificate(LoadCertificate("CN=ETL-Encryption"));
-            options.AddSigningCertificate(LoadCertificate("CN=ETL-Signing"));
+            options.AddEncryptionCertificate(LoadCertificate("CN=ETL-Encryption", builder.Configuration));
+            options.AddSigningCertificate(LoadCertificate("CN=ETL-Signing", builder.Configuration));
         }
 
         // ASP.NET Core integration
@@ -514,6 +514,7 @@ app.UseStaticFiles();
 app.UseResponseCaching();
 
 // Rate limiting - before authentication
+app.UseForwardedHeaders();
 app.UseIpRateLimiting();
 
 // Only use HTTPS redirection in production
@@ -568,8 +569,33 @@ if (app.Environment.IsDevelopment())
 app.Run();
 
 // Helper method to load certificate
-static X509Certificate2 LoadCertificate(string subjectName)
+static X509Certificate2 LoadCertificate(string subjectName, IConfiguration configuration)
 {
+    // First, try to load from file if configured
+    var certPath = configuration[$"Certificates:{subjectName}:Path"];
+    if (!string.IsNullOrEmpty(certPath))
+    {
+        var password = configuration[$"Certificates:{subjectName}:Password"];
+        if (File.Exists(certPath))
+        {
+            return new X509Certificate2(certPath, password);
+        }
+        else
+        {
+            throw new InvalidOperationException($"Certificate file '{certPath}' not found.");
+        }
+    }
+
+    // Fallback to base64 PFX from environment/config
+    var pfxBase64 = configuration[$"Certificates:{subjectName}:PfxBase64"];
+    if (!string.IsNullOrEmpty(pfxBase64))
+    {
+        var pfxBytes = Convert.FromBase64String(pfxBase64);
+        var password = configuration[$"Certificates:{subjectName}:Password"];
+        return new X509Certificate2(pfxBytes, password);
+    }
+
+    // Fallback to certificate store (for backward compatibility)
     using var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
     store.Open(OpenFlags.ReadOnly);
     
@@ -580,7 +606,7 @@ static X509Certificate2 LoadCertificate(string subjectName)
     
     if (certificates.Count == 0)
     {
-        throw new InvalidOperationException($"Certificate '{subjectName}' not found in certificate store.");
+        throw new InvalidOperationException($"Certificate '{subjectName}' not found in certificate store, file, or configuration.");
     }
     
     return certificates[0];

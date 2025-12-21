@@ -18,7 +18,8 @@ public class EncryptionServiceTests
         // Arrange - Set up test configuration with encryption key
         var inMemorySettings = new Dictionary<string, string>
         {
-            {"Encryption:Key", "test-encryption-key-for-unit-tests-12345"}
+            {"Encryption:Key", "test-encryption-key-for-unit-tests-12345"},
+            {"Encryption:Salt", "test-salt-for-unit-tests-67890"}
         };
 
         _configuration = new ConfigurationBuilder()

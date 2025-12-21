@@ -20,6 +20,7 @@ namespace MultiTenantETL.Infrastructure.Persistence
         IdentityUserToken<Guid>>
     {
         private readonly ITenantProvider _tenantProvider;
+        public Guid? CurrentTenantId => _tenantProvider.TenantId;
 
         // Domain entities
         public DbSet<Tenant> Tenants { get; set; }
@@ -78,13 +79,13 @@ namespace MultiTenantETL.Infrastructure.Persistence
 
         /// <summary>
         /// Sets the tenant query filter for a specific entity type.
-        /// The filter uses the scoped ITenantProvider, which works in both HTTP and worker contexts.
+        /// The filter uses the CurrentTenantId property to avoid capturing scoped services.
         /// </summary>
         private void SetTenantQueryFilter<TEntity>(ModelBuilder modelBuilder)
             where TEntity : class, ITenantResource
         {
             modelBuilder.Entity<TEntity>().HasQueryFilter(e => 
-                e.TenantId == _tenantProvider.TenantId);
+                e.TenantId == CurrentTenantId);
         }
     }
 }
