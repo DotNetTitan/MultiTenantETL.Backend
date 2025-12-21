@@ -28,11 +28,11 @@ public class S3DataReader : IDataReader
         JsonLinesDataReader jsonLinesReader,
         ILogger<S3DataReader> logger)
     {
-        _clientFactory = clientFactory;
-        _csvReader = csvReader;
-        _jsonReader = jsonReader;
-        _jsonLinesReader = jsonLinesReader;
-        _logger = logger;
+        _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
+        _csvReader = csvReader ?? throw new ArgumentNullException(nameof(csvReader));
+        _jsonReader = jsonReader ?? throw new ArgumentNullException(nameof(jsonReader));
+        _jsonLinesReader = jsonLinesReader ?? throw new ArgumentNullException(nameof(jsonLinesReader));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async IAsyncEnumerable<ReadBatch> ReadAsync(
@@ -41,6 +41,26 @@ public class S3DataReader : IDataReader
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var config = ParseConfig(connector.ConfigJson);
+
+        if (string.IsNullOrEmpty(config.Bucket))
+            throw new InvalidOperationException("S3 configuration must include BucketName");
+
+        if (string.IsNullOrEmpty(config.Key))
+            throw new InvalidOperationException("S3 configuration must include Key");
+
+        if (string.IsNullOrEmpty(config.AccessKey))
+            throw new InvalidOperationException("S3 configuration must include AccessKey");
+
+        if (string.IsNullOrEmpty(config.SecretKey))
+            throw new InvalidOperationException("S3 configuration must include SecretKey");
+
+        if (string.IsNullOrEmpty(config.Region))
+            throw new InvalidOperationException("S3 configuration must include Region");
+
+        var format = DetermineFormat(config.Key, config.Format);
+        if (!IsSupportedFormat(format))
+            throw new NotSupportedException($"File format '{format}' is not supported for S3");
+
         using var s3Client = _clientFactory.CreateS3Client(config.AccessKey, config.SecretKey, config.Region, config.Endpoint);
 
         var request = new GetObjectRequest
@@ -50,7 +70,6 @@ public class S3DataReader : IDataReader
         };
 
         using var response = await s3Client.GetObjectAsync(request, cancellationToken);
-        var format = DetermineFormat(config.Key, config.Format);
 
         // Pass stream directly to format-specific reader
         var streamConnector = CreateStreamConnector(response.ResponseStream, format);
@@ -170,6 +189,15 @@ public class S3DataReader : IDataReader
             "json" => "json",
             "jsonl" or "ndjson" => "jsonl",
             _ => "jsonl" // Default to JSONL for streaming
+        };
+    }
+
+    private bool IsSupportedFormat(string format)
+    {
+        return format switch
+        {
+            "csv" or "json" or "jsonl" or "jsonlines" or "ndjson" => true,
+            _ => false
         };
     }
 

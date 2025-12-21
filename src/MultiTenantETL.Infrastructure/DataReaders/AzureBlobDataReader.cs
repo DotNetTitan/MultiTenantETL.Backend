@@ -27,11 +27,11 @@ public class AzureBlobDataReader : IDataReader
         JsonLinesDataReader jsonLinesReader,
         ILogger<AzureBlobDataReader> logger)
     {
-        _clientFactory = clientFactory;
-        _csvReader = csvReader;
-        _jsonReader = jsonReader;
-        _jsonLinesReader = jsonLinesReader;
-        _logger = logger;
+        _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
+        _csvReader = csvReader ?? throw new ArgumentNullException(nameof(csvReader));
+        _jsonReader = jsonReader ?? throw new ArgumentNullException(nameof(jsonReader));
+        _jsonLinesReader = jsonLinesReader ?? throw new ArgumentNullException(nameof(jsonLinesReader));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async IAsyncEnumerable<ReadBatch> ReadAsync(
@@ -40,11 +40,27 @@ public class AzureBlobDataReader : IDataReader
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var config = ParseConfig(connector.ConfigJson);
+
+        if (string.IsNullOrEmpty(config.ContainerName))
+            throw new InvalidOperationException("Azure Blob configuration must include ContainerName");
+
+        if (string.IsNullOrEmpty(config.BlobName))
+            throw new InvalidOperationException("Azure Blob configuration must include BlobName");
+
+        if (string.IsNullOrEmpty(config.AccountName))
+            throw new InvalidOperationException("Azure Blob configuration must include AccountName");
+
+        if (string.IsNullOrEmpty(config.AccountKey))
+            throw new InvalidOperationException("Azure Blob configuration must include AccountKey");
+
+        var format = DetermineFormat(config.BlobName, config.Format);
+        if (!IsSupportedFormat(format))
+            throw new NotSupportedException($"File format '{format}' is not supported for Azure Blob");
+
         var containerClient = _clientFactory.CreateAzureBlobClient(config.AccountName, config.AccountKey, config.ContainerName);
         var blobClient = containerClient.GetBlobClient(config.BlobName);
 
         var response = await blobClient.DownloadStreamingAsync(cancellationToken: cancellationToken);
-        var format = DetermineFormat(config.BlobName, config.Format);
 
         var streamConnector = CreateStreamConnector(response.Value.Content, format);
         var reader = GetReaderForFormat(format);
@@ -152,6 +168,15 @@ public class AzureBlobDataReader : IDataReader
             "json" => "json",
             "jsonl" or "ndjson" => "jsonl",
             _ => "jsonl"
+        };
+    }
+
+    private bool IsSupportedFormat(string format)
+    {
+        return format switch
+        {
+            "csv" or "json" or "jsonl" or "jsonlines" or "ndjson" => true,
+            _ => false
         };
     }
 

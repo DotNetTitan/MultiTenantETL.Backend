@@ -15,7 +15,7 @@ public class CsvDataWriter : IDataWriter
 
     public CsvDataWriter(ILogger<CsvDataWriter> logger)
     {
-        _logger = logger;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task<DataWriteResult> WriteBatchAsync(
@@ -24,11 +24,14 @@ public class CsvDataWriter : IDataWriter
         WriteOptions options,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        
         var result = new DataWriteResult { BatchId = batch.BatchId };
 
+        var config = ParseConfig(connector.ConfigJson);
+        
         try
         {
-            var config = ParseConfig(connector.ConfigJson);
 
             StreamWriter writer;
             bool ownsStream = false;
@@ -75,6 +78,8 @@ public class CsvDataWriter : IDataWriter
 
                 foreach (var row in batch.Rows)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    
                     foreach (var header in headers)
                     {
                         csv.WriteField(row[header]);
@@ -84,7 +89,7 @@ public class CsvDataWriter : IDataWriter
 
                 await csv.FlushAsync();
 
-                result.RowsWritten = batch.RowCount;
+                result.RowsWritten = batch.Rows.Count;
                 result.RowsFailed = 0;
             }
             finally
@@ -107,8 +112,15 @@ public class CsvDataWriter : IDataWriter
 
     private CsvConfig ParseConfig(string configJson)
     {
-        return JsonSerializer.Deserialize<CsvConfig>(configJson)
-            ?? throw new InvalidOperationException("Invalid CSV configuration");
+        try
+        {
+            return JsonSerializer.Deserialize<CsvConfig>(configJson)
+                ?? throw new InvalidOperationException("Invalid CSV configuration");
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException("Failed to parse CSV connector configuration", ex);
+        }
     }
 
     public ValueTask DisposeAsync()

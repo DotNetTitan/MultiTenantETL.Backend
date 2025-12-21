@@ -18,8 +18,8 @@ public class PostgreSqlDataWriter : IDataWriter
 
     public PostgreSqlDataWriter(ILogger<PostgreSqlDataWriter> logger, IEncryptionService encryptionService)
     {
-        _logger = logger;
-        _encryptionService = encryptionService;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _encryptionService = encryptionService ?? throw new ArgumentNullException(nameof(encryptionService));
     }
 
     public async Task<DataWriteResult> WriteBatchAsync(
@@ -28,22 +28,21 @@ public class PostgreSqlDataWriter : IDataWriter
         WriteOptions options,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        
         var result = new DataWriteResult { BatchId = batch.BatchId };
+        
+        var config = ParseConfig(connector.ConfigJson);
         
         try
         {
-            var config = ParseConfig(connector.ConfigJson);
-            
-            if (string.IsNullOrEmpty(config.TableName))
-            {
-                throw new InvalidOperationException("Table name is required for PostgreSQL writer");
-            }
             
             await using var connection = new NpgsqlConnection(config.ConnectionString);
             await connection.OpenAsync(cancellationToken);
 
             if (options.TruncateBeforeLoad)
             {
+                _logger.LogInformation("Truncating table {TableName}", config.TableName);
                 await TruncateTableAsync(connection, config.TableName, cancellationToken);
             }
 
@@ -189,19 +188,36 @@ public class PostgreSqlDataWriter : IDataWriter
 
     private async Task TruncateTableAsync(NpgsqlConnection connection, string tableName, CancellationToken cancellationToken)
     {
+        _logger.LogInformation("Truncating table {TableName}", tableName);
         await using var command = new NpgsqlCommand($"TRUNCATE TABLE {tableName}", connection);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private PostgreSqlConfig ParseConfig(string configJson)
     {
-        var jsonElement = JsonSerializer.Deserialize<JsonElement>(configJson);
-        
-        // Decrypt sensitive fields
-        var decryptedElement = _encryptionService.DecryptJsonFields(jsonElement, EncryptionConstants.SensitiveFields);
-        
-        var config = JsonSerializer.Deserialize<PostgreSqlConfig>(decryptedElement.GetRawText(), JsonSerializerOptionsProvider.Default)
-            ?? throw new InvalidOperationException("Invalid PostgreSQL configuration");
+        PostgreSqlConfig config;
+        try
+        {
+            var jsonElement = JsonSerializer.Deserialize<JsonElement>(configJson);
+            
+            // Decrypt sensitive fields
+            var decryptedElement = _encryptionService.DecryptJsonFields(jsonElement, EncryptionConstants.SensitiveFields);
+            
+            config = JsonSerializer.Deserialize<PostgreSqlConfig>(decryptedElement.GetRawText(), JsonSerializerOptionsProvider.Default)
+                ?? throw new InvalidOperationException("Invalid PostgreSQL configuration");
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException("Failed to parse PostgreSQL connector configuration", ex);
+        }
+
+        // Validate that either ConnectionString is provided, or all required fields for building it
+        if (string.IsNullOrEmpty(config.ConnectionString) && 
+            (string.IsNullOrEmpty(config.Host) || string.IsNullOrEmpty(config.Database) || 
+             string.IsNullOrEmpty(config.Username) || string.IsNullOrEmpty(config.Password)))
+        {
+            throw new InvalidOperationException("PostgreSQL configuration must include ConnectionString");
+        }
 
         // Build connection string if not provided directly
         if (string.IsNullOrEmpty(config.ConnectionString))
@@ -215,11 +231,28 @@ public class PostgreSqlDataWriter : IDataWriter
             config.TableName = config.WriteConfig.TableName;
         }
 
+        if (string.IsNullOrEmpty(config.TableName))
+        {
+            throw new InvalidOperationException("PostgreSQL configuration must include TableName");
+        }
+
         return config;
     }
 
     private string BuildConnectionString(PostgreSqlConfig config)
     {
+        if (string.IsNullOrEmpty(config.Host))
+            throw new InvalidOperationException("PostgreSQL configuration must include Host");
+
+        if (string.IsNullOrEmpty(config.Database))
+            throw new InvalidOperationException("PostgreSQL configuration must include Database");
+
+        if (string.IsNullOrEmpty(config.Username))
+            throw new InvalidOperationException("PostgreSQL configuration must include Username");
+
+        if (string.IsNullOrEmpty(config.Password))
+            throw new InvalidOperationException("PostgreSQL configuration must include Password");
+
         var builder = new NpgsqlConnectionStringBuilder
         {
             Host = config.Host,
