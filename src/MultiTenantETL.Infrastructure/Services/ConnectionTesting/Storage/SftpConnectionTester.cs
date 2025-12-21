@@ -86,7 +86,7 @@ public class SftpConnectionTester
                 ["Port"] = port,
                 ["IsConnected"] = sftpClient.IsConnected,
                 ["ProtocolVersion"] = sftpClient.ProtocolVersion,
-                ["ServerVersion"] = sftpClient.ConnectionInfo.ServerVersion,
+                ["ServerVersion"] = sftpClient.ConnectionInfo.ServerVersion!,
                 ["Path"] = config.Path ?? "Not specified",
                 ["PathExists"] = pathExists,
                 ["PathType"] = pathType

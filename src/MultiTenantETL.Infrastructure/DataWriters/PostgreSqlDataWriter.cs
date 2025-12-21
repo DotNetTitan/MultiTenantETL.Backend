@@ -43,7 +43,7 @@ public class PostgreSqlDataWriter : IDataWriter
             if (options.TruncateBeforeLoad)
             {
                 _logger.LogInformation("Truncating table {TableName}", config.TableName);
-                await TruncateTableAsync(connection, config.TableName, cancellationToken);
+                await TruncateTableAsync(connection, config.TableName!, cancellationToken);
             }
 
             _logger.LogDebug("Batch has {RowCount} rows", batch.Rows.Count);
@@ -57,7 +57,7 @@ public class PostgreSqlDataWriter : IDataWriter
             // Use upsert if requested and keys are provided
             if (options.UseUpsert && options.UpsertKeys?.Count > 0)
             {
-                return await UpsertBatchAsync(connection, config.TableName, batch, options, cancellationToken);
+                return await UpsertBatchAsync(connection, config.TableName!, batch, options, cancellationToken);
             }
 
             // Use COPY for bulk insert (fastest for PostgreSQL)

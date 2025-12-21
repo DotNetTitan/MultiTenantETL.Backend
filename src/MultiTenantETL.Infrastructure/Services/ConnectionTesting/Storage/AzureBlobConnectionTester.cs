@@ -86,8 +86,8 @@ public class AzureBlobConnectionTester
                 ["AccountName"] = config.AzureAccountName ?? string.Empty,
                 ["Container"] = config.AzureContainer ?? string.Empty,
                 ["BlobPath"] = config.Path ?? string.Empty,
-                ["LastModified"] = properties.Value.LastModified,
-                ["HasImmutabilityPolicy"] = properties.Value.HasImmutabilityPolicy
+                ["LastModified"] = properties.Value.LastModified!,
+                ["HasImmutabilityPolicy"] = properties.Value.HasImmutabilityPolicy!
             };
 
             return new ConnectionTestResult

@@ -238,7 +238,7 @@ public class PostgreSqlDataReaderTests : IDisposable
         };
 
         // Assert
-        act.Should().ThrowAsync<NpgsqlException>();
+        await act.Should().ThrowAsync<NpgsqlException>();
     }
 
     [Fact]
@@ -322,7 +322,7 @@ public class PostgreSqlDataReaderTests : IDisposable
         };
 
         // Assert
-        act.Should().ThrowAsync<NpgsqlException>();
+        await act.Should().ThrowAsync<NpgsqlException>();
     }
 
     [Fact]
@@ -385,7 +385,7 @@ public class PostgreSqlDataReaderTests : IDisposable
         };
 
         // Assert - Should fail at database connection, but should have attempted to use custom query
-        act.Should().ThrowAsync<NpgsqlException>();
+        await act.Should().ThrowAsync<NpgsqlException>();
     }
 
     [Fact]
@@ -406,7 +406,7 @@ public class PostgreSqlDataReaderTests : IDisposable
         };
 
         // Assert - Should fail at database connection, but max rows logic should be tested
-        act.Should().ThrowAsync<NpgsqlException>();
+        await act.Should().ThrowAsync<NpgsqlException>();
     }
 
     [Fact]

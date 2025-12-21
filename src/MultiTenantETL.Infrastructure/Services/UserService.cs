@@ -258,9 +258,9 @@ public class UserService : IUserService
     public async Task<List<UserTenant>> GetUserTenantsAsync(Guid userId)
     {
         return await _context.UserTenants
-            .Include(ut => ut.Tenant)
+            .Include(ut => ut.Tenant!)
             .Where(ut => ut.UserId == userId && ut.IsActive)
-            .OrderBy(ut => ut.Tenant.Name)
+            .OrderBy(ut => ut.Tenant!.Name)
             .ToListAsync();
     }
 }

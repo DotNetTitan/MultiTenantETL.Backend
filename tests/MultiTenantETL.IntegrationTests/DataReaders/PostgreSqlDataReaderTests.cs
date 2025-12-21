@@ -22,7 +22,7 @@ public class PostgreSqlDataReaderTests : IAsyncLifetime
     {
         _container = new PostgreSqlBuilder()
             .WithImage("postgres:16-alpine")
-            .Build();
+            .Build()!;
     }
 
     public async Task InitializeAsync()

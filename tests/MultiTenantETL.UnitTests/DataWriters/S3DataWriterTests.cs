@@ -71,7 +71,7 @@ public class S3DataWriterTests
         var batch = new ReadBatch
         {
             BatchId = Guid.NewGuid(),
-            Rows = new List<Dictionary<string, object>>
+            Rows = new List<Dictionary<string, object?>>
             {
                 new() { ["id"] = 1, ["name"] = "Test" }
             }
@@ -113,7 +113,7 @@ public class S3DataWriterTests
         var batch = new ReadBatch
         {
             BatchId = Guid.NewGuid(),
-            Rows = new List<Dictionary<string, object>>
+            Rows = new List<Dictionary<string, object?>>
             {
                 new() { ["id"] = 1, ["name"] = "Test" }
             }
@@ -166,7 +166,7 @@ public class S3DataWriterTests
         var batch = new ReadBatch
         {
             BatchId = Guid.NewGuid(),
-            Rows = new List<Dictionary<string, object>>
+            Rows = new List<Dictionary<string, object?>>
             {
                 new() { ["id"] = 1, ["name"] = "Test", ["value"] = 123.45 }
             }
@@ -219,7 +219,7 @@ public class S3DataWriterTests
         var batch = new ReadBatch
         {
             BatchId = Guid.NewGuid(),
-            Rows = new List<Dictionary<string, object>>
+            Rows = new List<Dictionary<string, object?>>
             {
                 new() { ["id"] = 1, ["name"] = "Test", ["value"] = 123.45 }
             }
@@ -273,7 +273,7 @@ public class S3DataWriterTests
         var batch = new ReadBatch
         {
             BatchId = Guid.NewGuid(),
-            Rows = new List<Dictionary<string, object>>
+            Rows = new List<Dictionary<string, object?>>
             {
                 new() { ["id"] = 1, ["name"] = "Test", ["value"] = 123.45 }
             }
@@ -326,7 +326,7 @@ public class S3DataWriterTests
         var batch1 = new ReadBatch
         {
             BatchId = Guid.NewGuid(),
-            Rows = new List<Dictionary<string, object>>
+            Rows = new List<Dictionary<string, object?>>
             {
                 new() { ["id"] = 1, ["name"] = "Test1" }
             }
@@ -335,7 +335,7 @@ public class S3DataWriterTests
         var batch2 = new ReadBatch
         {
             BatchId = Guid.NewGuid(),
-            Rows = new List<Dictionary<string, object>>
+            Rows = new List<Dictionary<string, object?>>
             {
                 new() { ["id"] = 2, ["name"] = "Test2" }
             }
@@ -390,7 +390,7 @@ public class S3DataWriterTests
         var batch = new ReadBatch
         {
             BatchId = Guid.NewGuid(),
-            Rows = new List<Dictionary<string, object>>() // Empty batch
+            Rows = new List<Dictionary<string, object?>>() // Empty batch
         };
 
         var options = new WriteOptions();
@@ -440,7 +440,7 @@ public class S3DataWriterTests
         var batch = new ReadBatch
         {
             BatchId = Guid.NewGuid(),
-            Rows = new List<Dictionary<string, object>>
+            Rows = new List<Dictionary<string, object?>>
             {
                 new() { ["id"] = 1, ["name"] = "Test,with,commas", ["description"] = "Has \"quotes\" and\nnewlines" }
             }
@@ -493,7 +493,7 @@ public class S3DataWriterTests
         var batch = new ReadBatch
         {
             BatchId = Guid.NewGuid(),
-            Rows = new List<Dictionary<string, object>>
+            Rows = new List<Dictionary<string, object?>>
             {
                 new() { ["id"] = 1, ["name"] = "Test" }
             }

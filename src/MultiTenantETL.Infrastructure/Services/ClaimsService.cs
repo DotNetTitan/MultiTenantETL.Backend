@@ -87,7 +87,7 @@ public class ClaimsService : IClaimsService
                 }
 
                 // Add tenant name claim
-                identity.SetClaim(CustomClaims.TenantName, userTenant.Tenant.Name);
+                identity.SetClaim(CustomClaims.TenantName, userTenant.Tenant!.Name);
 
                 // Add permission claims based on the highest role
                 var roleForPermissions = globalRoles.Contains(Domain.Constants.Roles.SuperAdmin) 

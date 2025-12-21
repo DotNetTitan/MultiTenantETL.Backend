@@ -8,6 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UserSecretsId>5f8f7cd3-4bfe-4e8a-9b7c-5f8d34567890</UserSecretsId>
+    <NoWarn>ASPIRE002</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
