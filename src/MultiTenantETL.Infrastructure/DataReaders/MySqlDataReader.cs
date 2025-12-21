@@ -17,8 +17,8 @@ public class MySqlDataReader : IDataReader
 
     public MySqlDataReader(ILogger<MySqlDataReader> logger, IOptions<EtlSettings> settings)
     {
-        _logger = logger;
-        _settings = settings.Value;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
     }
 
     public async IAsyncEnumerable<ReadBatch> ReadAsync(
@@ -150,8 +150,15 @@ public class MySqlDataReader : IDataReader
 
     private MySqlConfig ParseConfig(string configJson)
     {
-        return JsonSerializer.Deserialize<MySqlConfig>(configJson)
+        var config = JsonSerializer.Deserialize<MySqlConfig>(configJson)
             ?? throw new InvalidOperationException("Invalid MySQL configuration");
+
+        if (string.IsNullOrEmpty(config.ConnectionString))
+        {
+            throw new ArgumentException("ConnectionString is required", nameof(config.ConnectionString));
+        }
+
+        return config;
     }
 
     private class MySqlConfig

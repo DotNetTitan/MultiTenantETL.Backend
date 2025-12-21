@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using Amazon.S3;
 using Amazon.S3.Model;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
@@ -61,7 +62,7 @@ public class S3DataReader : IDataReader
         if (!IsSupportedFormat(format))
             throw new NotSupportedException($"File format '{format}' is not supported for S3");
 
-        using var s3Client = _clientFactory.CreateS3Client(config.AccessKey, config.SecretKey, config.Region, config.Endpoint);
+        using IAmazonS3 s3Client = _clientFactory.CreateS3Client(config.AccessKey, config.SecretKey, config.Region, config.Endpoint);
 
         var request = new GetObjectRequest
         {
@@ -125,7 +126,7 @@ public class S3DataReader : IDataReader
         try
         {
             var config = ParseConfig(connector.ConfigJson);
-            using var s3Client = _clientFactory.CreateS3Client(config.AccessKey, config.SecretKey, config.Region, config.Endpoint);
+            using IAmazonS3 s3Client = _clientFactory.CreateS3Client(config.AccessKey, config.SecretKey, config.Region, config.Endpoint);
 
             var request = new GetBucketLocationRequest
             {
@@ -147,7 +148,7 @@ public class S3DataReader : IDataReader
         try
         {
             var config = ParseConfig(connector.ConfigJson);
-            using var s3Client = _clientFactory.CreateS3Client(config.AccessKey, config.SecretKey, config.Region, config.Endpoint);
+            using IAmazonS3 s3Client = _clientFactory.CreateS3Client(config.AccessKey, config.SecretKey, config.Region, config.Endpoint);
 
             var request = new GetObjectRequest
             {

@@ -25,10 +25,10 @@ public class FtpDataReader : IDataReader
         JsonLinesDataReader jsonLinesReader,
         ILogger<FtpDataReader> logger)
     {
-        _csvReader = csvReader;
-        _jsonReader = jsonReader;
-        _jsonLinesReader = jsonLinesReader;
-        _logger = logger;
+        _csvReader = csvReader ?? throw new ArgumentNullException(nameof(csvReader));
+        _jsonReader = jsonReader ?? throw new ArgumentNullException(nameof(jsonReader));
+        _jsonLinesReader = jsonLinesReader ?? throw new ArgumentNullException(nameof(jsonLinesReader));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async IAsyncEnumerable<ReadBatch> ReadAsync(
@@ -194,8 +194,27 @@ public class FtpDataReader : IDataReader
 
     private FtpConfig ParseConfig(string configJson)
     {
-        return JsonSerializer.Deserialize<FtpConfig>(configJson)
-            ?? throw new InvalidOperationException("Invalid FTP configuration");
+        try
+        {
+            var config = JsonSerializer.Deserialize<FtpConfig>(configJson)
+                ?? throw new InvalidOperationException("Invalid FTP configuration");
+
+            // Validate required fields
+            if (string.IsNullOrEmpty(config.Host))
+                throw new InvalidOperationException("FTP host is required");
+            if (string.IsNullOrEmpty(config.Username))
+                throw new InvalidOperationException("FTP username is required");
+            if (string.IsNullOrEmpty(config.Password))
+                throw new InvalidOperationException("FTP password is required");
+            if (string.IsNullOrEmpty(config.FilePath))
+                throw new InvalidOperationException("FTP file path is required");
+
+            return config;
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException("Invalid FTP configuration JSON", ex);
+        }
     }
 
     private class FtpConfig

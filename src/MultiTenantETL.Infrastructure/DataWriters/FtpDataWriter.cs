@@ -21,7 +21,7 @@ public class FtpDataWriter : IDataWriter
 
     public FtpDataWriter(ILogger<FtpDataWriter> logger)
     {
-        _logger = logger;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task<DataWriteResult> WriteBatchAsync(
@@ -30,13 +30,18 @@ public class FtpDataWriter : IDataWriter
         WriteOptions options,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        
         var result = new DataWriteResult { BatchId = batch.BatchId };
 
+        // Parse and validate config upfront
+        var config = ParseConfig(connector.ConfigJson);
+        
         try
         {
             if (_config == null)
             {
-                _config = ParseConfig(connector.ConfigJson);
+                _config = config;
                 _format = DetermineFormat(_config.FilePath, _config.Format);
                 _bufferStream = new MemoryStream();
             }
@@ -150,8 +155,15 @@ public class FtpDataWriter : IDataWriter
 
     private FtpConfig ParseConfig(string configJson)
     {
-        return JsonSerializer.Deserialize<FtpConfig>(configJson)
-            ?? throw new InvalidOperationException("Invalid FTP configuration");
+        try
+        {
+            return JsonSerializer.Deserialize<FtpConfig>(configJson)
+                ?? throw new InvalidOperationException("Invalid FTP configuration");
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException("Failed to parse FTP connector configuration", ex);
+        }
     }
 
     public async ValueTask DisposeAsync()

@@ -23,9 +23,9 @@ public class PostgreSqlDataReader : IDataReader
         IOptions<EtlSettings> settings,
         IEncryptionService encryptionService)
     {
-        _logger = logger;
-        _settings = settings.Value;
-        _encryptionService = encryptionService;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
+        _encryptionService = encryptionService ?? throw new ArgumentNullException(nameof(encryptionService));
     }
 
     public async IAsyncEnumerable<ReadBatch> ReadAsync(

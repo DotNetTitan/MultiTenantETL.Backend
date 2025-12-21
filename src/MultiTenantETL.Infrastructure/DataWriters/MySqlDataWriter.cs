@@ -17,8 +17,8 @@ public class MySqlDataWriter : IDataWriter
 
     public MySqlDataWriter(ILogger<MySqlDataWriter> logger, IOptions<EtlSettings> settings)
     {
-        _logger = logger;
-        _settings = settings.Value;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
     }
 
     public async Task<DataWriteResult> WriteBatchAsync(
@@ -27,21 +27,22 @@ public class MySqlDataWriter : IDataWriter
         WriteOptions options,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        
         var result = new DataWriteResult { BatchId = batch.BatchId };
 
+        // For empty batches, return success without database operations
+        if (batch.Rows.Count == 0)
+        {
+            return result;
+        }
+
+        var config = ParseConfig(connector.ConfigJson);
+        
         try
         {
-            var config = ParseConfig(connector.ConfigJson);
             await using var connection = new MySqlConnection(config.ConnectionString);
             await connection.OpenAsync(cancellationToken);
-
-            if (options.TruncateBeforeLoad)
-            {
-                await TruncateTableAsync(connection, config.TableName, cancellationToken);
-            }
-
-            if (batch.Rows.Count == 0)
-                return result;
 
             // Use upsert if requested
             if (options.UseUpsert && options.UpsertKeys?.Count > 0)
@@ -181,8 +182,29 @@ public class MySqlDataWriter : IDataWriter
 
     private MySqlConfig ParseConfig(string configJson)
     {
-        return JsonSerializer.Deserialize<MySqlConfig>(configJson)
-            ?? throw new InvalidOperationException("Invalid MySQL configuration");
+        MySqlConfig config;
+        try
+        {
+            config = JsonSerializer.Deserialize<MySqlConfig>(configJson)
+                ?? throw new InvalidOperationException("Invalid MySQL configuration");
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException("Failed to parse MySQL connector configuration", ex);
+        }
+
+        // Validate required fields
+        if (string.IsNullOrEmpty(config.ConnectionString))
+        {
+            throw new InvalidOperationException("MySQL configuration must include ConnectionString");
+        }
+
+        if (string.IsNullOrEmpty(config.TableName))
+        {
+            throw new InvalidOperationException("MySQL configuration must include TableName");
+        }
+
+        return config;
     }
 
     public ValueTask DisposeAsync()

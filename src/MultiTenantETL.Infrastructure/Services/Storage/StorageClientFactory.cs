@@ -10,7 +10,7 @@ public interface IStorageClientFactory
 {
     AsyncFtpClient CreateFtpClient(string host, int port, string username, string password);
     SftpClient CreateSftpClient(string host, int port, string username, string password);
-    AmazonS3Client CreateS3Client(string accessKey, string secretKey, string region, string? endpoint = null);
+    IAmazonS3 CreateS3Client(string accessKey, string secretKey, string region, string? endpoint = null);
     BlobContainerClient CreateAzureBlobClient(string accountName, string accountKey, string containerName);
 }
 
@@ -33,7 +33,7 @@ public class StorageClientFactory : IStorageClientFactory
         return new SftpClient(host, port, username, password);
     }
 
-    public AmazonS3Client CreateS3Client(string accessKey, string secretKey, string region, string? endpoint = null)
+    public IAmazonS3 CreateS3Client(string accessKey, string secretKey, string region, string? endpoint = null)
     {
         var s3Config = new AmazonS3Config
         {

@@ -12,7 +12,7 @@ public class JsonDataWriter : IDataWriter
 
     public JsonDataWriter(ILogger<JsonDataWriter> logger)
     {
-        _logger = logger;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task<DataWriteResult> WriteBatchAsync(
@@ -38,18 +38,7 @@ public class JsonDataWriter : IDataWriter
                 // For production use, recommend JSONL format instead for large datasets
                 if (!options.TruncateBeforeLoad && File.Exists(config.FilePath))
                 {
-                    _logger.LogWarning("JSON array append requires loading entire file into memory. Consider using JSONL format for large datasets.");
-                    
-                    // This is a known limitation of JSON arrays - they require complete rewrite
-                    // For production at scale, use JSONL (newline-delimited JSON) instead
-                    await using var readStream = File.OpenRead(config.FilePath);
-                    var existingRows = await JsonSerializer.DeserializeAsync<List<Dictionary<string, object?>>>(readStream, cancellationToken: cancellationToken)
-                        ?? new List<Dictionary<string, object?>>();
-
-                    existingRows.AddRange(batch.Rows);
-
-                    await using var writeStream = File.Create(config.FilePath);
-                    await WriteJsonArrayAsync(writeStream, existingRows, config.Indented, cancellationToken);
+                    throw new NotSupportedException("JSON array format does not support efficient append operations. Use JSONL format for append scenarios or truncate the file.");
                 }
                 else
                 {
@@ -61,6 +50,10 @@ public class JsonDataWriter : IDataWriter
 
             result.RowsWritten = batch.RowCount;
             result.RowsFailed = 0;
+        }
+        catch (NotSupportedException)
+        {
+            throw;
         }
         catch (Exception ex)
         {

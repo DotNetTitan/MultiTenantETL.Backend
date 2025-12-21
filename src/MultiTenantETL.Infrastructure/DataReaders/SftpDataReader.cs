@@ -25,10 +25,10 @@ public class SftpDataReader : IDataReader
         JsonLinesDataReader jsonLinesReader,
         ILogger<SftpDataReader> logger)
     {
-        _csvReader = csvReader;
-        _jsonReader = jsonReader;
-        _jsonLinesReader = jsonLinesReader;
-        _logger = logger;
+        _csvReader = csvReader ?? throw new ArgumentNullException(nameof(csvReader));
+        _jsonReader = jsonReader ?? throw new ArgumentNullException(nameof(jsonReader));
+        _jsonLinesReader = jsonLinesReader ?? throw new ArgumentNullException(nameof(jsonLinesReader));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async IAsyncEnumerable<ReadBatch> ReadAsync(
@@ -194,8 +194,27 @@ public class SftpDataReader : IDataReader
 
     private SftpConfig ParseConfig(string configJson)
     {
-        return JsonSerializer.Deserialize<SftpConfig>(configJson)
-            ?? throw new InvalidOperationException("Invalid SFTP configuration");
+        try
+        {
+            var config = JsonSerializer.Deserialize<SftpConfig>(configJson)
+                ?? throw new InvalidOperationException("Invalid SFTP configuration");
+
+            // Validate required fields
+            if (string.IsNullOrEmpty(config.Host))
+                throw new InvalidOperationException("SFTP host is required");
+            if (string.IsNullOrEmpty(config.Username))
+                throw new InvalidOperationException("SFTP username is required");
+            if (string.IsNullOrEmpty(config.Password))
+                throw new InvalidOperationException("SFTP password is required");
+            if (string.IsNullOrEmpty(config.FilePath))
+                throw new InvalidOperationException("SFTP file path is required");
+
+            return config;
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException("Invalid SFTP configuration JSON", ex);
+        }
     }
 
     private class SftpConfig

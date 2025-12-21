@@ -16,7 +16,7 @@ public class JsonLinesDataWriter : IDataWriter
 
     public JsonLinesDataWriter(ILogger<JsonLinesDataWriter> logger)
     {
-        _logger = logger;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task<DataWriteResult> WriteBatchAsync(

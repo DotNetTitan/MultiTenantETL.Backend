@@ -25,8 +25,8 @@ public class AzureBlobDataWriter : IDataWriter
         IStorageClientFactory clientFactory,
         ILogger<AzureBlobDataWriter> logger)
     {
-        _clientFactory = clientFactory;
-        _logger = logger;
+        _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task<DataWriteResult> WriteBatchAsync(
@@ -183,8 +183,27 @@ public class AzureBlobDataWriter : IDataWriter
 
     private AzureBlobConfig ParseConfig(string configJson)
     {
-        return JsonSerializer.Deserialize<AzureBlobConfig>(configJson)
-            ?? throw new InvalidOperationException("Invalid Azure Blob configuration");
+        try
+        {
+            var config = JsonSerializer.Deserialize<AzureBlobConfig>(configJson)
+                ?? throw new InvalidOperationException("Invalid Azure Blob configuration");
+
+            // Validate required fields
+            if (string.IsNullOrWhiteSpace(config.AccountName))
+                throw new InvalidOperationException("AccountName is required");
+            if (string.IsNullOrWhiteSpace(config.AccountKey))
+                throw new InvalidOperationException("AccountKey is required");
+            if (string.IsNullOrWhiteSpace(config.ContainerName))
+                throw new InvalidOperationException("ContainerName is required");
+            if (string.IsNullOrWhiteSpace(config.BlobName))
+                throw new InvalidOperationException("BlobName is required");
+
+            return config;
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException("Invalid JSON configuration for Azure Blob", ex);
+        }
     }
 
     public async ValueTask DisposeAsync()

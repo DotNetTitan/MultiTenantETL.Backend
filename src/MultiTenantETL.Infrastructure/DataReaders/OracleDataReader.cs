@@ -18,8 +18,8 @@ public class OracleDataReader : IDataReader
 
     public OracleDataReader(ILogger<OracleDataReader> logger, IOptions<EtlSettings> settings)
     {
-        _logger = logger;
-        _settings = settings.Value;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
     }
 
     public async IAsyncEnumerable<ReadBatch> ReadAsync(
@@ -159,8 +159,15 @@ public class OracleDataReader : IDataReader
 
     private OracleConfig ParseConfig(string configJson)
     {
-        return JsonSerializer.Deserialize<OracleConfig>(configJson)
-            ?? throw new InvalidOperationException("Invalid Oracle configuration");
+        try
+        {
+            return JsonSerializer.Deserialize<OracleConfig>(configJson)
+                ?? throw new InvalidOperationException("Invalid Oracle configuration");
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException("Invalid JSON configuration for Oracle reader", ex);
+        }
     }
 
     private class OracleConfig

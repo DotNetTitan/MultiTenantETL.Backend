@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Amazon.S3;
 using Amazon.S3.Model;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
@@ -26,8 +27,8 @@ public class S3DataWriter : IDataWriter
         IStorageClientFactory clientFactory,
         ILogger<S3DataWriter> logger)
     {
-        _clientFactory = clientFactory;
-        _logger = logger;
+        _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task<DataWriteResult> WriteBatchAsync(
@@ -79,7 +80,7 @@ public class S3DataWriter : IDataWriter
     {
         if (_config == null) return;
 
-        var s3Client = _clientFactory.CreateS3Client(_config.AccessKey, _config.SecretKey, _config.Region, _config.Endpoint);
+        IAmazonS3 s3Client = _clientFactory.CreateS3Client(_config.AccessKey, _config.SecretKey, _config.Region, _config.Endpoint);
         
         var contentType = _format?.ToLower() switch
         {
@@ -202,8 +203,29 @@ public class S3DataWriter : IDataWriter
 
     private S3Config ParseConfig(string configJson)
     {
-        return JsonSerializer.Deserialize<S3Config>(configJson)
-            ?? throw new InvalidOperationException("Invalid S3 configuration");
+        try
+        {
+            var config = JsonSerializer.Deserialize<S3Config>(configJson)
+                ?? throw new InvalidOperationException("Invalid S3 configuration");
+
+            // Validate required fields
+            if (string.IsNullOrEmpty(config.AccessKey))
+                throw new InvalidOperationException("S3 access key is required");
+            if (string.IsNullOrEmpty(config.SecretKey))
+                throw new InvalidOperationException("S3 secret key is required");
+            if (string.IsNullOrEmpty(config.Region))
+                throw new InvalidOperationException("S3 region is required");
+            if (string.IsNullOrEmpty(config.Bucket))
+                throw new InvalidOperationException("S3 bucket is required");
+            if (string.IsNullOrEmpty(config.Key))
+                throw new InvalidOperationException("S3 key is required");
+
+            return config;
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException("Invalid S3 configuration JSON", ex);
+        }
     }
 
     public async ValueTask DisposeAsync()

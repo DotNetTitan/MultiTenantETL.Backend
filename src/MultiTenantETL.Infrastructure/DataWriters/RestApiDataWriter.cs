@@ -15,8 +15,8 @@ public class RestApiDataWriter : IDataWriter
 
     public RestApiDataWriter(IHttpClientFactory httpClientFactory, ILogger<RestApiDataWriter> logger)
     {
-        _httpClientFactory = httpClientFactory;
-        _logger = logger;
+        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task<DataWriteResult> WriteBatchAsync(

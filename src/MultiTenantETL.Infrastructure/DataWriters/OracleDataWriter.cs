@@ -17,8 +17,8 @@ public class OracleDataWriter : IDataWriter
 
     public OracleDataWriter(ILogger<OracleDataWriter> logger, IOptions<EtlSettings> settings)
     {
-        _logger = logger;
-        _settings = settings.Value;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _settings = (settings ?? throw new ArgumentNullException(nameof(settings))).Value;
     }
 
     public async Task<DataWriteResult> WriteBatchAsync(
@@ -29,9 +29,10 @@ public class OracleDataWriter : IDataWriter
     {
         var result = new DataWriteResult { BatchId = batch.BatchId };
 
+        var config = ParseConfig(connector.ConfigJson);
+            
         try
         {
-            var config = ParseConfig(connector.ConfigJson);
             await using var connection = new OracleConnection(config.ConnectionString);
             await connection.OpenAsync(cancellationToken);
 
@@ -172,8 +173,28 @@ public class OracleDataWriter : IDataWriter
 
     private OracleConfig ParseConfig(string configJson)
     {
-        return JsonSerializer.Deserialize<OracleConfig>(configJson)
-            ?? throw new InvalidOperationException("Invalid Oracle configuration");
+        OracleConfig config;
+        try
+        {
+            config = JsonSerializer.Deserialize<OracleConfig>(configJson)
+                ?? throw new InvalidOperationException("Invalid Oracle configuration");
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException("Failed to parse Oracle connector configuration", ex);
+        }
+
+        if (string.IsNullOrEmpty(config.ConnectionString))
+        {
+            throw new InvalidOperationException("Oracle configuration must include ConnectionString");
+        }
+
+        if (string.IsNullOrEmpty(config.TableName))
+        {
+            throw new InvalidOperationException("Oracle configuration must include TableName");
+        }
+
+        return config;
     }
 
     public ValueTask DisposeAsync()
