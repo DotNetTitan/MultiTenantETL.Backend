@@ -78,6 +78,19 @@ jobs:
         TOTAL_CONNECTORS=$((WRITER_COUNT + READER_COUNT))
         echo "All data connector tests passed: $TOTAL_CONNECTORS total tests across 24 connectors"
 
+    - name: Generate HTML Test Report
+      if: always()
+      run: |
+        dotnet tool install --global trx2html
+        trx2html **/*.trx --output test-report.html
+
+    - name: Publish HTML Test Report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-report-html
+        path: test-report.html
+
     - name: Publish test results
       uses: EnricoMi/publish-unit-test-result-action@v2
       if: always()
