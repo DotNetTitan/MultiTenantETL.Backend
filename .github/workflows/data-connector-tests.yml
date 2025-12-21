@@ -25,8 +25,7 @@ jobs:
     # Environment variables for TestContainers
     env:
       DOCKER_HOST: unix:///var/run/docker.sock
-      TESTCONTAINERS_RYUK_DISABLED: false
-      TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX: mcr.microsoft.com/mirror/docker/library/
+      TESTCONTAINERS_RYUK_DISABLED: true
       DOTNET_CLI_TELEMETRY_OPTOUT: true
 
     steps:
