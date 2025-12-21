@@ -49,6 +49,10 @@ _ReSharper*/
 TestResult.xml
 nunit-*.xml
 
+# Test results directory (TRX files, HTML reports)
+test-results/
+test-report.html
+
 # Build Results of an ATL Project
 [Dd]ebugPS/
 [Rr]eleasePS/
