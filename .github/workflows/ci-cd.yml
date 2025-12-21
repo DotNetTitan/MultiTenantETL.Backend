@@ -76,6 +76,15 @@ jobs:
         TOTAL_CONNECTORS=$((WRITER_COUNT + READER_COUNT))
         echo "All data connector tests passed: $TOTAL_CONNECTORS total tests across 24 connectors"
 
+    - name: Publish test results
+      uses: EnricoMi/publish-unit-test-result-action@v2
+      if: always()
+      with:
+        files: |
+          **/*.trx
+        report_individual_runs: true
+        report_suite_logs: true
+
     - name: Upload test results
       uses: actions/upload-artifact@v4
       if: always()
