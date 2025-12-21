@@ -78,6 +78,15 @@ jobs:
         TOTAL_CONNECTORS=$((WRITER_COUNT + READER_COUNT))
         echo "All data connector tests passed: $TOTAL_CONNECTORS total tests across 24 connectors"
 
+    - name: Test Results Summary
+      uses: dorny/test-reporter@v1
+      if: always()
+      with:
+        name: Test Results Summary
+        path: '**/*.trx'
+        reporter: dotnet-trx
+        fail-on-error: false
+
     - name: Generate HTML Test Report
       if: always()
       run: |
