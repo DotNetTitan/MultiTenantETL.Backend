@@ -13,6 +13,8 @@ jobs:
     # Grant permissions for TestContainers to work
     permissions:
       contents: read
+      checks: write
+      pull-requests: read
 
     # Environment variables for TestContainers
     env:
