@@ -133,6 +133,8 @@ CREATE TABLE connectors (
 - **MySQL** - Full support with connection testing and schema detection
 - **Snowflake** - Full support with connection testing and schema detection
 - **Google BigQuery** - Full support with connection testing and schema detection
+- **AWS Redshift** - Full support with connection testing and multi-row insert optimization
+- **MongoDB** - Full support with collection-based schema detection and bulk operations
 
 **Features:**
 - Connection string builder or manual connection string
@@ -261,6 +263,41 @@ CREATE TABLE connectors (
     "warehouse": "COMPUTE_WH",
     "role": "MY_ROLE",
     "tableName": "MY_TABLE"
+  }
+}
+```
+
+### Database Connector (AWS Redshift)
+```json
+{
+  "name": "Redshift Cluster",
+  "type": "Database",
+  "provider": "Redshift",
+  "direction": "both",
+  "config": {
+    "host": "my-cluster.xyz.us-east-1.redshift.amazonaws.com",
+    "port": 5439,
+    "database": "dev",
+    "username": "admin",
+    "password": "password",
+    "useSsl": true,
+    "tableName": "analytics.events"
+  }
+}
+```
+
+### Database Connector (MongoDB)
+```json
+{
+  "name": "MongoDB Collection",
+  "type": "Database",
+  "provider": "MongoDb",
+  "direction": "both",
+  "config": {
+    "connectionString": "mongodb+srv://user:pass@cluster0.mongodb.net",
+    "database": "inventory",
+    "collectionName": "products",
+    "filterJson": "{\"category\": \"electronics\"}"
   }
 }
 ```
