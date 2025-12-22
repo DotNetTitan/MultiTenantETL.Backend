@@ -16,6 +16,7 @@ public class DatabaseDataReaderFactory : IDatabaseDataReaderFactory
     private readonly MySqlDataReader _mySqlReader;
     private readonly OracleDataReader _oracleReader;
     private readonly SnowflakeDataReader _snowflakeReader;
+    private readonly BigQueryDataReader _bigQueryReader;
     private readonly ILogger<DatabaseDataReaderFactory> _logger;
 
     public DatabaseDataReaderFactory(
@@ -24,6 +25,7 @@ public class DatabaseDataReaderFactory : IDatabaseDataReaderFactory
         MySqlDataReader mySqlReader,
         OracleDataReader oracleReader,
         SnowflakeDataReader snowflakeReader,
+        BigQueryDataReader bigQueryReader,
         ILogger<DatabaseDataReaderFactory> logger)
     {
         _sqlServerReader = sqlServerReader;
@@ -31,6 +33,7 @@ public class DatabaseDataReaderFactory : IDatabaseDataReaderFactory
         _mySqlReader = mySqlReader;
         _oracleReader = oracleReader;
         _snowflakeReader = snowflakeReader;
+        _bigQueryReader = bigQueryReader;
         _logger = logger;
     }
 
@@ -45,6 +48,7 @@ public class DatabaseDataReaderFactory : IDatabaseDataReaderFactory
             ConnectorProviders.MySQL => _mySqlReader,
             ConnectorProviders.Oracle => _oracleReader,
             ConnectorProviders.Snowflake => _snowflakeReader,
+            ConnectorProviders.BigQuery => _bigQueryReader,
             _ => throw new NotSupportedException($"Database provider '{connector.Provider}' is not supported")
         };
     }

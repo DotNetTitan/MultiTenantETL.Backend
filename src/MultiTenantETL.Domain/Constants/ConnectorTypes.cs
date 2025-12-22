@@ -15,6 +15,7 @@ public static class ConnectorProviders
     public const string MySQL = "MySQL";
     public const string Oracle = "Oracle";
     public const string Snowflake = "Snowflake";
+    public const string BigQuery = "BigQuery";
     
     // File providers (storage locations)
     public const string Local = "Local";

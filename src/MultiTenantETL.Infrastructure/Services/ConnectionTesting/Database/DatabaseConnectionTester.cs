@@ -67,6 +67,7 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
                 ConnectorProviders.MySQL => await TestMySqlConnectionAsync(dbConfig),
                 ConnectorProviders.Oracle => await TestOracleConnectionAsync(dbConfig),
                 ConnectorProviders.Snowflake => await TestSnowflakeConnectionAsync(dbConfig),
+                ConnectorProviders.BigQuery => await TestBigQueryConnectionAsync(dbConfig),
                 _ => new ConnectionTestResult
                 {
                     Success = false,
@@ -182,6 +183,43 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
             Success = true,
             Message = "Successfully connected to Snowflake database",
             Details = details
+        };
+    }
+
+    private static async Task<ConnectionTestResult> TestBigQueryConnectionAsync(DatabaseConfig config)
+    {
+        if (string.IsNullOrEmpty(config.ProjectId))
+        {
+            return new ConnectionTestResult { Success = false, Message = "Project ID is required" };
+        }
+
+        if (string.IsNullOrEmpty(config.DatasetId))
+        {
+            return new ConnectionTestResult { Success = false, Message = "Dataset ID is required" };
+        }
+
+        Google.Cloud.BigQuery.V2.BigQueryClient client;
+        if (!string.IsNullOrEmpty(config.JsonCredentials))
+        {
+            var credential = Google.Apis.Auth.OAuth2.GoogleCredential.FromJson(config.JsonCredentials);
+            client = Google.Cloud.BigQuery.V2.BigQueryClient.Create(config.ProjectId, credential);
+        }
+        else
+        {
+            client = Google.Cloud.BigQuery.V2.BigQueryClient.Create(config.ProjectId);
+        }
+
+        await client.GetDatasetAsync(config.DatasetId);
+
+        return new ConnectionTestResult
+        {
+            Success = true,
+            Message = "Successfully connected to Google BigQuery",
+            Details = new Dictionary<string, object>
+            {
+                ["ProjectId"] = config.ProjectId,
+                ["DatasetId"] = config.DatasetId
+            }
         };
     }
 

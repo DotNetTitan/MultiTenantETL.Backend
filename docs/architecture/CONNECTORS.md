@@ -131,6 +131,8 @@ CREATE TABLE connectors (
 - **SQL Server** - Full support with connection testing and schema detection
 - **PostgreSQL** - Full support with connection testing and schema detection
 - **MySQL** - Full support with connection testing and schema detection
+- **Snowflake** - Full support with connection testing and schema detection
+- **Google BigQuery** - Full support with connection testing and schema detection
 
 **Features:**
 - Connection string builder or manual connection string
@@ -219,6 +221,42 @@ CREATE TABLE connectors (
       "Content-Type": "application/json"
     },
     "timeoutSeconds": 30
+  }
+}
+```
+
+### Database Connector (BigQuery)
+```json
+{
+  "name": "BigQuery Data",
+  "type": "Database",
+  "provider": "BigQuery",
+  "direction": "both",
+  "config": {
+    "projectId": "my-gcp-project",
+    "datasetId": "my_dataset",
+    "tableName": "my_table",
+    "jsonCredentials": "{...}"
+  }
+}
+```
+
+### Database Connector (Snowflake)
+```json
+{
+  "name": "Snowflake Warehouse",
+  "type": "Database",
+  "provider": "Snowflake",
+  "direction": "both",
+  "config": {
+    "account": "xy12345.us-east-1",
+    "username": "my_user",
+    "password": "my_password",
+    "database": "MY_DB",
+    "schema": "PUBLIC",
+    "warehouse": "COMPUTE_WH",
+    "role": "MY_ROLE",
+    "tableName": "MY_TABLE"
   }
 }
 ```

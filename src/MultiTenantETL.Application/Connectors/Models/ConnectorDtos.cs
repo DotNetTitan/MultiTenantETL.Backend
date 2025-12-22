@@ -194,6 +194,11 @@ public record DatabaseConfig
     public string? Schema { get; init; }
     public string? Warehouse { get; init; }
     public string? Role { get; init; }
+    // BigQuery-specific fields
+    public string? ProjectId { get; init; }
+    public string? DatasetId { get; init; }
+    public string? Location { get; init; }
+    public string? JsonCredentials { get; init; }
 }
 
 public record FileConfig

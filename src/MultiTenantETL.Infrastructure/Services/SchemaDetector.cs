@@ -86,6 +86,7 @@ public class SchemaDetector : ISchemaDetector
                 ConnectorProviders.MySQL => await DetectMySqlSchemaAsync(dbConfig, tableName),
                 ConnectorProviders.Oracle => await DetectOracleSchemaAsync(dbConfig, tableName),
                 ConnectorProviders.Snowflake => await DetectSnowflakeSchemaAsync(dbConfig, tableName),
+                ConnectorProviders.BigQuery => await DetectBigQuerySchemaAsync(dbConfig, tableName),
                 _ => throw new NotSupportedException($"Database provider {provider} is not supported")
             };
 
@@ -825,5 +826,28 @@ public class SchemaDetector : ISchemaDetector
         if (!string.IsNullOrEmpty(config.Warehouse)) parts.Add($"warehouse={config.Warehouse}");
         if (!string.IsNullOrEmpty(config.Role)) parts.Add($"role={config.Role}");
         return string.Join(";", parts);
+    }
+
+    private async Task<List<SchemaField>> DetectBigQuerySchemaAsync(DatabaseConfig config, string tableName)
+    {
+        Google.Cloud.BigQuery.V2.BigQueryClient client;
+        if (!string.IsNullOrEmpty(config.JsonCredentials))
+        {
+            var credential = Google.Apis.Auth.OAuth2.GoogleCredential.FromJson(config.JsonCredentials);
+            client = Google.Cloud.BigQuery.V2.BigQueryClient.Create(config.ProjectId, credential);
+        }
+        else
+        {
+            client = Google.Cloud.BigQuery.V2.BigQueryClient.Create(config.ProjectId);
+        }
+
+        var table = await client.GetTableAsync(config.DatasetId!, tableName);
+        return table.Schema.Fields.Select(f => new SchemaField
+        {
+            Name = f.Name,
+            DataType = f.Type,
+            IsNullable = f.Mode != "REQUIRED",
+            IsPrimaryKey = false
+        }).ToList();
     }
 }

@@ -16,6 +16,7 @@ public class DatabaseDataWriterFactory : IDatabaseDataWriterFactory
     private readonly MySqlDataWriter _mySqlWriter;
     private readonly OracleDataWriter _oracleWriter;
     private readonly SnowflakeDataWriter _snowflakeWriter;
+    private readonly BigQueryDataWriter _bigQueryWriter;
     private readonly ILogger<DatabaseDataWriterFactory> _logger;
 
     public DatabaseDataWriterFactory(
@@ -24,6 +25,7 @@ public class DatabaseDataWriterFactory : IDatabaseDataWriterFactory
         MySqlDataWriter mySqlWriter,
         OracleDataWriter oracleWriter,
         SnowflakeDataWriter snowflakeWriter,
+        BigQueryDataWriter bigQueryWriter,
         ILogger<DatabaseDataWriterFactory> logger)
     {
         _sqlServerWriter = sqlServerWriter;
@@ -31,6 +33,7 @@ public class DatabaseDataWriterFactory : IDatabaseDataWriterFactory
         _mySqlWriter = mySqlWriter;
         _oracleWriter = oracleWriter;
         _snowflakeWriter = snowflakeWriter;
+        _bigQueryWriter = bigQueryWriter;
         _logger = logger;
     }
 
@@ -45,6 +48,7 @@ public class DatabaseDataWriterFactory : IDatabaseDataWriterFactory
             ConnectorProviders.MySQL => _mySqlWriter,
             ConnectorProviders.Oracle => _oracleWriter,
             ConnectorProviders.Snowflake => _snowflakeWriter,
+            ConnectorProviders.BigQuery => _bigQueryWriter,
             _ => throw new NotSupportedException($"Database provider '{connector.Provider}' is not supported")
         };
     }
