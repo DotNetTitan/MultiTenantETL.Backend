@@ -18,6 +18,7 @@ public class FileDataReaderFactory : IFileDataReaderFactory
     private readonly AzureBlobDataReader _azureBlobReader;
     private readonly SftpDataReader _sftpReader;
     private readonly FtpDataReader _ftpReader;
+    private readonly GcsDataReader _gcsReader;
     private readonly ILogger<FileDataReaderFactory> _logger;
 
     public FileDataReaderFactory(
@@ -28,6 +29,7 @@ public class FileDataReaderFactory : IFileDataReaderFactory
         AzureBlobDataReader azureBlobReader,
         SftpDataReader sftpReader,
         FtpDataReader ftpReader,
+        GcsDataReader gcsReader,
         ILogger<FileDataReaderFactory> logger)
     {
         _csvReader = csvReader;
@@ -37,6 +39,7 @@ public class FileDataReaderFactory : IFileDataReaderFactory
         _azureBlobReader = azureBlobReader;
         _sftpReader = sftpReader;
         _ftpReader = ftpReader;
+        _gcsReader = gcsReader;
         _logger = logger;
     }
 
@@ -51,6 +54,7 @@ public class FileDataReaderFactory : IFileDataReaderFactory
             ConnectorProviders.AzureBlob => _azureBlobReader,
             ConnectorProviders.SFTP => _sftpReader,
             ConnectorProviders.FTP => _ftpReader,
+            ConnectorProviders.GCS => _gcsReader,
             ConnectorProviders.Local => CreateLocalFileReader(connector),
             _ => throw new NotSupportedException($"File provider '{connector.Provider}' is not supported")
         };

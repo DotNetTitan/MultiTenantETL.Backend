@@ -47,7 +47,8 @@ public static class MetadataConstants
                     Constants.ConnectorProviders.FTP, 
                     Constants.ConnectorProviders.SFTP, 
                     Constants.ConnectorProviders.S3, 
-                    Constants.ConnectorProviders.AzureBlob 
+                    Constants.ConnectorProviders.AzureBlob,
+                    Constants.ConnectorProviders.GCS
                 } 
             }
         };
@@ -71,6 +72,7 @@ public static class MetadataConstants
             { Constants.ConnectorProviders.SFTP, ("mdi-server-security", "green-darken-2") },
             { Constants.ConnectorProviders.S3, ("mdi-aws", "orange-darken-2") },
             { Constants.ConnectorProviders.AzureBlob, ("mdi-microsoft-azure", "blue-lighten-1") },
+            { Constants.ConnectorProviders.GCS, ("mdi-google-cloud", "blue-lighten-1") },
             
             // API providers
             { Constants.ConnectorProviders.REST, ("mdi-api", "purple-darken-1") }

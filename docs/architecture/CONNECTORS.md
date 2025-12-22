@@ -145,6 +145,7 @@ CREATE TABLE connectors (
 - **CSV** - With delimiter and header configuration
 - **Excel** - With sheet name support
 - **JSON** - With encoding options
+- **Google Cloud Storage (GCS)** - Full support with connection testing and streaming
 
 **Features:**
 - File path validation
@@ -206,21 +207,24 @@ CREATE TABLE connectors (
 }
 ```
 
-### API Connector (REST)
+    "timeoutSeconds": 30
+  }
+}
+```
+
+### File Connector (GCS)
 ```json
 {
-  "name": "External API",
-  "type": "API",
-  "provider": "REST",
-  "direction": "both",
+  "name": "Cloud Storage CSV",
+  "type": "File",
+  "provider": "GCS",
+  "direction": "source",
   "config": {
-    "baseUrl": "https://api.example.com",
-    "authType": "Bearer",
-    "authToken": "your-token",
-    "headers": {
-      "Content-Type": "application/json"
-    },
-    "timeoutSeconds": 30
+    "gcsBucket": "my-bucket",
+    "gcsProjectId": "my-project",
+    "gcsJsonCredentials": "{...}",
+    "path": "data/sales.csv",
+    "format": "csv"
   }
 }
 ```

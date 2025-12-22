@@ -23,6 +23,7 @@ public static class ConnectorProviders
     public const string SFTP = "SFTP";
     public const string S3 = "S3";
     public const string AzureBlob = "AzureBlob";
+    public const string GCS = "GCS";
     
     // API providers
     public const string REST = "REST";

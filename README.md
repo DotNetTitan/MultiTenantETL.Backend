@@ -19,7 +19,7 @@ A production-ready, secure multi-tenant ASP.NET Core 8.0 platform designed for E
 
 ### Data Connectors
 - **Database Connectors**: SQL Server, PostgreSQL, MySQL, Oracle, Snowflake, Google BigQuery with connection pooling
-- **File Connectors**: CSV, JSON, JSONL with local, FTP, SFTP, Azure Blob, and S3 storage
+- **File Connectors**: CSV, JSON, JSONL with local, FTP, SFTP, Azure Blob, S3, and Google Cloud Storage (GCS)
 - **API Connectors**: REST API with authentication, headers, and pagination support
 - **Connection Testing**: Validate connector configurations before pipeline execution
 - **Schema Detection**: Auto-detect source schemas for field mapping assistance

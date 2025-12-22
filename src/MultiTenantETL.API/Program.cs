@@ -419,6 +419,7 @@ builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.S3DataReade
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.AzureBlobDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.SftpDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.FtpDataReader>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.GcsDataReader>();
 
 // Data Writers
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.SqlServerDataWriter>();
@@ -435,6 +436,7 @@ builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.S3DataWrite
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.AzureBlobDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.SftpDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.FtpDataWriter>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.GcsDataWriter>();
 
 // Format Validation
 builder.Services.AddScoped<MultiTenantETL.Application.Connectors.DataWriters.IFormatValidator,
@@ -473,6 +475,7 @@ builder.Services.AddScoped<MultiTenantETL.Infrastructure.Services.ConnectionTest
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.Services.ConnectionTesting.Storage.S3ConnectionTester>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.Services.ConnectionTesting.Storage.FtpConnectionTester>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.Services.ConnectionTesting.Storage.SftpConnectionTester>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.Services.ConnectionTesting.Storage.GcsConnectionTester>();
 
 // Global Exception Handler
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();

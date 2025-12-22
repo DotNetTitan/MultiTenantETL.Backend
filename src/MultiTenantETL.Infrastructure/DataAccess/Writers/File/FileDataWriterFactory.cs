@@ -18,6 +18,7 @@ public class FileDataWriterFactory : IFileDataWriterFactory
     private readonly AzureBlobDataWriter _azureBlobWriter;
     private readonly SftpDataWriter _sftpWriter;
     private readonly FtpDataWriter _ftpWriter;
+    private readonly GcsDataWriter _gcsWriter;
     private readonly ILogger<FileDataWriterFactory> _logger;
 
     public FileDataWriterFactory(
@@ -28,6 +29,7 @@ public class FileDataWriterFactory : IFileDataWriterFactory
         AzureBlobDataWriter azureBlobWriter,
         SftpDataWriter sftpWriter,
         FtpDataWriter ftpWriter,
+        GcsDataWriter gcsWriter,
         ILogger<FileDataWriterFactory> logger)
     {
         _csvWriter = csvWriter;
@@ -37,6 +39,7 @@ public class FileDataWriterFactory : IFileDataWriterFactory
         _azureBlobWriter = azureBlobWriter;
         _sftpWriter = sftpWriter;
         _ftpWriter = ftpWriter;
+        _gcsWriter = gcsWriter;
         _logger = logger;
     }
 
@@ -51,6 +54,7 @@ public class FileDataWriterFactory : IFileDataWriterFactory
             ConnectorProviders.AzureBlob => _azureBlobWriter,
             ConnectorProviders.SFTP => _sftpWriter,
             ConnectorProviders.FTP => _ftpWriter,
+            ConnectorProviders.GCS => _gcsWriter,
             ConnectorProviders.Local => CreateLocalFileWriter(connector),
             _ => throw new NotSupportedException($"File provider '{connector.Provider}' is not supported")
         };

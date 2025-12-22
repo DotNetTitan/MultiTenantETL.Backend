@@ -12,6 +12,7 @@ public interface IStorageClientFactory
     SftpClient CreateSftpClient(string host, int port, string username, string password);
     IAmazonS3 CreateS3Client(string accessKey, string secretKey, string region, string? endpoint = null);
     BlobContainerClient CreateAzureBlobClient(string accountName, string accountKey, string containerName);
+    Google.Cloud.Storage.V1.StorageClient CreateGcsClient(string projectId, string jsonCredentials);
 }
 
 public class StorageClientFactory : IStorageClientFactory
@@ -70,5 +71,12 @@ public class StorageClientFactory : IStorageClientFactory
 
         var blobServiceClient = new BlobServiceClient(connectionString, blobClientOptions);
         return blobServiceClient.GetBlobContainerClient(containerName);
+    }
+    
+    public Google.Cloud.Storage.V1.StorageClient CreateGcsClient(string projectId, string jsonCredentials)
+    {
+        return Google.Cloud.Storage.V1.StorageClient.Create(
+            Google.Apis.Auth.OAuth2.GoogleCredential.FromJson(jsonCredentials)
+        );
     }
 }

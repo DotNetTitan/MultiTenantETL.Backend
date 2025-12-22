@@ -12,6 +12,7 @@ public class StorageConnectionTester : IStorageConnectionTester
     private readonly S3ConnectionTester _s3Tester;
     private readonly FtpConnectionTester _ftpTester;
     private readonly SftpConnectionTester _sftpTester;
+    private readonly GcsConnectionTester _gcsTester;
     private readonly ILogger<StorageConnectionTester> _logger;
 
     public StorageConnectionTester(
@@ -19,12 +20,14 @@ public class StorageConnectionTester : IStorageConnectionTester
         S3ConnectionTester s3Tester,
         FtpConnectionTester ftpTester,
         SftpConnectionTester sftpTester,
+        GcsConnectionTester gcsTester,
         ILogger<StorageConnectionTester> logger)
     {
         _azureBlobTester = azureBlobTester;
         _s3Tester = s3Tester;
         _ftpTester = ftpTester;
         _sftpTester = sftpTester;
+        _gcsTester = gcsTester;
         _logger = logger;
     }
 
@@ -59,6 +62,7 @@ public class StorageConnectionTester : IStorageConnectionTester
                 "SFTP" => await _sftpTester.TestConnectionAsync(fileConfig),
                 "S3" => await _s3Tester.TestConnectionAsync(fileConfig),
                 "AzureBlob" => await _azureBlobTester.TestConnectionAsync(fileConfig),
+                "GCS" => await _gcsTester.TestConnectionAsync(fileConfig),
                 _ => new ConnectionTestResult
                 {
                     Success = false,

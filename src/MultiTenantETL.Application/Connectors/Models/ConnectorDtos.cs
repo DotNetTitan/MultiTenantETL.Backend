@@ -230,6 +230,10 @@ public record FileConfig
     public string? AzureAccountName { get; init; }
     public string? AzureContainer { get; init; }
     public string? AzureAccountKey { get; init; }
+    // GCS
+    public string? GcsBucket { get; init; }
+    public string? GcsProjectId { get; init; }
+    public string? GcsJsonCredentials { get; init; }
     public Dictionary<string, string>? AdditionalParameters { get; init; }
 }
 

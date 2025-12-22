@@ -85,6 +85,7 @@ builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.S3DataReade
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.AzureBlobDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.SftpDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.FtpDataReader>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.GcsDataReader>();
 
 // Data Writers
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.SqlServerDataWriter>();
@@ -101,6 +102,7 @@ builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.S3DataWrite
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.AzureBlobDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.SftpDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.FtpDataWriter>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.GcsDataWriter>();
 
 // Supporting Services
 builder.Services.AddHttpClient(); // For API connectors
@@ -110,9 +112,6 @@ builder.Services.AddSingleton<MultiTenantETL.Infrastructure.Services.Storage.ISt
     MultiTenantETL.Infrastructure.Services.Storage.StorageClientFactory>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.Services.Http.IHttpClientAuthenticator,
     MultiTenantETL.Infrastructure.Services.Http.HttpClientAuthenticator>();
-builder.Services.AddScoped<MultiTenantETL.Application.Connectors.DataWriters.IFormatValidator,
-    MultiTenantETL.Infrastructure.DataWriters.FormatValidator>();
-
 // Orchestration Services
 builder.Services.AddScoped<IPipelineOrchestrator, PipelineOrchestrator>();
 builder.Services.AddScoped<MultiTenantETL.Application.Orchestration.IFieldMappingService,

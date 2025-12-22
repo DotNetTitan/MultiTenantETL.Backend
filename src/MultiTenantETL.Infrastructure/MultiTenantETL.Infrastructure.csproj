@@ -15,6 +15,7 @@
     <PackageReference Include="EPPlus" Version="7.0.10" />
     <PackageReference Include="FluentFTP" Version="49.0.2" />
     <PackageReference Include="Google.Cloud.BigQuery.V2" Version="3.11.0" />
+    <PackageReference Include="Google.Cloud.Storage.V1" Version="4.13.0" />
     <PackageReference Include="Jint" Version="4.4.2" />
     <PackageReference Include="Quartz.Serialization.Json" Version="3.15.1" />
     <PackageReference Include="SSH.NET" Version="2024.1.0" />
