@@ -29,7 +29,8 @@ public static class MetadataConstants
                     Constants.ConnectorProviders.MySQL,
                     Constants.ConnectorProviders.Oracle,
                     Constants.ConnectorProviders.Snowflake,
-                    Constants.ConnectorProviders.BigQuery
+                    Constants.ConnectorProviders.BigQuery,
+                    Constants.ConnectorProviders.Redshift
                 } 
             },
             { 
@@ -65,6 +66,7 @@ public static class MetadataConstants
             { Constants.ConnectorProviders.Oracle, ("mdi-database", "blue-darken-2") },
             { Constants.ConnectorProviders.Snowflake, ("mdi-snowflake", "blue-darken-2") },
             { Constants.ConnectorProviders.BigQuery, ("mdi-google-cloud", "blue-darken-2") },
+            { Constants.ConnectorProviders.Redshift, ("mdi-aws", "orange-darken-2") },
             
             // File providers
             { Constants.ConnectorProviders.Local, ("mdi-folder", "grey-darken-1") },

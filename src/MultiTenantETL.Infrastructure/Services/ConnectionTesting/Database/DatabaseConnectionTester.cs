@@ -68,6 +68,7 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
                 ConnectorProviders.Oracle => await TestOracleConnectionAsync(dbConfig),
                 ConnectorProviders.Snowflake => await TestSnowflakeConnectionAsync(dbConfig),
                 ConnectorProviders.BigQuery => await TestBigQueryConnectionAsync(dbConfig),
+                ConnectorProviders.Redshift => await TestRedshiftConnectionAsync(dbConfig),
                 _ => new ConnectionTestResult
                 {
                     Success = false,
@@ -223,6 +224,26 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
         };
     }
 
+    private static async Task<ConnectionTestResult> TestRedshiftConnectionAsync(DatabaseConfig config)
+    {
+        using var connection = new NpgsqlConnection(BuildRedshiftConnectionString(config));
+        await connection.OpenAsync();
+        
+        var details = new Dictionary<string, object>
+        {
+            ["ServerVersion"] = connection.ServerVersion,
+            ["Database"] = connection.Database,
+            ["State"] = connection.State.ToString()
+        };
+
+        return new ConnectionTestResult
+        {
+            Success = true,
+            Message = "Successfully connected to AWS Redshift",
+            Details = details
+        };
+    }
+
     private static string BuildSqlServerConnectionString(DatabaseConfig config)
     {
         if (!string.IsNullOrEmpty(config.ConnectionString))
@@ -322,5 +343,27 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
         if (!string.IsNullOrEmpty(config.Warehouse)) parts.Add($"warehouse={config.Warehouse}");
         if (!string.IsNullOrEmpty(config.Role)) parts.Add($"role={config.Role}");
         return string.Join(";", parts);
+    }
+
+    private static string BuildRedshiftConnectionString(DatabaseConfig config)
+    {
+        if (!string.IsNullOrEmpty(config.ConnectionString))
+        {
+            return config.ConnectionString;
+        }
+
+        var port = config.Port > 0 ? config.Port : 5439;
+        var builder = new NpgsqlConnectionStringBuilder
+        {
+            Host = config.Host!,
+            Port = port,
+            Database = config.Database!,
+            Username = config.Username!,
+            Password = config.Password!,
+            SslMode = SslMode.Require,
+            TrustServerCertificate = true
+        };
+
+        return builder.ConnectionString;
     }
 }
