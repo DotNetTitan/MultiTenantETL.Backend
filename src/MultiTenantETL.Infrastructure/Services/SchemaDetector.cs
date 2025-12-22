@@ -9,6 +9,7 @@ using MultiTenantETL.Infrastructure.Configuration;
 using Npgsql;
 using MySqlConnector;
 using Oracle.ManagedDataAccess.Client;
+using Snowflake.Data.Client;
 
 namespace MultiTenantETL.Infrastructure.Services;
 
@@ -84,6 +85,7 @@ public class SchemaDetector : ISchemaDetector
                 ConnectorProviders.PostgreSQL => await DetectPostgreSqlSchemaAsync(dbConfig, tableName),
                 ConnectorProviders.MySQL => await DetectMySqlSchemaAsync(dbConfig, tableName),
                 ConnectorProviders.Oracle => await DetectOracleSchemaAsync(dbConfig, tableName),
+                ConnectorProviders.Snowflake => await DetectSnowflakeSchemaAsync(dbConfig, tableName),
                 _ => throw new NotSupportedException($"Database provider {provider} is not supported")
             };
 
@@ -757,5 +759,71 @@ public class SchemaDetector : ISchemaDetector
         };
 
         return builder.ConnectionString;
+    }
+
+    private async Task<List<SchemaField>> DetectSnowflakeSchemaAsync(DatabaseConfig config, string tableName)
+    {
+        using var connection = new SnowflakeDbConnection(BuildSnowflakeConnectionString(config));
+        await connection.OpenAsync();
+
+        var query = $@"
+            SELECT
+                COLUMN_NAME,
+                DATA_TYPE,
+                IS_NULLABLE,
+                CHARACTER_MAXIMUM_LENGTH,
+                NUMERIC_PRECISION,
+                NUMERIC_SCALE,
+                COLUMN_DEFAULT,
+                CASE WHEN COLUMN_NAME IN (
+                    SELECT COLUMN_NAME
+                    FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
+                    JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
+                        ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
+                    WHERE tc.CONSTRAINT_TYPE = 'PRIMARY KEY'
+                        AND tc.TABLE_NAME = '{tableName}'
+                ) THEN true ELSE false END AS IS_PRIMARY_KEY
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = '{tableName}'
+            ORDER BY ORDINAL_POSITION";
+
+        using var command = new SnowflakeDbCommand(connection, query);
+
+        var fields = new List<SchemaField>();
+        using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            fields.Add(new SchemaField
+            {
+                Name = reader.GetString(0),
+                DataType = reader.GetString(1),
+                IsNullable = reader.GetString(2) == "YES",
+                MaxLength = reader.IsDBNull(3) ? null : reader.GetInt32(3),
+                Precision = reader.IsDBNull(4) ? null : reader.GetInt32(4),
+                Scale = reader.IsDBNull(5) ? null : reader.GetInt32(5),
+                DefaultValue = reader.IsDBNull(6) ? null : reader.GetString(6),
+                IsPrimaryKey = reader.GetBoolean(7)
+            });
+        }
+
+        return fields;
+    }
+
+    private string BuildSnowflakeConnectionString(DatabaseConfig config)
+    {
+        if (!string.IsNullOrEmpty(config.ConnectionString))
+        {
+            return config.ConnectionString;
+        }
+
+        var parts = new List<string>();
+        if (!string.IsNullOrEmpty(config.Account)) parts.Add($"account={config.Account}");
+        if (!string.IsNullOrEmpty(config.Username)) parts.Add($"user={config.Username}");
+        if (!string.IsNullOrEmpty(config.Password)) parts.Add($"password={config.Password}");
+        if (!string.IsNullOrEmpty(config.Database)) parts.Add($"db={config.Database}");
+        if (!string.IsNullOrEmpty(config.Schema)) parts.Add($"schema={config.Schema}");
+        if (!string.IsNullOrEmpty(config.Warehouse)) parts.Add($"warehouse={config.Warehouse}");
+        if (!string.IsNullOrEmpty(config.Role)) parts.Add($"role={config.Role}");
+        return string.Join(";", parts);
     }
 }

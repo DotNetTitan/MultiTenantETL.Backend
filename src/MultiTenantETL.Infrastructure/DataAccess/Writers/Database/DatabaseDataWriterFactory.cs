@@ -15,6 +15,7 @@ public class DatabaseDataWriterFactory : IDatabaseDataWriterFactory
     private readonly PostgreSqlDataWriter _postgreSqlWriter;
     private readonly MySqlDataWriter _mySqlWriter;
     private readonly OracleDataWriter _oracleWriter;
+    private readonly SnowflakeDataWriter _snowflakeWriter;
     private readonly ILogger<DatabaseDataWriterFactory> _logger;
 
     public DatabaseDataWriterFactory(
@@ -22,12 +23,14 @@ public class DatabaseDataWriterFactory : IDatabaseDataWriterFactory
         PostgreSqlDataWriter postgreSqlWriter,
         MySqlDataWriter mySqlWriter,
         OracleDataWriter oracleWriter,
+        SnowflakeDataWriter snowflakeWriter,
         ILogger<DatabaseDataWriterFactory> logger)
     {
         _sqlServerWriter = sqlServerWriter;
         _postgreSqlWriter = postgreSqlWriter;
         _mySqlWriter = mySqlWriter;
         _oracleWriter = oracleWriter;
+        _snowflakeWriter = snowflakeWriter;
         _logger = logger;
     }
 
@@ -41,6 +44,7 @@ public class DatabaseDataWriterFactory : IDatabaseDataWriterFactory
             ConnectorProviders.PostgreSQL => _postgreSqlWriter,
             ConnectorProviders.MySQL => _mySqlWriter,
             ConnectorProviders.Oracle => _oracleWriter,
+            ConnectorProviders.Snowflake => _snowflakeWriter,
             _ => throw new NotSupportedException($"Database provider '{connector.Provider}' is not supported")
         };
     }

@@ -189,6 +189,11 @@ public record DatabaseConfig
     public bool UseCustomConnectionString { get; init; }
     public string? ConnectionString { get; init; }
     public Dictionary<string, string>? AdditionalParameters { get; init; }
+    // Snowflake-specific fields
+    public string? Account { get; init; }
+    public string? Schema { get; init; }
+    public string? Warehouse { get; init; }
+    public string? Role { get; init; }
 }
 
 public record FileConfig

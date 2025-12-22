@@ -8,6 +8,7 @@ using MultiTenantETL.Infrastructure.Configuration;
 using Npgsql;
 using MySqlConnector;
 using Oracle.ManagedDataAccess.Client;
+using Snowflake.Data.Client;
 
 namespace MultiTenantETL.Infrastructure.Services.ConnectionTesting.Database;
 
@@ -65,6 +66,7 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
                 ConnectorProviders.PostgreSQL => await TestPostgreSqlConnectionAsync(dbConfig),
                 ConnectorProviders.MySQL => await TestMySqlConnectionAsync(dbConfig),
                 ConnectorProviders.Oracle => await TestOracleConnectionAsync(dbConfig),
+                ConnectorProviders.Snowflake => await TestSnowflakeConnectionAsync(dbConfig),
                 _ => new ConnectionTestResult
                 {
                     Success = false,
@@ -163,6 +165,26 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
         };
     }
 
+    private static async Task<ConnectionTestResult> TestSnowflakeConnectionAsync(DatabaseConfig config)
+    {
+        using var connection = new SnowflakeDbConnection(BuildSnowflakeConnectionString(config));
+        await connection.OpenAsync();
+
+        var details = new Dictionary<string, object>
+        {
+            ["ServerVersion"] = connection.ServerVersion,
+            ["Database"] = connection.Database ?? "Unknown",
+            ["State"] = connection.State.ToString()
+        };
+
+        return new ConnectionTestResult
+        {
+            Success = true,
+            Message = "Successfully connected to Snowflake database",
+            Details = details
+        };
+    }
+
     private static string BuildSqlServerConnectionString(DatabaseConfig config)
     {
         if (!string.IsNullOrEmpty(config.ConnectionString))
@@ -244,5 +266,23 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
         };
 
         return builder.ConnectionString;
+    }
+
+    private static string BuildSnowflakeConnectionString(DatabaseConfig config)
+    {
+        if (!string.IsNullOrEmpty(config.ConnectionString))
+        {
+            return config.ConnectionString;
+        }
+
+        var parts = new List<string>();
+        if (!string.IsNullOrEmpty(config.Account)) parts.Add($"account={config.Account}");
+        if (!string.IsNullOrEmpty(config.Username)) parts.Add($"user={config.Username}");
+        if (!string.IsNullOrEmpty(config.Password)) parts.Add($"password={config.Password}");
+        if (!string.IsNullOrEmpty(config.Database)) parts.Add($"db={config.Database}");
+        if (!string.IsNullOrEmpty(config.Schema)) parts.Add($"schema={config.Schema}");
+        if (!string.IsNullOrEmpty(config.Warehouse)) parts.Add($"warehouse={config.Warehouse}");
+        if (!string.IsNullOrEmpty(config.Role)) parts.Add($"role={config.Role}");
+        return string.Join(";", parts);
     }
 }

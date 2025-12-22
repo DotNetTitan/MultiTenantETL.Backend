@@ -27,7 +27,8 @@ public static class MetadataConstants
                     Constants.ConnectorProviders.SqlServer, 
                     Constants.ConnectorProviders.PostgreSQL, 
                     Constants.ConnectorProviders.MySQL,
-                    Constants.ConnectorProviders.Oracle
+                    Constants.ConnectorProviders.Oracle,
+                    Constants.ConnectorProviders.Snowflake
                 } 
             },
             { 
@@ -59,6 +60,8 @@ public static class MetadataConstants
             { Constants.ConnectorProviders.SqlServer, ("mdi-database", "blue-darken-2") },
             { Constants.ConnectorProviders.PostgreSQL, ("mdi-database", "blue-darken-2") },
             { Constants.ConnectorProviders.MySQL, ("mdi-database", "orange-darken-1") },
+            { Constants.ConnectorProviders.Oracle, ("mdi-database", "red-darken-2") },
+            { Constants.ConnectorProviders.Snowflake, ("mdi-snowflake", "blue-grey-lighten-1") },
             
             // File providers
             { Constants.ConnectorProviders.Local, ("mdi-folder", "grey-darken-1") },

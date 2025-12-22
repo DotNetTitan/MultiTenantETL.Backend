@@ -85,7 +85,7 @@ Controllers should:
 
 ### Supported Types
 
-**Database**: SQL Server, PostgreSQL, MySQL
+**Database**: SQL Server, PostgreSQL, MySQL, Oracle, Snowflake
 **File**: CSV, JSON, JSONL (with Local, FTP, SFTP, S3, Azure Blob storage)
 **API**: REST API with authentication support
 
