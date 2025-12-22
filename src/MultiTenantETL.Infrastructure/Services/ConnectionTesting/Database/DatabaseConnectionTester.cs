@@ -9,6 +9,8 @@ using Npgsql;
 using MySqlConnector;
 using Oracle.ManagedDataAccess.Client;
 using Snowflake.Data.Client;
+using MongoDB.Driver;
+using MongoDB.Bson;
 
 namespace MultiTenantETL.Infrastructure.Services.ConnectionTesting.Database;
 
@@ -69,6 +71,7 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
                 ConnectorProviders.Snowflake => await TestSnowflakeConnectionAsync(dbConfig),
                 ConnectorProviders.BigQuery => await TestBigQueryConnectionAsync(dbConfig),
                 ConnectorProviders.Redshift => await TestRedshiftConnectionAsync(dbConfig),
+                ConnectorProviders.MongoDb => await TestMongoDbConnectionAsync(dbConfig),
                 _ => new ConnectionTestResult
                 {
                     Success = false,
@@ -241,6 +244,28 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
             Success = true,
             Message = "Successfully connected to AWS Redshift",
             Details = details
+        };
+    }
+
+    private static async Task<ConnectionTestResult> TestMongoDbConnectionAsync(DatabaseConfig config)
+    {
+        if (string.IsNullOrEmpty(config.ConnectionString))
+        {
+            return new ConnectionTestResult { Success = false, Message = "Connection string is required for MongoDB" };
+        }
+
+        var client = new MongoClient(config.ConnectionString);
+        var database = client.GetDatabase(config.Database ?? "admin");
+        await database.RunCommandAsync((Command<BsonDocument>)"{ping:1}");
+
+        return new ConnectionTestResult
+        {
+            Success = true,
+            Message = "Successfully connected to MongoDB",
+            Details = new Dictionary<string, object>
+            {
+                ["Database"] = database.DatabaseNamespace.DatabaseName
+            }
         };
     }
 

@@ -18,6 +18,7 @@ public class DatabaseDataReaderFactory : IDatabaseDataReaderFactory
     private readonly SnowflakeDataReader _snowflakeReader;
     private readonly BigQueryDataReader _bigQueryReader;
     private readonly RedshiftDataReader _redshiftReader;
+    private readonly MongoDbDataReader _mongoDbReader;
     private readonly ILogger<DatabaseDataReaderFactory> _logger;
 
     public DatabaseDataReaderFactory(
@@ -28,6 +29,7 @@ public class DatabaseDataReaderFactory : IDatabaseDataReaderFactory
         SnowflakeDataReader snowflakeReader,
         BigQueryDataReader bigQueryReader,
         RedshiftDataReader redshiftReader,
+        MongoDbDataReader mongoDbReader,
         ILogger<DatabaseDataReaderFactory> logger)
     {
         _sqlServerReader = sqlServerReader;
@@ -37,6 +39,7 @@ public class DatabaseDataReaderFactory : IDatabaseDataReaderFactory
         _snowflakeReader = snowflakeReader;
         _bigQueryReader = bigQueryReader;
         _redshiftReader = redshiftReader;
+        _mongoDbReader = mongoDbReader;
         _logger = logger;
     }
 
@@ -53,6 +56,7 @@ public class DatabaseDataReaderFactory : IDatabaseDataReaderFactory
             ConnectorProviders.Snowflake => _snowflakeReader,
             ConnectorProviders.BigQuery => _bigQueryReader,
             ConnectorProviders.Redshift => _redshiftReader,
+            ConnectorProviders.MongoDb => _mongoDbReader,
             _ => throw new NotSupportedException($"Database provider '{connector.Provider}' is not supported")
         };
     }

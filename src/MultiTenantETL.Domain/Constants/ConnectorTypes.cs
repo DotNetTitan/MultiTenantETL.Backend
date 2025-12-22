@@ -17,6 +17,7 @@ public static class ConnectorProviders
     public const string Snowflake = "Snowflake";
     public const string BigQuery = "BigQuery";
     public const string Redshift = "Redshift";
+    public const string MongoDb = "MongoDb";
     
     // File providers (storage locations)
     public const string Local = "Local";

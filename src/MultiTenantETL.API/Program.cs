@@ -412,6 +412,7 @@ builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.OracleDataR
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.SnowflakeDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.BigQueryDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.RedshiftDataReader>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.MongoDbDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.CsvDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.JsonDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.JsonLinesDataReader>();
@@ -430,6 +431,7 @@ builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.OracleDataW
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.SnowflakeDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.BigQueryDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.RedshiftDataWriter>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.MongoDbDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.CsvDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.JsonDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.JsonLinesDataWriter>();
