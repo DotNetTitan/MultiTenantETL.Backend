@@ -18,6 +18,7 @@ public static class ConnectorProviders
     public const string BigQuery = "BigQuery";
     public const string Redshift = "Redshift";
     public const string MongoDb = "MongoDb";
+    public const string CosmosDb = "CosmosDb";
     
     // File providers (storage locations)
     public const string Local = "Local";
