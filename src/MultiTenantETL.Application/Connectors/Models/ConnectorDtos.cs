@@ -199,6 +199,11 @@ public record DatabaseConfig
     public string? DatasetId { get; init; }
     public string? Location { get; init; }
     public string? JsonCredentials { get; init; }
+    // Cosmos DB fields
+    public string? CosmosEndpoint { get; init; }
+    public string? CosmosKey { get; init; }
+    public string? Container { get; init; }
+    public string? Query { get; init; }
 }
 
 public record FileConfig

@@ -11,6 +11,7 @@ using Oracle.ManagedDataAccess.Client;
 using Snowflake.Data.Client;
 using MongoDB.Driver;
 using MongoDB.Bson;
+using Microsoft.Azure.Cosmos;
 
 namespace MultiTenantETL.Infrastructure.Services.ConnectionTesting.Database;
 
@@ -72,6 +73,7 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
                 ConnectorProviders.BigQuery => await TestBigQueryConnectionAsync(dbConfig),
                 ConnectorProviders.Redshift => await TestRedshiftConnectionAsync(dbConfig),
                 ConnectorProviders.MongoDb => await TestMongoDbConnectionAsync(dbConfig),
+                ConnectorProviders.CosmosDb => await TestCosmosDbConnectionAsync(dbConfig),
                 _ => new ConnectionTestResult
                 {
                     Success = false,
@@ -265,6 +267,30 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
             Details = new Dictionary<string, object>
             {
                 ["Database"] = database.DatabaseNamespace.DatabaseName
+            }
+        };
+    }
+
+    private static async Task<ConnectionTestResult> TestCosmosDbConnectionAsync(DatabaseConfig config)
+    {
+        var endpoint = config.CosmosEndpoint ?? config.Host;
+        var key = config.CosmosKey ?? config.Password;
+
+        if (string.IsNullOrEmpty(endpoint) || string.IsNullOrEmpty(key))
+        {
+            return new ConnectionTestResult { Success = false, Message = "Cosmos DB Endpoint and Key are required" };
+        }
+
+        using var client = new CosmosClient(endpoint, key);
+        await client.ReadAccountAsync();
+
+        return new ConnectionTestResult
+        {
+            Success = true,
+            Message = "Successfully connected to Azure Cosmos DB",
+            Details = new Dictionary<string, object>
+            {
+                ["Endpoint"] = endpoint
             }
         };
     }
