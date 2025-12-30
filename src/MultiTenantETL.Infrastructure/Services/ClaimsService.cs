@@ -95,6 +95,21 @@ public class ClaimsService : IClaimsService
                     : userTenant.RoleCode;
                 await AddPermissionClaimsAsync(identity, roleForPermissions);
             }
+            else if (globalRoles.Contains(Domain.Constants.Roles.SuperAdmin))
+            {
+                // SuperAdmin can access any tenant, even without UserTenant record
+                // Add tenant name if tenant exists
+                var tenant = await _context.Tenants
+                    .IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(t => t.Id == user.CurrentTenantId.Value && t.IsActive);
+                if (tenant != null)
+                {
+                    identity.SetClaim(CustomClaims.TenantName, tenant.Name);
+                }
+
+                // Add SuperAdmin permissions
+                await AddPermissionClaimsAsync(identity, Domain.Constants.Roles.SuperAdmin);
+            }
         }
         else if (globalRoles.Any())
         {
