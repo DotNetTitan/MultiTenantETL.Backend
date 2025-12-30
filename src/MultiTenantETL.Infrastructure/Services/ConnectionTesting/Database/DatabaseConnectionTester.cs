@@ -411,8 +411,7 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
             Database = config.Database!,
             Username = config.Username!,
             Password = config.Password!,
-            SslMode = SslMode.Require,
-            TrustServerCertificate = true
+            SslMode = SslMode.Require
         };
 
         return builder.ConnectionString;

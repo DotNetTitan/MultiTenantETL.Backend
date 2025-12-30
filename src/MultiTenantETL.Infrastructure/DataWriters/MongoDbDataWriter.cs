@@ -111,7 +111,7 @@ public class MongoDbDataWriter : IDataWriter
 
         if (string.IsNullOrEmpty(config.CollectionName) && config.WriteConfig != null)
         {
-            config.CollectionName = config.WriteConfig.CollectionName;
+            config.CollectionName = config.WriteConfig.CollectionName ?? string.Empty;
         }
 
         if (string.IsNullOrEmpty(config.CollectionName))

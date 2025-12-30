@@ -198,8 +198,7 @@ public class RedshiftDataReader : IDataReader
             Username = config.Username ?? string.Empty,
             Password = config.Password ?? string.Empty,
             // Optimization for Redshift
-            SslMode = SslMode.Require, 
-            TrustServerCertificate = true 
+            SslMode = SslMode.Require
         };
 
         return builder.ToString();

@@ -154,8 +154,7 @@ public class RedshiftDataWriter : IDataWriter
             Database = config.Database,
             Username = config.Username ?? string.Empty,
             Password = config.Password ?? string.Empty,
-            SslMode = SslMode.Require,
-            TrustServerCertificate = true
+            SslMode = SslMode.Require
         };
 
         return builder.ToString();
