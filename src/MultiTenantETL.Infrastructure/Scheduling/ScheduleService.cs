@@ -732,7 +732,7 @@ public class ScheduleService : IScheduleService
     /// For more complex expressions, returns the cron expression itself.
     /// Consider using CronExpressionDescriptor library for production if detailed descriptions are needed.
     /// </summary>
-    private static string GetCronDescription(string cronExpression)
+    public static string GetCronDescription(string cronExpression)
     {
         try
         {

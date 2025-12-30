@@ -1,5 +1,5 @@
-using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
+using MultiTenantETL.Application.Scheduling.Models;
 
 namespace MultiTenantETL.Application.Pipelines.Models;
 
@@ -40,6 +40,7 @@ public record PipelineResponse
     public required string Status { get; init; }
     public required JsonElement FieldMappings { get; init; }
     public bool IsScheduled { get; init; }
+    public ScheduleResponse? Schedule { get; init; }
     public bool IsActive { get; init; }
     public DateTime? LastRunAt { get; init; }
     public string? LastRunStatus { get; init; }

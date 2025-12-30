@@ -7,10 +7,12 @@ using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Application.Pipelines;
 using MultiTenantETL.Application.Pipelines.Models;
 using MultiTenantETL.Application.Scheduling;
+using MultiTenantETL.Application.Scheduling.Models;
 using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.Persistence;
+using MultiTenantETL.Infrastructure.Scheduling;
 
 namespace MultiTenantETL.Infrastructure.Services;
 
@@ -371,6 +373,25 @@ public class PipelineService : IPipelineService
             Status = pipeline.Status,
             FieldMappings = JsonSerializer.Deserialize<JsonElement>(pipeline.FieldMappingsJson),
             IsScheduled = pipeline.Schedule?.IsActive ?? false,
+            Schedule = pipeline.Schedule != null ? new ScheduleResponse
+            {
+                Id = pipeline.Schedule.Id,
+                PipelineId = pipeline.Schedule.PipelineId,
+                PipelineName = pipeline.Name,
+                TenantId = pipeline.Schedule.TenantId,
+                CronExpression = pipeline.Schedule.CronExpression,
+                Timezone = pipeline.Schedule.Timezone,
+                Description = pipeline.Schedule.Description,
+                IsActive = pipeline.Schedule.IsActive,
+                NextRunAt = pipeline.Schedule.NextRunAt,
+                LastRunAt = pipeline.LastRunAt,
+                LastRunStatus = pipeline.LastRunStatus,
+                ConsecutiveFailures = pipeline.Schedule.ConsecutiveFailures,
+                MaxConsecutiveFailures = pipeline.Schedule.MaxConsecutiveFailures,
+                CronDescription = ScheduleService.GetCronDescription(pipeline.Schedule.CronExpression),
+                CreatedAt = pipeline.Schedule.CreatedAt,
+                UpdatedAt = pipeline.Schedule.UpdatedAt
+            } : null,
             IsActive = pipeline.IsActive,
             LastRunAt = pipeline.LastRunAt,
             LastRunStatus = pipeline.LastRunStatus,
