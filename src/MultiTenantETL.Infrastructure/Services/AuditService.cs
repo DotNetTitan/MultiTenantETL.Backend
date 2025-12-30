@@ -42,6 +42,12 @@ public class AuditService : IAuditService
         {
             var httpContext = _httpContextAccessor.HttpContext;
             
+            // Auto-set severity to Error if success is false and no specific severity was provided
+            if (!success && severity == "Info")
+            {
+                severity = "Error";
+            }
+
             var auditLog = new AuditLog
             {
                 Id = Guid.NewGuid(),
@@ -92,7 +98,7 @@ public class AuditService : IAuditService
                 Description = $"{action} - {userEmail}",
                 IpAddress = httpContext?.Connection.RemoteIpAddress?.ToString(),
                 UserAgent = httpContext?.Request.Headers["User-Agent"].ToString(),
-                Severity = success ? "Info" : "Warning",
+                Severity = success ? "Info" : "Error",
                 Success = success,
                 ErrorMessage = errorMessage,
                 CreatedAt = DateTime.UtcNow
@@ -136,7 +142,18 @@ public class AuditService : IAuditService
             query = query.Where(a => a.ResourceType == resourceType);
 
         if (!string.IsNullOrEmpty(severity))
-            query = query.Where(a => a.Severity == severity);
+        {
+            var severityLower = severity.ToLower();
+            if (severityLower == "error")
+            {
+                // When filtering by Error, include both logs with Error severity AND logs where Success is false
+                query = query.Where(a => a.Severity.ToLower() == "error" || a.Success == false);
+            }
+            else
+            {
+                query = query.Where(a => a.Severity.ToLower() == severityLower);
+            }
+        }
 
         if (startDate.HasValue)
             query = query.Where(a => a.CreatedAt >= startDate.Value);
