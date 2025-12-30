@@ -4,20 +4,13 @@ namespace MultiTenantETL.Application.Tenants.Models;
 
 public record CreateTenantRequest
 {
-    [Required]
-    [StringLength(100, MinimumLength = 2)]
     public required string Name { get; init; }
 
-    [Required]
-    [StringLength(50, MinimumLength = 2)]
-    [RegularExpression(@"^[a-z0-9-]+$", ErrorMessage = "Slug must contain only lowercase letters, numbers, and hyphens")]
     public required string Slug { get; init; }
 }
 
 public record UpdateTenantRequest
 {
-    [Required]
-    [StringLength(100, MinimumLength = 2)]
     public required string Name { get; init; }
 
     public bool? IsActive { get; init; }
@@ -44,21 +37,15 @@ public record UserTenantResponse
 
 public record AddUserToTenantRequest
 {
-    [Required]
     public Guid UserId { get; init; }
 
-    [Required]
     public Guid TenantId { get; init; }
 
-    [Required]
-    [StringLength(50)]
     public required string RoleCode { get; init; }
 }
 
 public record UpdateUserTenantRoleRequest
 {
-    [Required]
-    [StringLength(50)]
     public required string RoleCode { get; init; }
 }
 

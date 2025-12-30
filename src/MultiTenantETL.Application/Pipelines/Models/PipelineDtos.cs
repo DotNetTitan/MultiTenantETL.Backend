@@ -5,33 +5,23 @@ namespace MultiTenantETL.Application.Pipelines.Models;
 
 public record CreatePipelineRequest
 {
-    [Required]
-    [StringLength(200, MinimumLength = 2)]
     public required string Name { get; init; }
 
-    [StringLength(500)]
     public string? Description { get; init; }
 
-    [Required]
     public Guid SourceConnectorId { get; init; }
 
-    [Required]
     public Guid DestinationConnectorId { get; init; }
 
-    [Required]
     public required JsonElement FieldMappings { get; init; } // Array of field mappings
 }
 
 public record UpdatePipelineRequest
 {
-    [Required]
-    [StringLength(200, MinimumLength = 2)]
     public required string Name { get; init; }
 
-    [StringLength(500)]
     public string? Description { get; init; }
 
-    [Required]
     public required JsonElement FieldMappings { get; init; }
 
     public bool? IsActive { get; init; }

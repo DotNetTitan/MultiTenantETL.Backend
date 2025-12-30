@@ -5,26 +5,16 @@ namespace MultiTenantETL.Application.Connectors.Models;
 
 public record CreateConnectorRequest
 {
-    [Required]
-    [StringLength(200, MinimumLength = 2)]
     public required string Name { get; init; }
 
-    [StringLength(500)]
     public string? Description { get; init; }
 
-    [Required]
-    [StringLength(50)]
     public required string Type { get; init; } // Database, File, API
 
-    [Required]
-    [StringLength(100)]
     public required string Provider { get; init; } // SqlServer, PostgreSQL, CSV, etc.
 
-    [Required]
-    [StringLength(20)]
     public required string Direction { get; init; } // source, destination, both
 
-    [Required]
     public required JsonElement Config { get; init; } // Type-specific configuration
 
     public JsonElement? Schema { get; init; } // Optional schema definition
@@ -32,18 +22,12 @@ public record CreateConnectorRequest
 
 public record UpdateConnectorRequest
 {
-    [Required]
-    [StringLength(200, MinimumLength = 2)]
     public required string Name { get; init; }
 
-    [StringLength(500)]
     public string? Description { get; init; }
 
-    [Required]
-    [StringLength(20)]
     public required string Direction { get; init; }
 
-    [Required]
     public required JsonElement Config { get; init; }
 
     public JsonElement? Schema { get; init; }
@@ -91,15 +75,10 @@ public record ConnectorListResponse
 
 public record TestConnectionRequest
 {
-    [Required]
-    [StringLength(50)]
     public required string Type { get; init; }
 
-    [Required]
-    [StringLength(100)]
     public required string Provider { get; init; }
 
-    [Required]
     public required JsonElement Config { get; init; }
 }
 
@@ -113,27 +92,19 @@ public record TestConnectionResponse
 
 public record DetectSchemaRequest
 {
-    [Required]
     public Guid ConnectorId { get; init; }
 
-    [StringLength(200)]
     public string? TableOrResourceName { get; init; } // For databases: table name, For APIs: endpoint
 }
 
 public record DetectSchemaPreviewRequest
 {
-    [Required]
-    [StringLength(50)]
     public required string Type { get; init; } // Database, File, API
 
-    [Required]
-    [StringLength(100)]
     public required string Provider { get; init; } // SqlServer, PostgreSQL, MySQL, etc.
 
-    [Required]
     public required JsonElement Config { get; init; } // Connection configuration
 
-    [StringLength(200)]
     public string? TableOrResourceName { get; init; } // For databases: table name
 }
 

@@ -1,6 +1,7 @@
 using System.Security.Cryptography.X509Certificates;
 using AspNetCoreRateLimit;
 using FluentValidation;
+using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -489,6 +490,9 @@ builder.Services.AddProblemDetails();
 
 // FluentValidation - register all validators from Application assembly
 builder.Services.AddValidatorsFromAssemblyContaining<MultiTenantETL.Application.Connectors.Validators.CreateConnectorRequestValidator>();
+
+builder.Services.AddFluentValidationAutoValidation()
+    .AddFluentValidationClientsideAdapters();
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
