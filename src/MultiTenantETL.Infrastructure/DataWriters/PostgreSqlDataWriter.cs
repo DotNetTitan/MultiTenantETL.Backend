@@ -145,6 +145,7 @@ public class PostgreSqlDataWriter : IDataWriter
             for (int rowIndex = 0; rowIndex < batch.Rows.Count; rowIndex++)
             {
                 var row = batch.Rows[rowIndex];
+                // Use a safe savepoint name (rowIndex is always a non-negative integer from for loop)
                 var savepointName = $"sp_row_{rowIndex}";
                 
                 try
@@ -164,7 +165,7 @@ public class PostgreSqlDataWriter : IDataWriter
                     await command.ExecuteNonQueryAsync(cancellationToken);
                     result.RowsWritten++;
                     
-                    // Release the savepoint on success
+                    // Release the savepoint on success to free resources
                     await using var releaseCommand = new NpgsqlCommand($"RELEASE SAVEPOINT {savepointName}", connection, transaction);
                     await releaseCommand.ExecuteNonQueryAsync(cancellationToken);
                 }
@@ -178,7 +179,9 @@ public class PostgreSqlDataWriter : IDataWriter
                     }
                     catch (Exception rollbackEx)
                     {
-                        _logger.LogWarning(rollbackEx, "Failed to rollback to savepoint for row {RowIndex}", rowIndex);
+                        // If savepoint rollback fails, the transaction is likely in an unrecoverable state
+                        // Log the error and let the outer catch block handle transaction rollback
+                        _logger.LogError(rollbackEx, "Failed to rollback to savepoint for row {RowIndex}. Transaction may be in invalid state.", rowIndex);
                     }
                     
                     result.RowsFailed++;
