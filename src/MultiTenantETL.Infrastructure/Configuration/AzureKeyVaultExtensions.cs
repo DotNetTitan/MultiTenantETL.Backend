@@ -4,7 +4,6 @@ using Azure.Identity;
 using Azure.Security.KeyVault.Secrets;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 
 namespace MultiTenantETL.Infrastructure.Configuration;
 
@@ -36,14 +35,15 @@ public static class AzureKeyVaultExtensions
         // Only add Key Vault if explicitly enabled
         if (!keyVaultSettings.Enabled)
         {
-            Console.WriteLine($"Azure Key Vault is disabled. Using local configuration.");
             return builder;
         }
         
         var keyVaultUri = keyVaultSettings.GetKeyVaultUri();
         if (string.IsNullOrEmpty(keyVaultUri))
         {
-            Console.WriteLine("Warning: Azure Key Vault is enabled but KeyVaultName or KeyVaultUri is not configured. Skipping Key Vault integration.");
+            // Log warning but continue - Key Vault is configured but missing URI
+            System.Diagnostics.Trace.TraceWarning(
+                "Azure Key Vault is enabled but KeyVaultName or KeyVaultUri is not configured. Skipping Key Vault integration.");
             return builder;
         }
         
@@ -59,14 +59,16 @@ public static class AzureKeyVaultExtensions
                 ReloadInterval = TimeSpan.FromHours(12)
             });
             
-            Console.WriteLine($"Azure Key Vault configured successfully: {keyVaultUri}");
+            // Success - log via trace
+            System.Diagnostics.Trace.TraceInformation(
+                $"Azure Key Vault configured successfully: {keyVaultUri} (Environment: {hostingEnvironment.EnvironmentName})");
         }
         catch (Exception ex)
         {
             // Log error but don't fail application startup
             // This allows the app to run with local configuration if Key Vault is unreachable
-            Console.WriteLine($"Warning: Failed to configure Azure Key Vault: {ex.Message}");
-            Console.WriteLine("Continuing with local configuration...");
+            System.Diagnostics.Trace.TraceWarning(
+                $"Failed to configure Azure Key Vault: {ex.Message}. Continuing with local configuration.");
         }
         
         return builder;
@@ -84,7 +86,8 @@ public static class AzureKeyVaultExtensions
             !string.IsNullOrEmpty(settings.ClientId) &&
             !string.IsNullOrEmpty(settings.ClientSecret))
         {
-            Console.WriteLine("Using Service Principal authentication for Azure Key Vault");
+            System.Diagnostics.Trace.TraceInformation(
+                "Using Service Principal authentication for Azure Key Vault");
             return new ClientSecretCredential(
                 settings.TenantId,
                 settings.ClientId,
@@ -93,7 +96,8 @@ public static class AzureKeyVaultExtensions
         
         // For production, prefer Managed Identity
         // For development, fall back to Azure CLI, Visual Studio, etc.
-        Console.WriteLine($"Using DefaultAzureCredential for Azure Key Vault (Environment: {hostingEnvironment.EnvironmentName})");
+        System.Diagnostics.Trace.TraceInformation(
+            $"Using DefaultAzureCredential for Azure Key Vault (Environment: {hostingEnvironment.EnvironmentName})");
         
         var defaultAzureCredentialOptions = new DefaultAzureCredentialOptions
         {
