@@ -1,11 +1,13 @@
-# Pipeline Execution Engine - Implementation Plan (Production, Azure + RabbitMQ)
+# Pipeline Execution Engine - Implementation Plan (Production, Azure + Azure Service Bus)
+
+> **Note:** This document was originally written for RabbitMQ. The implementation has been updated to use Azure Service Bus instead. References to RabbitMQ in this document should be interpreted as Azure Service Bus.
 
 ## Overview
 
-This document is the production-ready implementation plan for the Pipeline Execution Engine and related features in the MultiTenant ETL platform. It is tailored for a high-scale deployment (millions of users, very large datasets) on Azure using RabbitMQ as the broker. It includes architecture, schema changes, streaming/batching guidance, security (secrets, sandboxing), operational recommendations (Docker, AKS), observability, and an updated checklist & timeline.
+This document is the production-ready implementation plan for the Pipeline Execution Engine and related features in the MultiTenant ETL platform. It is tailored for a high-scale deployment (millions of users, very large datasets) on Azure using Azure Service Bus as the message broker. It includes architecture, schema changes, streaming/batching guidance, security (secrets, sandboxing), operational recommendations (Docker, AKS), observability, and an updated checklist & timeline.
 
 Key decisions applied in this version
-- Broker: RabbitMQ (durable, task-queue semantics)
+- Broker: Azure Service Bus (durable, task-queue semantics)
 - Cloud: Azure (AKS, ACR, Azure Blob Storage, Azure Database for PostgreSQL, Azure Key Vault)
 - Delivery semantics: at-least-once delivery with idempotency/upsert strategies (recommended for production; exactly-once is complex and sink-dependent)
 - Execution logs retention: 365 days (default; configurable per tenant)
