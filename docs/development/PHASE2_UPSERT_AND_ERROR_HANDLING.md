@@ -61,8 +61,15 @@ DO UPDATE SET col2 = EXCLUDED.col2, col3 = EXCLUDED.col3
 - Uses PostgreSQL's native ON CONFLICT clause
 - Supports composite upsert keys
 - Per-row error tracking with PostgresException error codes
-- Transaction-based for consistency
+- Transaction-based with savepoints for resilience
+- Continues processing after individual row failures
 - Falls back to COPY for non-upsert operations (fastest bulk insert)
+
+**Error Handling:**
+- Uses PostgreSQL savepoints to isolate row-level errors
+- Rolls back individual row failures without aborting the entire transaction
+- Allows successful rows to be committed even when some rows fail with constraint violations
+- Properly handles unique constraint violations on non-upsert columns
 
 **Usage:**
 ```csharp

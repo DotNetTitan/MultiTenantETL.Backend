@@ -133,7 +133,7 @@ public class PostgreSqlDataWriter : IDataWriter
         var updateSet = string.Join(", ", updateColumns.Select(c => $"\"{c}\" = EXCLUDED.\"{c}\""));
 
         var sql = $@"
-            INSERT INTO {tableName} ({columnList})
+            INSERT INTO ""{tableName}"" ({columnList})
             VALUES ({valuePlaceholders})
             ON CONFLICT ({conflictColumns})
             DO UPDATE SET {updateSet}";
@@ -145,9 +145,15 @@ public class PostgreSqlDataWriter : IDataWriter
             for (int rowIndex = 0; rowIndex < batch.Rows.Count; rowIndex++)
             {
                 var row = batch.Rows[rowIndex];
+                // Use a safe savepoint name (rowIndex is always a non-negative integer from for loop)
+                var savepointName = $"sp_row_{rowIndex}";
                 
                 try
                 {
+                    // Create a savepoint before each row operation
+                    await using var savepointCommand = new NpgsqlCommand($"SAVEPOINT {savepointName}", connection, transaction);
+                    await savepointCommand.ExecuteNonQueryAsync(cancellationToken);
+                    
                     await using var command = new NpgsqlCommand(sql, connection, transaction);
                     
                     for (int i = 0; i < columns.Count; i++)
@@ -158,9 +164,26 @@ public class PostgreSqlDataWriter : IDataWriter
 
                     await command.ExecuteNonQueryAsync(cancellationToken);
                     result.RowsWritten++;
+                    
+                    // Release the savepoint on success to free resources
+                    await using var releaseCommand = new NpgsqlCommand($"RELEASE SAVEPOINT {savepointName}", connection, transaction);
+                    await releaseCommand.ExecuteNonQueryAsync(cancellationToken);
                 }
                 catch (Exception ex)
                 {
+                    // Rollback to savepoint on error, allowing the transaction to continue
+                    try
+                    {
+                        await using var rollbackCommand = new NpgsqlCommand($"ROLLBACK TO SAVEPOINT {savepointName}", connection, transaction);
+                        await rollbackCommand.ExecuteNonQueryAsync(cancellationToken);
+                    }
+                    catch (Exception rollbackEx)
+                    {
+                        // If savepoint rollback fails, the transaction is likely in an unrecoverable state
+                        // Log the error and let the outer catch block handle transaction rollback
+                        _logger.LogError(rollbackEx, "Failed to rollback to savepoint for row {RowIndex}. Transaction may be in invalid state.", rowIndex);
+                    }
+                    
                     result.RowsFailed++;
                     result.RowErrors.Add(new RowError
                     {
