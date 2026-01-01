@@ -16,12 +16,12 @@ var builder = Host.CreateApplicationBuilder(args);
 // Add Aspire service defaults (includes OpenTelemetry, health checks, service discovery)
 builder.AddServiceDefaults();
 
-// Configuration - bind RabbitMq settings and inject connection string if available from Aspire
-builder.Services.Configure<RabbitMqSettings>(options =>
+// Configuration - bind Azure Service Bus settings and inject connection string if available from Aspire
+builder.Services.Configure<ServiceBusSettings>(options =>
 {
-    builder.Configuration.GetSection("RabbitMq").Bind(options);
+    builder.Configuration.GetSection("ServiceBus").Bind(options);
     // Check for Aspire-provided connection string
-    var connectionString = builder.Configuration.GetConnectionString("RabbitMq");
+    var connectionString = builder.Configuration.GetConnectionString("ServiceBus");
     if (!string.IsNullOrEmpty(connectionString))
     {
         options.ConnectionString = connectionString;
@@ -122,7 +122,7 @@ builder.Services.AddScoped<MultiTenantETL.Application.Orchestration.IFieldMappin
     MultiTenantETL.Infrastructure.Orchestration.FieldMappingService>();
 
 // Worker
-builder.Services.AddHostedService<Worker>();
+builder.Services.AddHostedService<ServiceBusWorker>();
 
 var host = builder.Build();
 host.Run();

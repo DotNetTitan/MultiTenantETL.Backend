@@ -229,12 +229,12 @@ builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.AzureComm
 builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.EtlSettings>(
     builder.Configuration.GetSection(MultiTenantETL.Infrastructure.Configuration.EtlSettings.SectionName));
 
-// Configure RabbitMQ settings with Aspire connection string support
-builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.RabbitMqSettings>(options =>
+// Configure Azure Service Bus settings with Aspire connection string support
+builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.ServiceBusSettings>(options =>
 {
-    builder.Configuration.GetSection("RabbitMq").Bind(options);
+    builder.Configuration.GetSection("ServiceBus").Bind(options);
     // Check for Aspire-provided connection string
-    var connectionString = builder.Configuration.GetConnectionString("RabbitMq");
+    var connectionString = builder.Configuration.GetConnectionString("ServiceBus");
     if (!string.IsNullOrEmpty(connectionString))
     {
         options.ConnectionString = connectionString;
@@ -397,7 +397,7 @@ builder.Services.AddHostedService<MultiTenantETL.Infrastructure.Scheduling.Sched
 
 // Messaging Services
 builder.Services.AddSingleton<MultiTenantETL.Application.Messaging.IMessagePublisher,
-    MultiTenantETL.Infrastructure.Messaging.RabbitMqPublisher>();
+    MultiTenantETL.Infrastructure.Messaging.ServiceBusPublisher>();
 
 // Orchestration Services
 builder.Services.AddScoped<MultiTenantETL.Application.Orchestration.IPipelineOrchestrator,
