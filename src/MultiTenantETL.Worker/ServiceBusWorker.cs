@@ -197,23 +197,25 @@ public class ServiceBusWorker : BackgroundService
 
         try
         {
-            var message = JsonSerializer.Deserialize<Dictionary<string, object>>(json);
+            var request = JsonSerializer.Deserialize<CancellationRequest>(json);
 
-            if (message != null && message.TryGetValue("ExecutionId", out var executionIdObj))
+            if (request != null)
             {
-                var executionId = Guid.Parse(executionIdObj.ToString()!);
-
-                if (_runningExecutions.TryGetValue(executionId, out var cts))
+                if (_runningExecutions.TryGetValue(request.ExecutionId, out var cts))
                 {
-                    _logger.LogInformation("Cancelling execution: ExecutionId={ExecutionId}", executionId);
+                    _logger.LogInformation("Cancelling execution: ExecutionId={ExecutionId}", request.ExecutionId);
                     cts.Cancel();
-                    _runningExecutions.Remove(executionId);
+                    _runningExecutions.Remove(request.ExecutionId);
                 }
                 else
                 {
                     _logger.LogWarning("Cancellation requested for non-running execution: ExecutionId={ExecutionId}",
-                        executionId);
+                        request.ExecutionId);
                 }
+            }
+            else
+            {
+                _logger.LogError("Failed to deserialize cancellation request");
             }
         }
         catch (Exception ex)
@@ -240,6 +242,7 @@ public class ServiceBusWorker : BackgroundService
             cts.Cancel();
         }
 
+        // Stop processors first
         if (_executionProcessor != null)
         {
             await _executionProcessor.StopProcessingAsync(cancellationToken);
@@ -250,30 +253,36 @@ public class ServiceBusWorker : BackgroundService
             await _cancellationProcessor.StopProcessingAsync(cancellationToken);
         }
 
-        await base.StopAsync(cancellationToken);
-    }
-
-    public override async void Dispose()
-    {
+        // Dispose processors and client
         if (_executionProcessor != null)
         {
             await _executionProcessor.DisposeAsync();
+            _executionProcessor = null;
         }
 
         if (_cancellationProcessor != null)
         {
             await _cancellationProcessor.DisposeAsync();
+            _cancellationProcessor = null;
         }
 
         if (_client != null)
         {
             await _client.DisposeAsync();
+            _client = null;
         }
 
+        await base.StopAsync(cancellationToken);
+    }
+
+    public override void Dispose()
+    {
+        // Dispose synchronous resources
         foreach (var cts in _runningExecutions.Values)
         {
             cts.Dispose();
         }
+        _runningExecutions.Clear();
 
         base.Dispose();
     }

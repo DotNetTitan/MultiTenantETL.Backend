@@ -72,8 +72,12 @@ public class ServiceBusPublisher : IMessagePublisher, IAsyncDisposable
     {
         try
         {
-            var message = new { ExecutionId = executionId, CancelledAt = DateTimeOffset.UtcNow };
-            var json = JsonSerializer.Serialize(message);
+            var request = new CancellationRequest
+            {
+                ExecutionId = executionId,
+                CancelledAt = DateTimeOffset.UtcNow
+            };
+            var json = JsonSerializer.Serialize(request);
             var body = Encoding.UTF8.GetBytes(json);
 
             var serviceBusMessage = new ServiceBusMessage(body)
