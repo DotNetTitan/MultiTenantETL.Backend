@@ -56,6 +56,7 @@ A production-ready, secure multi-tenant ASP.NET Core 8.0 platform designed for E
 - Token revocation on password change and logout
 - Input sanitization utilities
 - Email enumeration prevention
+- **Azure Key Vault Integration**: Secure secrets management for production deployments (see [Azure Key Vault Guide](docs/guides/AZURE-KEY-VAULT-GUIDE.md))
 
 ### Clean Architecture
 - Strict separation of concerns with Domain, Application, Infrastructure, API, and Worker layers
@@ -136,6 +137,8 @@ This starts PostgreSQL on port 5432.
 #### 3. Configure Application Settings
 
 Use **user secrets** for sensitive configuration (recommended for development):
+
+> **Production Note**: For production deployments, use Azure Key Vault to manage secrets securely. See the [Azure Key Vault Integration Guide](docs/guides/AZURE-KEY-VAULT-GUIDE.md) for detailed setup instructions.
 
 ```bash
 cd src/MultiTenantETL.API

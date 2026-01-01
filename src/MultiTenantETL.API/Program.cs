@@ -22,6 +22,10 @@ using Quartz;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Configure Azure Key Vault as early as possible in the configuration pipeline
+// This allows secrets from Key Vault to override appsettings.json values
+builder.Configuration.AddAzureKeyVaultIfConfigured(builder.Environment);
+
 // Add Aspire service defaults (includes OpenTelemetry, health checks, service discovery)
 builder.AddServiceDefaults();
 
