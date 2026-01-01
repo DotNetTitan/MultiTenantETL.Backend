@@ -282,6 +282,66 @@ public class PostgreSqlDataWriterTests : IAsyncLifetime
         count.Should().Be(10000);
     }
 
+    [Fact]
+    public async Task WriteBatchAsync_WithUpsert_ShouldContinueAfterRowFailure()
+    {
+        // Arrange
+        var connector = CreateConnector();
+        
+        // Insert some initial data
+        var initialBatch = new ReadBatch
+        {
+            BatchId = Guid.NewGuid(),
+            Rows = new List<Dictionary<string, object?>>
+            {
+                new() { ["id"] = 1, ["email"] = "existing@test.com", ["name"] = "Existing", ["age"] = 25 }
+            },
+            RowCount = 1
+        };
+        
+        await _writer.WriteBatchAsync(connector, initialBatch, new WriteOptions(), CancellationToken.None);
+
+        // Create a batch with mixed success and failure
+        var mixedBatch = new ReadBatch
+        {
+            BatchId = Guid.NewGuid(),
+            Rows = new List<Dictionary<string, object?>>
+            {
+                new() { ["id"] = 10, ["email"] = "valid1@test.com", ["name"] = "Valid 1", ["age"] = 30 },  // Should succeed
+                new() { ["id"] = 11, ["email"] = "existing@test.com", ["name"] = "Duplicate", ["age"] = 35 },  // Should fail (duplicate email)
+                new() { ["id"] = 12, ["email"] = "valid2@test.com", ["name"] = "Valid 2", ["age"] = 40 }   // Should succeed (but will fail if transaction is aborted)
+            },
+            RowCount = 3
+        };
+
+        var options = new WriteOptions
+        {
+            UseUpsert = true,
+            UpsertKeys = new List<string> { "id" }
+        };
+
+        // Act
+        var result = await _writer.WriteBatchAsync(connector, mixedBatch, options, CancellationToken.None);
+
+        // Assert
+        result.RowsWritten.Should().Be(2);  // Row 0 and Row 2 should succeed
+        result.RowsFailed.Should().Be(1);   // Row 1 should fail
+        result.RowErrors.Should().HaveCount(1);
+        result.RowErrors[0].RowIndex.Should().Be(1);
+        result.RowErrors[0].ErrorCode.Should().Be("23505"); // PostgreSQL unique violation
+        
+        // Verify that the successful rows were actually inserted
+        var count = await GetRowCount();
+        count.Should().Be(3); // Initial row + 2 successful rows from mixed batch
+        
+        // Verify the specific rows exist
+        var validRow1 = await GetUserName(10);
+        validRow1.Should().Be("Valid 1");
+        
+        var validRow2 = await GetUserName(12);
+        validRow2.Should().Be("Valid 2");
+    }
+
     private Connector CreateConnector()
     {
         return new Connector
