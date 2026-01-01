@@ -16,12 +16,28 @@ var builder = Host.CreateApplicationBuilder(args);
 // Add Aspire service defaults (includes OpenTelemetry, health checks, service discovery)
 builder.AddServiceDefaults();
 
-// Configuration - bind RabbitMq settings and inject connection string if available from Aspire
+// Configuration - bind Messaging settings
+builder.Services.Configure<MessagingSettings>(
+    builder.Configuration.GetSection(MessagingSettings.SectionName));
+
+// Configuration - bind RabbitMQ settings and inject connection string if available from Aspire
 builder.Services.Configure<RabbitMqSettings>(options =>
 {
     builder.Configuration.GetSection("RabbitMq").Bind(options);
     // Check for Aspire-provided connection string
     var connectionString = builder.Configuration.GetConnectionString("RabbitMq");
+    if (!string.IsNullOrEmpty(connectionString))
+    {
+        options.ConnectionString = connectionString;
+    }
+});
+
+// Configuration - bind Azure Service Bus settings and inject connection string if available from Aspire
+builder.Services.Configure<ServiceBusSettings>(options =>
+{
+    builder.Configuration.GetSection("ServiceBus").Bind(options);
+    // Check for Aspire-provided connection string
+    var connectionString = builder.Configuration.GetConnectionString("ServiceBus");
     if (!string.IsNullOrEmpty(connectionString))
     {
         options.ConnectionString = connectionString;
@@ -121,8 +137,19 @@ builder.Services.AddScoped<IPipelineOrchestrator, PipelineOrchestrator>();
 builder.Services.AddScoped<MultiTenantETL.Application.Orchestration.IFieldMappingService,
     MultiTenantETL.Infrastructure.Orchestration.FieldMappingService>();
 
-// Worker
-builder.Services.AddHostedService<Worker>();
+// Worker - register based on configuration
+var messagingSettings = new MessagingSettings();
+builder.Configuration.GetSection(MessagingSettings.SectionName).Bind(messagingSettings);
+
+if (messagingSettings.UseServiceBus)
+{
+    builder.Services.AddHostedService<ServiceBusWorker>();
+}
+else
+{
+    // Default to RabbitMQ for local development
+    builder.Services.AddHostedService<Worker>();
+}
 
 var host = builder.Build();
 host.Run();

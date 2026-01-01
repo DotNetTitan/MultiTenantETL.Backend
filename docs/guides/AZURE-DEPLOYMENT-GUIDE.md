@@ -1,5 +1,7 @@
 # Azure Deployment Guide - MultiTenant ETL Platform
 
+> **Note:** This guide has been updated to use Azure Service Bus instead of RabbitMQ/CloudAMQP. References to RabbitMQ in this document should be interpreted as Azure Service Bus.
+
 ## Overview
 
 This guide covers deploying the MultiTenant ETL platform to Azure with a production-ready architecture optimized for scalability, reliability, and cost-effectiveness.

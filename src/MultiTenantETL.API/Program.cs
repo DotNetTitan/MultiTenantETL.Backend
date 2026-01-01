@@ -229,12 +229,28 @@ builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.AzureComm
 builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.EtlSettings>(
     builder.Configuration.GetSection(MultiTenantETL.Infrastructure.Configuration.EtlSettings.SectionName));
 
+// Configure Messaging Provider settings
+builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.MessagingSettings>(
+    builder.Configuration.GetSection(MultiTenantETL.Infrastructure.Configuration.MessagingSettings.SectionName));
+
 // Configure RabbitMQ settings with Aspire connection string support
 builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.RabbitMqSettings>(options =>
 {
     builder.Configuration.GetSection("RabbitMq").Bind(options);
     // Check for Aspire-provided connection string
     var connectionString = builder.Configuration.GetConnectionString("RabbitMq");
+    if (!string.IsNullOrEmpty(connectionString))
+    {
+        options.ConnectionString = connectionString;
+    }
+});
+
+// Configure Azure Service Bus settings with Aspire connection string support
+builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.ServiceBusSettings>(options =>
+{
+    builder.Configuration.GetSection("ServiceBus").Bind(options);
+    // Check for Aspire-provided connection string
+    var connectionString = builder.Configuration.GetConnectionString("ServiceBus");
     if (!string.IsNullOrEmpty(connectionString))
     {
         options.ConnectionString = connectionString;
@@ -395,9 +411,21 @@ builder.Services.AddScoped<MultiTenantETL.Application.Scheduling.IScheduleServic
     MultiTenantETL.Infrastructure.Scheduling.ScheduleService>();
 builder.Services.AddHostedService<MultiTenantETL.Infrastructure.Scheduling.ScheduleInitializerService>();
 
-// Messaging Services
-builder.Services.AddSingleton<MultiTenantETL.Application.Messaging.IMessagePublisher,
-    MultiTenantETL.Infrastructure.Messaging.RabbitMqPublisher>();
+// Messaging Services - register based on configuration
+var messagingSettings = new MultiTenantETL.Infrastructure.Configuration.MessagingSettings();
+builder.Configuration.GetSection(MultiTenantETL.Infrastructure.Configuration.MessagingSettings.SectionName).Bind(messagingSettings);
+
+if (messagingSettings.UseServiceBus)
+{
+    builder.Services.AddSingleton<MultiTenantETL.Application.Messaging.IMessagePublisher,
+        MultiTenantETL.Infrastructure.Messaging.ServiceBusPublisher>();
+}
+else
+{
+    // Default to RabbitMQ for local development
+    builder.Services.AddSingleton<MultiTenantETL.Application.Messaging.IMessagePublisher,
+        MultiTenantETL.Infrastructure.Messaging.RabbitMqPublisher>();
+}
 
 // Orchestration Services
 builder.Services.AddScoped<MultiTenantETL.Application.Orchestration.IPipelineOrchestrator,

@@ -1,6 +1,6 @@
 # MultiTenant ETL - Enterprise ETL Platform
 
-A production-ready, secure multi-tenant ASP.NET Core 8.0 platform designed for ETL (Extract, Transform, Load) operations with complete tenant isolation, OAuth 2.0/OpenID Connect authentication powered by OpenIddict, and a scalable pipeline execution engine with RabbitMQ message broker integration.
+A production-ready, secure multi-tenant ASP.NET Core 8.0 platform designed for ETL (Extract, Transform, Load) operations with complete tenant isolation, OAuth 2.0/OpenID Connect authentication powered by OpenIddict, and a scalable pipeline execution engine with configurable message broker support (RabbitMQ for local development, Azure Service Bus for cloud deployment).
 
 ## 🚀 Features
 
@@ -31,12 +31,13 @@ A production-ready, secure multi-tenant ASP.NET Core 8.0 platform designed for E
 - **Script Transformations**: Custom JavaScript expressions for complex logic
 - **Field-Level Processing**: Apply transformations to specific fields within a batch
 
-### Message Broker Integration (RabbitMQ)
+### Message Broker Integration
+- **Flexible Configuration**: RabbitMQ for local development, Azure Service Bus for cloud deployment
 - **Asynchronous Execution**: Pipelines execute via background workers
 - **Horizontal Scalability**: Run multiple worker instances for parallel processing
-- **Durable Queues**: Persistent messages with dead letter exchange for failed tasks
+- **Durable Queues**: Persistent messages with dead letter queue for failed tasks
 - **Cancellation Support**: Graceful cancellation via dedicated queue
-- **Retry Mechanism**: Configurable retry with exponential backoff
+- **Easy Switching**: Configuration-based provider selection without code changes
 
 ### Authentication & Authorization
 - **OAuth 2.0 & OpenID Connect**: Powered by OpenIddict 7.2.0
@@ -60,7 +61,7 @@ A production-ready, secure multi-tenant ASP.NET Core 8.0 platform designed for E
 - Strict separation of concerns with Domain, Application, Infrastructure, API, and Worker layers
 
 ### .NET Aspire Support
-- **Orchestration**: Single entry point to run all services with dependencies (PostgreSQL, RabbitMQ)
+- **Orchestration**: Single entry point to run all services with dependencies (PostgreSQL, RabbitMQ/Azure Service Bus)
 - **Service Discovery**: Built-in service discovery for inter-service communication
 - **Health Checks**: Standardized health check endpoints (/health, /alive)
 - **OpenTelemetry**: Distributed tracing and metrics out of the box
@@ -71,8 +72,10 @@ A production-ready, secure multi-tenant ASP.NET Core 8.0 platform designed for E
 
 - [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
 - [PostgreSQL 12+](https://www.postgresql.org/download/)
-- [RabbitMQ 3.13+](https://www.rabbitmq.com/download.html) (for pipeline execution)
-- [Docker](https://www.docker.com/get-started/) (required for Aspire orchestration)
+- **Message Broker** (choose one):
+  - [RabbitMQ 3.13+](https://www.rabbitmq.com/download.html) (default for local development)
+  - [Azure Service Bus](https://azure.microsoft.com/en-us/services/service-bus/) (for cloud deployment)
+- [Docker](https://www.docker.com/get-started/) (required for Aspire orchestration and docker-compose)
 - A code editor ([VS Code](https://code.visualstudio.com/), [Visual Studio](https://visualstudio.microsoft.com/), or [Rider](https://www.jetbrains.com/rider/))
 
 ## 🛠️ Setup Instructions
@@ -88,12 +91,12 @@ dotnet run
 
 This automatically:
 - Starts PostgreSQL with a data volume (managed by Aspire)
-- Starts RabbitMQ with the management plugin (managed by Aspire)
+- Starts RabbitMQ with management plugin (managed by Aspire)
 - Starts the API service with automatic connection string injection
 - Starts the Worker service with automatic connection string injection
 - Opens the Aspire Dashboard for monitoring
 
-> **Note:** When running with Aspire, you don't need to configure connection strings manually. Aspire automatically manages PostgreSQL and RabbitMQ containers and injects the correct connection strings into the API and Worker services.
+> **Note:** By default, Aspire uses RabbitMQ for local development. The application is configured with `"Messaging": { "Provider": "RabbitMQ" }` in appsettings.json. To use Azure Service Bus instead, change the Provider to "ServiceBus" and configure the connection string via user secrets or environment variables.
 
 The Aspire Dashboard will open in your browser, showing:
 - All services and their health status
@@ -112,7 +115,7 @@ cd MultiTenantETL
 
 #### 2. Start Infrastructure with Docker Compose
 
-The easiest way to set up PostgreSQL and RabbitMQ:
+Start PostgreSQL and RabbitMQ:
 
 ```bash
 docker-compose up -d
@@ -121,6 +124,14 @@ docker-compose up -d
 This starts:
 - PostgreSQL on port 5432
 - RabbitMQ on port 5672 (AMQP) and 15672 (Management UI)
+
+> **Note:** The application uses RabbitMQ by default for local development. No additional configuration needed.
+docker-compose up -d
+```
+
+This starts PostgreSQL on port 5432.
+
+> **Note:** Azure Service Bus is a cloud service. You'll need an Azure Service Bus namespace and connection string. For local development, configure the connection string in user secrets (see step 3).
 
 #### 3. Configure Application Settings
 
@@ -144,6 +155,32 @@ dotnet user-secrets set "AzureCommunication:SenderEmail" "noreply@yourdomain.com
 ```
 
 **User Secrets ID**: `96149a75-7a4b-4db0-89c3-93fc63bf95e8`
+
+#### Switching to Azure Service Bus (Optional)
+
+By default, the application uses RabbitMQ for local development. To use Azure Service Bus for cloud deployment:
+
+1. **Update Configuration** in `appsettings.json` or via environment variable:
+   ```json
+   {
+     "Messaging": {
+       "Provider": "ServiceBus"
+     }
+   }
+   ```
+
+2. **Configure Azure Service Bus Connection String**:
+   ```bash
+   cd src/MultiTenantETL.API
+   dotnet user-secrets set "ServiceBus:ConnectionString" "Endpoint=sb://your-namespace.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=your-key"
+   
+   cd ../MultiTenantETL.Worker
+   dotnet user-secrets set "ServiceBus:ConnectionString" "Endpoint=sb://your-namespace.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=your-key"
+   ```
+
+3. **Create Required Azure Service Bus Queues**:
+   - `pipeline-executions` - for execution tasks
+   - `pipeline-cancellations` - for cancellation requests
 
 #### 4. Run Database Migrations
 
