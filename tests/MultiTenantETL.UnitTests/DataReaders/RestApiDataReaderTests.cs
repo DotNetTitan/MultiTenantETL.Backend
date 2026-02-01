@@ -1,4 +1,5 @@
 using System.Net;
+using System.Reflection;
 using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
@@ -404,5 +405,28 @@ public class RestApiDataReaderTests
 
         // Assert
         result.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task TestConnectionAsync_WithInvalidUrl_ShouldThrowInvalidOperationException()
+    {
+        // Arrange
+        var connector = CreateConnector("relative/path");
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _sut.TestConnectionAsync(connector, CancellationToken.None));
+    }
+    
+    [Fact]
+    public async Task DetectSchemaAsync_WithInvalidUrl_ShouldThrowInvalidOperationException()
+    {
+        // Arrange
+        var connector = CreateConnector("not-a-valid-url");
+
+        // Act & Assert
+        var result = await _sut.DetectSchemaAsync(connector, CancellationToken.None);
+        
+        result.Success.Should().BeFalse();
     }
 }

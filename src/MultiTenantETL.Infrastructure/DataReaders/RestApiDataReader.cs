@@ -95,9 +95,10 @@ public class RestApiDataReader : IDataReader
 
     public async Task<bool> TestConnectionAsync(Connector connector, CancellationToken cancellationToken)
     {
+        var config = ParseConfig(connector.ConfigJson);
+        
         try
         {
-            var config = ParseConfig(connector.ConfigJson);
             var httpClient = _httpClientFactory.CreateClient();
 
             ConfigureHttpClient(httpClient, config);
@@ -239,8 +240,15 @@ public class RestApiDataReader : IDataReader
 
     private RestApiConfig ParseConfig(string configJson)
     {
-        return JsonSerializer.Deserialize<RestApiConfig>(configJson)
+        var config = JsonSerializer.Deserialize<RestApiConfig>(configJson)
             ?? throw new InvalidOperationException("Invalid REST API configuration");
+
+        if (!Uri.TryCreate(config.Url, UriKind.Absolute, out _))
+        {
+            throw new InvalidOperationException("REST API connector URL must be an absolute URI (e.g., https://api.example.com/data).");
+        }
+
+        return config;
     }
 
     private class RestApiConfig
