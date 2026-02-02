@@ -225,6 +225,21 @@ public class ConnectorService : IConnectorService
             throw new KeyNotFoundException($"Connector with ID {id} not found");
         }
 
+        // Check if connector is being used by any pipelines
+        var pipelinesUsingConnector = await _context.Pipelines
+            .Where(p => p.TenantId == tenantId && 
+                       (p.SourceConnectorId == id || p.DestinationConnectorId == id))
+            .Select(p => p.Name)
+            .ToListAsync();
+
+        if (pipelinesUsingConnector.Any())
+        {
+            var pipelineList = string.Join(", ", pipelinesUsingConnector.Select(p => $"'{p}'"));
+            throw new InvalidOperationException(
+                $"Cannot delete connector '{connector.Name}' because it is being used by the following pipeline(s): {pipelineList}. " +
+                $"Please remove or update these pipelines before deleting the connector.");
+        }
+
         _logger.LogInformation("Deleting connector {ConnectorId}", id);
 
         var connectorName = connector.Name;

@@ -2,6 +2,8 @@ using System.Net;
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace MultiTenantETL.API.Middleware;
 
@@ -136,6 +138,16 @@ public class GlobalExceptionHandler : IExceptionHandler
                 "Resource Conflict",
                 ex.Message),
 
+            InvalidOperationException ex when ex.Message.Contains("cannot delete", StringComparison.OrdinalIgnoreCase) => (
+                (int)HttpStatusCode.Conflict,
+                "Cannot Delete Resource",
+                ex.Message),
+
+            InvalidOperationException ex when ex.Message.Contains("being used", StringComparison.OrdinalIgnoreCase) => (
+                (int)HttpStatusCode.Conflict,
+                "Resource In Use",
+                ex.Message),
+
             // Authorization
             UnauthorizedAccessException ex => (
                 (int)HttpStatusCode.Forbidden,
@@ -153,6 +165,12 @@ public class GlobalExceptionHandler : IExceptionHandler
                 (int)HttpStatusCode.GatewayTimeout,
                 "Operation Timeout",
                 ex.Message),
+
+            // Database exceptions - these should be 500 as they indicate unexpected errors
+            DbUpdateException ex => (
+                (int)HttpStatusCode.InternalServerError,
+                "Database Error",
+                "An error occurred while updating the database. Please try again or contact support."),
 
             // Other InvalidOperationException
             InvalidOperationException ex => (
