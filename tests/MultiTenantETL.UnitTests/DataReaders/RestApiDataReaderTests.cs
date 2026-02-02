@@ -49,11 +49,12 @@ public class RestApiDataReaderTests
         }
     }
 
-    private Connector CreateConnector(string url, string? dataPath = null, string? authType = null)
+    private Connector CreateConnector(string url, string? dataPath = null, string? authType = null, string? endpointPath = null)
     {
         var config = new
         {
             Url = url,
+            EndpointPath = endpointPath,
             DataPath = dataPath,
             AuthType = authType,
             TimeoutSeconds = 30
@@ -428,5 +429,49 @@ public class RestApiDataReaderTests
         var result = await _sut.DetectSchemaAsync(connector, CancellationToken.None);
         
         result.Success.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ReadAsync_WithEndpointPath_ShouldCombineUrls()
+    {
+        // Arrange
+        var jsonResponse = @"[{""id"":1,""name"":""Test""}]";
+        var response = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(jsonResponse)
+        };
+        var mockHttpClient = CreateMockHttpClient(response);
+        _httpClientFactory.CreateClient().Returns(mockHttpClient);
+
+        var connector = CreateConnector("https://api.example.com", endpointPath: "api/v2/accounts/etls");
+        var options = new ReadOptions { BatchSize = 10 };
+
+        // Act
+        var batches = new List<ReadBatch>();
+        await foreach (var batch in _sut.ReadAsync(connector, options, CancellationToken.None))
+        {
+            batches.Add(batch);
+        }
+
+        // Assert
+        batches.Should().HaveCount(1);
+        batches[0].Rows.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task TestConnectionAsync_WithEndpointPath_ShouldCombineUrls()
+    {
+        // Arrange
+        var response = new HttpResponseMessage(HttpStatusCode.OK);
+        var mockHttpClient = CreateMockHttpClient(response);
+        _httpClientFactory.CreateClient().Returns(mockHttpClient);
+
+        var connector = CreateConnector("https://api.example.com", endpointPath: "api/v2/accounts");
+
+        // Act
+        var result = await _sut.TestConnectionAsync(connector, CancellationToken.None);
+
+        // Assert
+        result.Should().BeTrue();
     }
 }
