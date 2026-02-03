@@ -10,6 +10,9 @@ using Npgsql;
 using MySqlConnector;
 using Oracle.ManagedDataAccess.Client;
 using Snowflake.Data.Client;
+using MongoDB.Driver;
+using Microsoft.Azure.Cosmos;
+using System.Text.Json.Nodes;
 
 namespace MultiTenantETL.Infrastructure.Services;
 
@@ -87,6 +90,9 @@ public class SchemaDetector : ISchemaDetector
                 ConnectorProviders.Oracle => await DetectOracleSchemaAsync(dbConfig, tableName),
                 ConnectorProviders.Snowflake => await DetectSnowflakeSchemaAsync(dbConfig, tableName),
                 ConnectorProviders.BigQuery => await DetectBigQuerySchemaAsync(dbConfig, tableName),
+                ConnectorProviders.Redshift => await DetectRedshiftSchemaAsync(dbConfig, tableName),
+                ConnectorProviders.MongoDb => await DetectMongoDbSchemaAsync(dbConfig, tableName),
+                ConnectorProviders.CosmosDb => await DetectCosmosDbSchemaAsync(dbConfig, tableName),
                 _ => throw new NotSupportedException($"Database provider {provider} is not supported")
             };
 
@@ -849,5 +855,145 @@ public class SchemaDetector : ISchemaDetector
             IsNullable = f.Mode != "REQUIRED",
             IsPrimaryKey = false
         }).ToList();
+    }
+
+    private async Task<List<SchemaField>> DetectRedshiftSchemaAsync(DatabaseConfig config, string tableName)
+    {
+        // Redshift is compatible with PostgreSQL for schema detection
+        var connectionString = config.ConnectionString;
+        if (string.IsNullOrEmpty(connectionString))
+        {
+            var builder = new NpgsqlConnectionStringBuilder
+            {
+                Host = config.Host,
+                Port = config.Port > 0 ? config.Port : 5439,
+                Database = config.Database,
+                Username = config.Username,
+                Password = config.Password,
+                SslMode = SslMode.Require
+            };
+            connectionString = builder.ConnectionString;
+        }
+
+        using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync();
+
+        var query = @"
+            SELECT 
+                column_name as Name,
+                data_type as DataType,
+                is_nullable as IsNullable,
+                character_maximum_length as MaxLength,
+                false as IsPrimaryKey
+            FROM information_schema.columns
+            WHERE table_name = @TableName
+            ORDER BY ordinal_position";
+
+        using var command = connection.CreateCommand();
+        command.CommandText = query;
+        var param = command.CreateParameter();
+        param.ParameterName = "@TableName";
+        param.Value = tableName;
+        command.Parameters.Add(param);
+
+        var fields = new List<SchemaField>();
+        using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            fields.Add(new SchemaField
+            {
+                Name = reader.GetString(0),
+                DataType = reader.GetString(1),
+                IsNullable = reader.GetString(2) == "YES",
+                IsPrimaryKey = reader.GetBoolean(4),
+                MaxLength = reader.IsDBNull(3) ? null : reader.GetInt32(3)
+            });
+        }
+
+        return fields;
+    }
+
+    private async Task<List<SchemaField>> DetectMongoDbSchemaAsync(DatabaseConfig config, string tableName)
+    {
+        var client = new MongoDB.Driver.MongoClient(config.ConnectionString);
+        var database = client.GetDatabase(config.Database);
+        var collection = database.GetCollection<MongoDB.Bson.BsonDocument>(tableName);
+
+        // Fetch a few documents to sample types
+        var sampleDocs = await collection.Find(MongoDB.Driver.FilterDefinition<MongoDB.Bson.BsonDocument>.Empty)
+            .Limit(10)
+            .ToListAsync();
+
+        if (sampleDocs.Count == 0) return new List<SchemaField>();
+
+        var fieldMap = new Dictionary<string, SchemaField>();
+        foreach (var doc in sampleDocs)
+        {
+            foreach (var element in doc.Elements)
+            {
+                if (fieldMap.ContainsKey(element.Name)) continue;
+
+                fieldMap[element.Name] = new SchemaField
+                {
+                    Name = element.Name,
+                    DataType = element.Value.BsonType.ToString().ToLower(),
+                    IsNullable = true,
+                    IsPrimaryKey = element.Name == "_id"
+                };
+            }
+        }
+
+        return fieldMap.Values.ToList();
+    }
+
+    private async Task<List<SchemaField>> DetectCosmosDbSchemaAsync(DatabaseConfig config, string tableName)
+    {
+        var endpoint = config.CosmosEndpoint ?? config.Host;
+        var key = config.CosmosKey ?? config.Password;
+        
+        using var client = new Microsoft.Azure.Cosmos.CosmosClient(endpoint, key);
+        var container = client.GetContainer(config.Database, tableName);
+
+        // Fetch a few documents to sample types
+        var query = new Microsoft.Azure.Cosmos.QueryDefinition("SELECT TOP 10 * FROM c");
+        using var iterator = container.GetItemQueryIterator<System.Text.Json.Nodes.JsonObject>(query);
+        
+        if (!iterator.HasMoreResults) return new List<SchemaField>();
+
+        var response = await iterator.ReadNextAsync();
+        if (response.Count == 0) return new List<SchemaField>();
+
+        var fieldMap = new Dictionary<string, SchemaField>();
+        foreach (var doc in response)
+        {
+            foreach (var property in doc)
+            {
+                if (fieldMap.ContainsKey(property.Key)) continue;
+
+                fieldMap[property.Key] = new SchemaField
+                {
+                    Name = property.Key,
+                    DataType = InferDataTypeFromValue(property.Value),
+                    IsNullable = true,
+                    IsPrimaryKey = property.Key == "id"
+                };
+            }
+        }
+
+        return fieldMap.Values.ToList();
+    }
+
+    private string InferDataTypeFromValue(System.Text.Json.Nodes.JsonNode? node)
+    {
+        if (node == null) return "string";
+        
+        var value = node.AsValue();
+        if (value.TryGetValue<int>(out _)) return "int";
+        if (value.TryGetValue<long>(out _)) return "bigint";
+        if (value.TryGetValue<double>(out _)) return "decimal";
+        if (value.TryGetValue<bool>(out _)) return "boolean";
+        if (value.TryGetValue<DateTime>(out _)) return "datetime";
+        
+        return "string";
     }
 }

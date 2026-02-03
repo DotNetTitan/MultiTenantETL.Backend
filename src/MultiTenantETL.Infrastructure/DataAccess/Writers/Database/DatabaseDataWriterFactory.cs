@@ -19,6 +19,7 @@ public class DatabaseDataWriterFactory : IDatabaseDataWriterFactory
     private readonly BigQueryDataWriter _bigQueryWriter;
     private readonly RedshiftDataWriter _redshiftWriter;
     private readonly MongoDbDataWriter _mongoDbWriter;
+    private readonly CosmosDbDataWriter _cosmosDbWriter;
     private readonly ILogger<DatabaseDataWriterFactory> _logger;
 
     public DatabaseDataWriterFactory(
@@ -30,6 +31,7 @@ public class DatabaseDataWriterFactory : IDatabaseDataWriterFactory
         BigQueryDataWriter bigQueryWriter,
         RedshiftDataWriter redshiftWriter,
         MongoDbDataWriter mongoDbWriter,
+        CosmosDbDataWriter cosmosDbWriter,
         ILogger<DatabaseDataWriterFactory> logger)
     {
         _sqlServerWriter = sqlServerWriter;
@@ -40,6 +42,7 @@ public class DatabaseDataWriterFactory : IDatabaseDataWriterFactory
         _bigQueryWriter = bigQueryWriter;
         _redshiftWriter = redshiftWriter;
         _mongoDbWriter = mongoDbWriter;
+        _cosmosDbWriter = cosmosDbWriter;
         _logger = logger;
     }
 
@@ -57,6 +60,7 @@ public class DatabaseDataWriterFactory : IDatabaseDataWriterFactory
             ConnectorProviders.BigQuery => _bigQueryWriter,
             ConnectorProviders.Redshift => _redshiftWriter,
             ConnectorProviders.MongoDb => _mongoDbWriter,
+            ConnectorProviders.CosmosDb => _cosmosDbWriter,
             _ => throw new NotSupportedException($"Database provider '{connector.Provider}' is not supported")
         };
     }

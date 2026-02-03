@@ -19,6 +19,7 @@ public class DatabaseDataReaderFactory : IDatabaseDataReaderFactory
     private readonly BigQueryDataReader _bigQueryReader;
     private readonly RedshiftDataReader _redshiftReader;
     private readonly MongoDbDataReader _mongoDbReader;
+    private readonly CosmosDbDataReader _cosmosDbReader;
     private readonly ILogger<DatabaseDataReaderFactory> _logger;
 
     public DatabaseDataReaderFactory(
@@ -30,6 +31,7 @@ public class DatabaseDataReaderFactory : IDatabaseDataReaderFactory
         BigQueryDataReader bigQueryReader,
         RedshiftDataReader redshiftReader,
         MongoDbDataReader mongoDbReader,
+        CosmosDbDataReader cosmosDbReader,
         ILogger<DatabaseDataReaderFactory> logger)
     {
         _sqlServerReader = sqlServerReader;
@@ -40,6 +42,7 @@ public class DatabaseDataReaderFactory : IDatabaseDataReaderFactory
         _bigQueryReader = bigQueryReader;
         _redshiftReader = redshiftReader;
         _mongoDbReader = mongoDbReader;
+        _cosmosDbReader = cosmosDbReader;
         _logger = logger;
     }
 
@@ -57,6 +60,7 @@ public class DatabaseDataReaderFactory : IDatabaseDataReaderFactory
             ConnectorProviders.BigQuery => _bigQueryReader,
             ConnectorProviders.Redshift => _redshiftReader,
             ConnectorProviders.MongoDb => _mongoDbReader,
+            ConnectorProviders.CosmosDb => _cosmosDbReader,
             _ => throw new NotSupportedException($"Database provider '{connector.Provider}' is not supported")
         };
     }
