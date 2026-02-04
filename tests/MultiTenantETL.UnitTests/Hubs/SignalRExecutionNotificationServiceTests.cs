@@ -5,7 +5,7 @@ using NSubstitute;
 
 namespace MultiTenantETL.UnitTests.Hubs;
 
-public class ExecutionNotificationServiceTests
+public class SignalRExecutionNotificationServiceTests
 {
     [Fact]
     public async Task NotifyExecutionStatusChangedAsync_WithValidData_ShouldNotThrow()
