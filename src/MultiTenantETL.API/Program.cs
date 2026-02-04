@@ -405,6 +405,9 @@ builder.Services.AddScoped<MultiTenantETL.Application.Pipelines.IPipelineService
 // Execution Services
 builder.Services.AddScoped<MultiTenantETL.Application.Executions.IExecutionService,
     MultiTenantETL.Infrastructure.Services.ExecutionService>();
+// Use SignalR-enabled hub service in API
+builder.Services.AddScoped<MultiTenantETL.Application.Executions.IExecutionHubService,
+    MultiTenantETL.API.Services.SignalRExecutionHubService>();
 
 // Scheduling Services
 builder.Services.AddScoped<MultiTenantETL.Application.Scheduling.IScheduleService,
@@ -528,6 +531,13 @@ builder.Services.AddControllers()
         JsonSerializerOptionsProvider.Configure(options.JsonSerializerOptions);
     });
 
+// SignalR for real-time execution updates
+builder.Services.AddSignalR()
+    .AddJsonProtocol(options =>
+    {
+        JsonSerializerOptionsProvider.Configure(options.PayloadSerializerOptions);
+    });
+
 // Add Razor Pages for OAuth login page
 builder.Services.AddRazorPages();
 
@@ -576,6 +586,9 @@ app.UseTenantContext();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Map SignalR hub for real-time execution updates
+app.MapHub<MultiTenantETL.API.Hubs.ExecutionHub>("/hubs/executions");
 
 // Map Razor Pages for OAuth login
 app.MapRazorPages();

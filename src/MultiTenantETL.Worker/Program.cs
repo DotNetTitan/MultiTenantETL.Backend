@@ -139,6 +139,10 @@ builder.Services.AddScoped<IPipelineOrchestrator, PipelineOrchestrator>();
 builder.Services.AddScoped<MultiTenantETL.Application.Orchestration.IFieldMappingService,
     MultiTenantETL.Infrastructure.Orchestration.FieldMappingService>();
 
+// Execution Hub Service - use stub implementation in Worker (no SignalR)
+builder.Services.AddScoped<MultiTenantETL.Application.Executions.IExecutionHubService,
+    MultiTenantETL.Infrastructure.Services.ExecutionHubService>();
+
 // Worker - register based on configuration
 var messagingSettings = new MessagingSettings();
 builder.Configuration.GetSection(MessagingSettings.SectionName).Bind(messagingSettings);
