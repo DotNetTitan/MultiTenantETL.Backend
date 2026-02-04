@@ -1,0 +1,189 @@
+// Global styles and CSS variables for the ETL Portal
+// This file centralizes common styles and ensures theme consistency
+
+// Reusable mixins for common patterns
+@mixin card-hover {
+  transition: all 0.3s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(var(--v-theme-on-surface), 0.1);
+  }
+}
+
+@mixin glass-effect {
+  backdrop-filter: blur(10px);
+  background: rgba(var(--v-theme-surface), 0.95);
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.1);
+}
+
+@mixin gradient-background {
+  background: linear-gradient(135deg,
+      rgba(var(--v-theme-primary), 0.03) 0%,
+      rgba(var(--v-theme-primary), 0.08) 100%);
+}
+
+// Common utility classes
+.hover-primary {
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: rgba(var(--v-theme-primary), 0.05);
+  }
+}
+
+.glass-card {
+  @include glass-effect;
+  border-radius: 16px;
+}
+
+.gradient-bg {
+  @include gradient-background;
+}
+
+// Timeline styles (used in multiple views)
+.app-timeline-card {
+  border-left: 3px solid rgb(var(--v-theme-primary));
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-left-color: rgb(var(--v-theme-secondary));
+    box-shadow: 0 4px 12px rgba(var(--v-theme-on-surface), 0.1);
+  }
+}
+
+// Dark theme specific overrides
+.v-theme--dark {
+  .timeline-divider-line {
+    border-left-color: rgba(255, 255, 255, 0.12) !important;
+  }
+
+  .logs-container {
+    background-color: rgb(var(--v-theme-surface-variant));
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+
+  .logs-content {
+    color: rgb(var(--v-theme-on-surface));
+  }
+}
+
+// Light theme specific overrides
+.v-theme--light {
+  .timeline-divider-line {
+    border-left-color: rgba(0, 0, 0, 0.12) !important;
+  }
+
+  .logs-container {
+    background-color: rgb(var(--v-theme-surface-variant));
+    border-color: rgba(0, 0, 0, 0.12);
+  }
+
+  .logs-content {
+    color: rgb(var(--v-theme-on-surface));
+  }
+}
+
+// Status colors (consistent across the app)
+.status-completed {
+  color: rgb(var(--v-theme-success));
+}
+
+.status-running {
+  color: rgb(var(--v-theme-info));
+}
+
+.status-failed {
+  color: rgb(var(--v-theme-error));
+}
+
+.status-pending {
+  color: rgb(var(--v-theme-warning));
+}
+
+// Execution row hover effect
+.execution-row {
+  transition: background-color 0.2s ease;
+  cursor: pointer;
+
+  &:hover {
+    background-color: rgba(var(--v-theme-primary), 0.05);
+  }
+}
+
+// Global typography refinement
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.text-h1,
+.text-h2,
+.text-h3,
+.text-h4,
+.text-h5,
+.text-h6,
+.text-subtitle-1 {
+  font-weight: 500 !important;
+  color: rgb(var(--v-theme-on-surface));
+  letter-spacing: -0.01em !important;
+}
+
+// Dialog title refinement
+.v-dialog .v-card-title {
+  font-weight: 500 !important;
+  letter-spacing: -0.01em !important;
+  padding: 16px 20px !important;
+}
+
+// Stepper title refinement
+.v-stepper-item__title {
+  font-weight: 500 !important;
+}
+
+.v-stepper-item--selected .v-stepper-item__title {
+  font-weight: 600 !important;
+}
+
+// Global card refinement
+.v-card {
+  border-radius: 12px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03) !important;
+  border: 1px solid rgba(var(--v-theme-outline), 0.5) !important;
+  transition: all 0.3s ease;
+
+  &.v-card--variant-elevated {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05) !important;
+  }
+}
+
+// Refine data tables
+.v-data-table {
+  background: transparent !important;
+
+  .v-data-table-header {
+    th {
+      font-weight: 600 !important;
+      text-transform: uppercase;
+      font-size: 0.75rem !important;
+      letter-spacing: 0.05em !important;
+      color: rgb(var(--v-theme-on-surface-variant)) !important;
+      background: rgba(var(--v-theme-surface-variant), 0.5) !important;
+      border-bottom: 2px solid rgb(var(--v-theme-outline-variant)) !important;
+    }
+  }
+
+  .v-data-table__tr {
+    &:hover {
+      background-color: rgba(var(--v-theme-primary), 0.02) !important;
+    }
+  }
+}
+
+// Form view backgrounds
+.form-view {
+  padding: 24px;
+  background: rgb(var(--v-theme-background));
+  min-height: 100vh;
+}
