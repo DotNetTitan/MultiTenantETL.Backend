@@ -11,6 +11,19 @@ The MultiTenant ETL API provides real-time updates for pipeline executions via S
 - Get instant status change notifications
 - Receive completion notifications
 
+## Architecture
+
+The system uses an HTTP callback architecture where:
+1. **Worker** processes pipelines and makes HTTP calls to API
+2. **API** broadcasts updates via SignalR to connected clients
+3. **Vue 3 Client** receives updates in real-time via WebSocket
+
+```
+Worker (execute) → HTTP POST → API (broadcast) → SignalR → Vue 3 Client
+```
+
+This ensures real-time updates work even though execution happens in a separate Worker process.
+
 ## SignalR Hub Endpoint
 
 **Hub URL:** `https://your-api-domain/hubs/executions`
