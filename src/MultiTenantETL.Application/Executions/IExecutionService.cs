@@ -9,4 +9,5 @@ public interface IExecutionService
     Task<PagedExecutionResponse> GetAllAsync(ExecutionSearchRequest request, CancellationToken cancellationToken = default);
     Task<ExecutionResponse> CancelExecutionAsync(Guid id, CancellationToken cancellationToken = default);
     Task<ExecutionStatsDto> GetStatsAsync(Guid? pipelineId = null, CancellationToken cancellationToken = default);
+    Task<List<ExecutionLogDto>> GetExecutionLogsAsync(Guid executionId, CancellationToken cancellationToken = default);
 }

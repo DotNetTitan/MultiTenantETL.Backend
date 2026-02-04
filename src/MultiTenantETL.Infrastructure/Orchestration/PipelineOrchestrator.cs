@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Application.DataAccess;
+using MultiTenantETL.Application.Executions;
 using MultiTenantETL.Application.Orchestration;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Domain.Enums;
@@ -17,6 +18,7 @@ public class PipelineOrchestrator : IPipelineOrchestrator
     private readonly IDataReaderFactory _readerFactory;
     private readonly IDataWriterFactory _writerFactory;
     private readonly IFieldMappingService _fieldMappingService;
+    private readonly IExecutionLogBroadcaster? _logBroadcaster;
     private readonly ILogger<PipelineOrchestrator> _logger;
 
     public PipelineOrchestrator(
@@ -24,12 +26,14 @@ public class PipelineOrchestrator : IPipelineOrchestrator
         IDataReaderFactory readerFactory,
         IDataWriterFactory writerFactory,
         IFieldMappingService fieldMappingService,
-        ILogger<PipelineOrchestrator> logger)
+        ILogger<PipelineOrchestrator> logger,
+        IExecutionLogBroadcaster? logBroadcaster = null)
     {
         _context = context;
         _readerFactory = readerFactory;
         _writerFactory = writerFactory;
         _fieldMappingService = fieldMappingService;
+        _logBroadcaster = logBroadcaster;
         _logger = logger;
     }
 
@@ -101,6 +105,7 @@ public class PipelineOrchestrator : IPipelineOrchestrator
         execution.StartTime = DateTimeOffset.UtcNow;
         await _context.SaveChangesAsync(cancellationToken);
         await AddLogEntryAsync(execution, "Info", "System", "Pipeline execution started", cancellationToken);
+        await BroadcastStatusAsync(execution, cancellationToken);
     }
 
     private async Task CompleteExecutionAsync(PipelineExecution execution, BatchProcessingResult result, CancellationToken cancellationToken)
@@ -122,6 +127,7 @@ public class PipelineOrchestrator : IPipelineOrchestrator
         await AddLogEntryAsync(execution, "Info", "System", 
             $"Pipeline execution completed: {result.TotalSucceeded} succeeded, {result.TotalFailed} failed", 
             cancellationToken);
+        await BroadcastStatusAsync(execution, cancellationToken);
 
         _logger.LogInformation("Execution {ExecutionId} completed: {TotalProcessed} records processed",
             execution.Id, result.TotalProcessed);
@@ -143,6 +149,7 @@ public class PipelineOrchestrator : IPipelineOrchestrator
 
         await _context.SaveChangesAsync(cancellationToken);
         await AddLogEntryAsync(execution, "Error", "System", errorMessage, cancellationToken);
+        await BroadcastStatusAsync(execution, cancellationToken);
     }
 
     private async Task CancelExecutionAsync(PipelineExecution execution, CancellationToken cancellationToken)
@@ -160,6 +167,7 @@ public class PipelineOrchestrator : IPipelineOrchestrator
 
         await _context.SaveChangesAsync(cancellationToken);
         await AddLogEntryAsync(execution, "Warning", "System", "Execution cancelled by user", cancellationToken);
+        await BroadcastStatusAsync(execution, cancellationToken);
     }
 
     private async Task<BatchProcessingResult> ProcessBatchesAsync(
@@ -238,6 +246,7 @@ public class PipelineOrchestrator : IPipelineOrchestrator
             execution.BatchCount = result.BatchIndex;
 
             await _context.SaveChangesAsync(cancellationToken);
+            await BroadcastStatusAsync(execution, cancellationToken);
 
             _logger.LogInformation("Batch {BatchIndex} completed for execution {ExecutionId}: {Succeeded} succeeded, {Failed} failed",
                 result.BatchIndex, execution.Id, writeResult.RowsWritten, writeResult.RowsFailed);
@@ -258,7 +267,7 @@ public class PipelineOrchestrator : IPipelineOrchestrator
 
     private async Task AddLogEntryAsync(PipelineExecution execution, string level, string source, string message, CancellationToken cancellationToken)
     {
-        _context.ExecutionLogs.Add(new ExecutionLogEntry
+        var logEntry = new ExecutionLogEntry
         {
             Id = Guid.NewGuid(),
             ExecutionId = execution.Id,
@@ -268,8 +277,43 @@ public class PipelineOrchestrator : IPipelineOrchestrator
             Source = source,
             Message = message,
             CreatedAt = DateTimeOffset.UtcNow
-        });
+        };
+        
+        _context.ExecutionLogs.Add(logEntry);
         await _context.SaveChangesAsync(cancellationToken);
+        
+        // Broadcast log entry to SignalR clients
+        if (_logBroadcaster != null)
+        {
+            await _logBroadcaster.BroadcastLogEntryAsync(execution.Id, new ExecutionLogBroadcastDto
+            {
+                Id = logEntry.Id,
+                ExecutionId = logEntry.ExecutionId,
+                Timestamp = logEntry.Timestamp,
+                Level = logEntry.Level,
+                Source = logEntry.Source,
+                Message = logEntry.Message,
+                Details = logEntry.Details,
+                BatchId = logEntry.BatchId
+            }, cancellationToken);
+        }
+    }
+
+    private async Task BroadcastStatusAsync(PipelineExecution execution, CancellationToken cancellationToken)
+    {
+        if (_logBroadcaster != null)
+        {
+            await _logBroadcaster.BroadcastExecutionStatusAsync(execution.Id, new ExecutionStatusBroadcastDto
+            {
+                ExecutionId = execution.Id,
+                Status = execution.Status.ToString(),
+                RecordsProcessed = execution.RecordsProcessed,
+                RecordsSucceeded = execution.RecordsSucceeded,
+                RecordsFailed = execution.RecordsFailed,
+                ProgressPercent = execution.ProgressPercent,
+                BatchCount = execution.BatchCount
+            }, cancellationToken);
+        }
     }
 
     private WriteOptions ExtractWriteOptions(Connector connector)

@@ -122,4 +122,27 @@ public class ExecutionsController : ControllerBase
         var stats = await _executionService.GetStatsAsync(pipelineId);
         return Ok(stats);
     }
+
+    /// <summary>
+    /// Get execution logs for an execution
+    /// </summary>
+    [HttpGet("{id}/logs")]
+    [ProducesResponseType(typeof(List<ExecutionLogDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetLogs(Guid id)
+    {
+        var authResult = await _authorizationService.AuthorizeAsync(
+            User,
+            null,
+            new PermissionRequirement(Permissions.Pipelines.Read));
+
+        if (!authResult.Succeeded)
+        {
+            return Forbid();
+        }
+
+        var logs = await _executionService.GetExecutionLogsAsync(id);
+        return Ok(logs);
+    }
 }

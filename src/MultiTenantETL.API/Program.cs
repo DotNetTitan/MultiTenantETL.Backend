@@ -332,6 +332,13 @@ builder.Services.AddCors(options =>
     });
 });
 
+// SignalR
+builder.Services.AddSignalR()
+    .AddJsonProtocol(options =>
+    {
+        JsonSerializerOptionsProvider.Configure(options.PayloadSerializerOptions);
+    });
+
 // Email Service
 var useStubEmailService = builder.Configuration.GetValue<bool>("EmailService:UseStub", true);
 if (useStubEmailService)
@@ -388,6 +395,8 @@ builder.Services.AddScoped<MultiTenantETL.Application.Pipelines.IPipelineService
 // Execution Services
 builder.Services.AddScoped<MultiTenantETL.Application.Executions.IExecutionService,
     MultiTenantETL.Infrastructure.Services.ExecutionService>();
+builder.Services.AddScoped<MultiTenantETL.Application.Executions.IExecutionLogBroadcaster,
+    MultiTenantETL.Infrastructure.Services.ExecutionLogBroadcaster>();
 
 // Scheduling Services
 builder.Services.AddScoped<MultiTenantETL.Application.Scheduling.IScheduleService,
@@ -528,6 +537,9 @@ app.UseTenantContext();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Map SignalR Hub
+app.MapHub<MultiTenantETL.Infrastructure.Hubs.PipelineExecutionHub>("/hubs/pipeline-execution");
 
 // Map Razor Pages for OAuth login
 app.MapRazorPages();

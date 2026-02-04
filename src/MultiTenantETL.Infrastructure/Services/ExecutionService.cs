@@ -384,4 +384,33 @@ public class ExecutionService : IExecutionService
             CreatedAt = execution.CreatedAt
         };
     }
+
+    public async Task<List<ExecutionLogDto>> GetExecutionLogsAsync(Guid executionId, CancellationToken cancellationToken = default)
+    {
+        var currentTenantId = _currentUserService.GetTenantId();
+
+        // Verify the execution belongs to the current tenant
+        var execution = await _context.Set<PipelineExecution>()
+            .FirstOrDefaultAsync(e => e.Id == executionId && e.TenantId == currentTenantId, cancellationToken);
+
+        if (execution == null)
+        {
+            throw new KeyNotFoundException($"Execution with ID {executionId} not found");
+        }
+
+        var logs = await _context.Set<ExecutionLogEntry>()
+            .Where(l => l.ExecutionId == executionId)
+            .OrderBy(l => l.Timestamp)
+            .Select(l => new ExecutionLogDto
+            {
+                Timestamp = l.Timestamp,
+                Level = l.Level,
+                Source = l.Source,
+                Message = l.Message,
+                Details = l.Details
+            })
+            .ToListAsync(cancellationToken);
+
+        return logs;
+    }
 }
