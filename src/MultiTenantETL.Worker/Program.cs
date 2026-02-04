@@ -134,14 +134,15 @@ builder.Services.AddSingleton<MultiTenantETL.Infrastructure.Services.Storage.ISt
     MultiTenantETL.Infrastructure.Services.Storage.StorageClientFactory>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.Services.Http.IHttpClientAuthenticator,
     MultiTenantETL.Infrastructure.Services.Http.HttpClientAuthenticator>();
+
 // Orchestration Services
 builder.Services.AddScoped<IPipelineOrchestrator, PipelineOrchestrator>();
 builder.Services.AddScoped<MultiTenantETL.Application.Orchestration.IFieldMappingService,
     MultiTenantETL.Infrastructure.Orchestration.FieldMappingService>();
 
-// Execution Hub Service - use stub implementation in Worker (no SignalR)
-builder.Services.AddScoped<MultiTenantETL.Application.Executions.IExecutionHubService,
-    MultiTenantETL.Infrastructure.Services.ExecutionHubService>();
+// Execution Hub Service - use HTTP callback to API for SignalR broadcasting
+builder.Services.AddHttpClient<MultiTenantETL.Application.Executions.IExecutionHubService, 
+    MultiTenantETL.Infrastructure.Services.HttpExecutionHubService>();
 
 // Worker - register based on configuration
 var messagingSettings = new MessagingSettings();

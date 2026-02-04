@@ -36,20 +36,43 @@ Defined the interface for real-time updates with:
 
 #### Stub Implementation (`src/MultiTenantETL.Infrastructure/Services/ExecutionHubService.cs`)
 
-Default no-op implementation used by the Worker:
+**⚠️ DEPRECATED - Only kept for backward compatibility**
+
+Default no-op implementation:
 - Does nothing (silent operations)
-- Allows Worker to function without SignalR
-- Logs trace messages for debugging
+- Should NOT be used - real-time updates won't work!
+- Kept only for backward compatibility
 
 #### SignalR Implementation (`src/MultiTenantETL.API/Services/SignalRExecutionHubService.cs`)
 
-Full SignalR implementation used by the API:
+Direct SignalR implementation used by the API layer:
 - Injects `IHubContext<ExecutionHub>`
 - Sends real-time updates to connected clients
 - Broadcasts to both execution-specific groups and tenant-wide groups
 - Includes error handling and logging
 
-### 4. Orchestrator Integration (`src/MultiTenantETL.Infrastructure/Orchestration/PipelineOrchestrator.cs`)
+#### HTTP Callback Implementation (`src/MultiTenantETL.Infrastructure/Services/HttpExecutionHubService.cs`)
+
+**✅ RECOMMENDED for Worker**
+
+HTTP-based implementation that calls back to API:
+- Makes HTTP POST requests to API's internal SignalR broadcast endpoints
+- Works across process boundaries (Worker → API)
+- Configurable via `SignalR:ApiBaseUrl` setting
+- Fault tolerant: execution continues if broadcast fails
+- Can be disabled via `SignalR:Enabled` setting
+
+### 4. SignalR Broadcast Controller (`src/MultiTenantETL.API/Controllers/SignalRBroadcastController.cs`)
+
+Internal API endpoints for Worker to trigger SignalR broadcasts:
+- `POST /api/internal/signalr/log` - Broadcast log entry
+- `POST /api/internal/signalr/status` - Broadcast status update
+- `POST /api/internal/signalr/progress` - Broadcast progress update
+- `POST /api/internal/signalr/completion` - Broadcast completion
+
+These endpoints receive DTOs from Worker and broadcast via `IHubContext<ExecutionHub>`.
+
+### 5. Orchestrator Integration (`src/MultiTenantETL.Infrastructure/Orchestration/PipelineOrchestrator.cs`)
 
 Enhanced the PipelineOrchestrator to send real-time updates:
 
@@ -68,21 +91,34 @@ Enhanced the PipelineOrchestrator to send real-time updates:
 - All log entries are sent in real-time via `AddLogEntryAsync()`
 - Includes timestamp, level, source, message, and details
 
-### 5. API Configuration (`src/MultiTenantETL.API/Program.cs`)
+### 6. API Configuration (`src/MultiTenantETL.API/Program.cs`)
 
 Updated API startup to:
 - Register SignalR services with JSON protocol configuration
 - Map SignalR hub endpoint at `/hubs/executions`
+- Map internal broadcast endpoints at `/api/internal/signalr/*`
 - Register `SignalRExecutionHubService` as the implementation of `IExecutionHubService`
 - CORS already configured to support SignalR (AllowCredentials)
 
-### 6. Worker Configuration (`src/MultiTenantETL.Worker/Program.cs`)
+### 7. Worker Configuration (`src/MultiTenantETL.Worker/Program.cs`)
 
 Updated Worker startup to:
-- Register stub `ExecutionHubService` (no SignalR)
-- Allows Worker to run independently without API/SignalR dependencies
+- Register `HttpExecutionHubService` with `HttpClient` injection
+- Configures API base URL from `SignalR:ApiBaseUrl` setting
+- Worker calls back to API for all SignalR broadcasts
+- Execution continues even if broadcasts fail
 
-### 7. Vue 3 Integration Documentation (`SIGNALR_VUE3_INTEGRATION.md`)
+**Configuration (appsettings.json):**
+```json
+{
+  "SignalR": {
+    "ApiBaseUrl": "http://localhost:5000",
+    "Enabled": true
+  }
+}
+```
+
+### 8. Vue 3 Integration Documentation (`SIGNALR_VUE3_INTEGRATION.md`)
 
 Comprehensive guide including:
 - Complete SignalR service implementation in TypeScript
@@ -112,17 +148,22 @@ Comprehensive guide including:
 │  └──────────────┬───────────────────────────────────────┘  │
 │                 │                                            │
 │  ┌──────────────▼───────────────────────────────────────┐  │
-│  │  SignalRExecutionHubService                          │  │
-│  │  - SendLogAsync                                      │  │
-│  │  - SendStatusUpdateAsync                             │  │
-│  │  - SendStatsUpdateAsync                              │  │
-│  │  - SendCompletionAsync                               │  │
+│  │  SignalRBroadcastController                          │  │
+│  │  - POST /api/internal/signalr/log                   │  │
+│  │  - POST /api/internal/signalr/status                │  │
+│  │  - POST /api/internal/signalr/progress              │  │
+│  │  - POST /api/internal/signalr/completion            │  │
 │  └──────────────┬───────────────────────────────────────┘  │
-└─────────────────┼───────────────────────────────────────────┘
-                  │ IExecutionHubService
-                  │
-┌─────────────────▼───────────────────────────────────────────┐
-│              Infrastructure Layer                            │
+│                 │ Uses IHubContext<ExecutionHub>           │
+│  ┌──────────────▼───────────────────────────────────────┐  │
+│  │  SignalRExecutionHubService (for API-side)          │  │
+│  │  - Direct hub context access                        │  │
+│  └──────────────────────────────────────────────────────┘  │
+└───────────────────────────┬─────────────────────────────────┘
+                            │ HTTP POST (internal)
+                            │
+┌───────────────────────────▼─────────────────────────────────┐
+│               Worker Layer (Background Service)              │
 │                                                               │
 │  ┌──────────────────────────────────────────────────────┐  │
 │  │  PipelineOrchestrator                                │  │
@@ -130,9 +171,24 @@ Comprehensive guide including:
 │  │  - ProcessBatchAsync → SendStatsUpdateAsync          │  │
 │  │  - AddLogEntryAsync → SendLogAsync                   │  │
 │  │  - CompleteExecutionAsync → SendCompletionAsync      │  │
-│  │  - FailExecutionAsync → SendCompletionAsync          │  │
-│  │  - CancelExecutionAsync → SendCompletionAsync        │  │
+│  └──────────────┬───────────────────────────────────────┘  │
+│                 │ IExecutionHubService                      │
+│  ┌──────────────▼───────────────────────────────────────┐  │
+│  │  HttpExecutionHubService                             │  │
+│  │  - Makes HTTP POST to API broadcast endpoints       │  │
+│  │  - Configured with API base URL                     │  │
+│  │  - Fault tolerant (execution continues on error)    │  │
 │  └──────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Key Points:**
+- Worker executes pipelines via PipelineOrchestrator
+- HttpExecutionHubService calls back to API via HTTP
+- API's SignalRBroadcastController receives callbacks and broadcasts
+- SignalR clients receive real-time updates via WebSocket
+
+## SignalR Events
 └─────────────────────────────────────────────────────────────┘
                   │
                   │ Executed by
