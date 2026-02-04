@@ -406,6 +406,17 @@ builder.Services.AddScoped<MultiTenantETL.Application.Pipelines.IPipelineService
 builder.Services.AddScoped<MultiTenantETL.Application.Executions.IExecutionService,
     MultiTenantETL.Infrastructure.Services.ExecutionService>();
 
+// SignalR for real-time updates
+builder.Services.AddSignalR()
+    .AddJsonProtocol(options =>
+    {
+        JsonSerializerOptionsProvider.Configure(options.PayloadSerializerOptions);
+    });
+
+// Execution notification service for SignalR (in API layer to avoid circular dependency)
+builder.Services.AddScoped<MultiTenantETL.Application.Executions.Notifications.IExecutionNotificationService,
+    MultiTenantETL.API.Services.SignalRExecutionNotificationService>();
+
 // Scheduling Services
 builder.Services.AddScoped<MultiTenantETL.Application.Scheduling.IScheduleService,
     MultiTenantETL.Infrastructure.Scheduling.ScheduleService>();
@@ -576,6 +587,9 @@ app.UseTenantContext();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Map SignalR hub
+app.MapHub<MultiTenantETL.API.Hubs.ExecutionHub>("/hubs/executions");
 
 // Map Razor Pages for OAuth login
 app.MapRazorPages();

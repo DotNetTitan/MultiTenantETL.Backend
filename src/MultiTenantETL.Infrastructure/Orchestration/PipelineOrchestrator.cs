@@ -4,6 +4,8 @@ using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Application.DataAccess;
+using MultiTenantETL.Application.Executions.Models;
+using MultiTenantETL.Application.Executions.Notifications;
 using MultiTenantETL.Application.Orchestration;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Domain.Enums;
@@ -17,6 +19,7 @@ public class PipelineOrchestrator : IPipelineOrchestrator
     private readonly IDataReaderFactory _readerFactory;
     private readonly IDataWriterFactory _writerFactory;
     private readonly IFieldMappingService _fieldMappingService;
+    private readonly IExecutionNotificationService _notificationService;
     private readonly ILogger<PipelineOrchestrator> _logger;
 
     public PipelineOrchestrator(
@@ -24,12 +27,14 @@ public class PipelineOrchestrator : IPipelineOrchestrator
         IDataReaderFactory readerFactory,
         IDataWriterFactory writerFactory,
         IFieldMappingService fieldMappingService,
+        IExecutionNotificationService notificationService,
         ILogger<PipelineOrchestrator> logger)
     {
         _context = context;
         _readerFactory = readerFactory;
         _writerFactory = writerFactory;
         _fieldMappingService = fieldMappingService;
+        _notificationService = notificationService;
         _logger = logger;
     }
 
@@ -101,6 +106,16 @@ public class PipelineOrchestrator : IPipelineOrchestrator
         execution.StartTime = DateTimeOffset.UtcNow;
         await _context.SaveChangesAsync(cancellationToken);
         await AddLogEntryAsync(execution, "Info", "System", "Pipeline execution started", cancellationToken);
+        
+        // Notify clients about status change
+        await _notificationService.NotifyExecutionStatusChangedAsync(
+            execution.TenantId,
+            new ExecutionStatusUpdate
+            {
+                ExecutionId = execution.Id,
+                Status = execution.Status.ToString()
+            },
+            cancellationToken);
     }
 
     private async Task CompleteExecutionAsync(PipelineExecution execution, BatchProcessingResult result, CancellationToken cancellationToken)
@@ -125,6 +140,18 @@ public class PipelineOrchestrator : IPipelineOrchestrator
 
         _logger.LogInformation("Execution {ExecutionId} completed: {TotalProcessed} records processed",
             execution.Id, result.TotalProcessed);
+        
+        // Notify clients about status change
+        await _notificationService.NotifyExecutionStatusChangedAsync(
+            execution.TenantId,
+            new ExecutionStatusUpdate
+            {
+                ExecutionId = execution.Id,
+                Status = execution.Status.ToString(),
+                EndTime = execution.EndTime,
+                Duration = execution.Duration
+            },
+            cancellationToken);
     }
 
     private async Task FailExecutionAsync(PipelineExecution execution, string errorMessage, CancellationToken cancellationToken)
@@ -143,6 +170,19 @@ public class PipelineOrchestrator : IPipelineOrchestrator
 
         await _context.SaveChangesAsync(cancellationToken);
         await AddLogEntryAsync(execution, "Error", "System", errorMessage, cancellationToken);
+        
+        // Notify clients about status change
+        await _notificationService.NotifyExecutionStatusChangedAsync(
+            execution.TenantId,
+            new ExecutionStatusUpdate
+            {
+                ExecutionId = execution.Id,
+                Status = execution.Status.ToString(),
+                EndTime = execution.EndTime,
+                Duration = execution.Duration,
+                ErrorMessage = errorMessage
+            },
+            cancellationToken);
     }
 
     private async Task CancelExecutionAsync(PipelineExecution execution, CancellationToken cancellationToken)
@@ -160,6 +200,18 @@ public class PipelineOrchestrator : IPipelineOrchestrator
 
         await _context.SaveChangesAsync(cancellationToken);
         await AddLogEntryAsync(execution, "Warning", "System", "Execution cancelled by user", cancellationToken);
+        
+        // Notify clients about status change
+        await _notificationService.NotifyExecutionStatusChangedAsync(
+            execution.TenantId,
+            new ExecutionStatusUpdate
+            {
+                ExecutionId = execution.Id,
+                Status = execution.Status.ToString(),
+                EndTime = execution.EndTime,
+                Duration = execution.Duration
+            },
+            cancellationToken);
     }
 
     private async Task<BatchProcessingResult> ProcessBatchesAsync(
@@ -247,6 +299,20 @@ public class PipelineOrchestrator : IPipelineOrchestrator
 
             _logger.LogInformation("Batch {BatchIndex} completed for execution {ExecutionId}: {Succeeded} succeeded, {Failed} failed",
                 result.BatchIndex, execution.Id, writeResult.RowsWritten, writeResult.RowsFailed);
+            
+            // Notify clients about progress update
+            await _notificationService.NotifyExecutionProgressAsync(
+                execution.TenantId,
+                new ExecutionProgressUpdate
+                {
+                    ExecutionId = execution.Id,
+                    RecordsProcessed = execution.RecordsProcessed,
+                    RecordsSucceeded = execution.RecordsSucceeded,
+                    RecordsFailed = execution.RecordsFailed,
+                    ProgressPercent = (int)execution.ProgressPercent,
+                    BatchCount = execution.BatchCount
+                },
+                cancellationToken);
         }
         catch (Exception ex)
         {
@@ -264,7 +330,7 @@ public class PipelineOrchestrator : IPipelineOrchestrator
 
     private async Task AddLogEntryAsync(PipelineExecution execution, string level, string source, string message, CancellationToken cancellationToken)
     {
-        _context.ExecutionLogs.Add(new ExecutionLogEntry
+        var logEntry = new ExecutionLogEntry
         {
             Id = Guid.NewGuid(),
             ExecutionId = execution.Id,
@@ -274,8 +340,23 @@ public class PipelineOrchestrator : IPipelineOrchestrator
             Source = source,
             Message = message,
             CreatedAt = DateTimeOffset.UtcNow
-        });
+        };
+        
+        _context.ExecutionLogs.Add(logEntry);
         await _context.SaveChangesAsync(cancellationToken);
+        
+        // Notify clients about new log entry
+        await _notificationService.NotifyExecutionLogAddedAsync(
+            execution.TenantId,
+            execution.Id,
+            new ExecutionLogDto
+            {
+                Timestamp = logEntry.Timestamp,
+                Level = logEntry.Level,
+                Source = logEntry.Source,
+                Message = logEntry.Message
+            },
+            cancellationToken);
     }
 
     private WriteOptions ExtractWriteOptions(Connector connector)
