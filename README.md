@@ -14,6 +14,7 @@ A production-ready, secure multi-tenant ASP.NET Core 8.0 platform designed for E
 - **Pipeline Management**: Create, configure, and manage ETL pipelines with source and destination connectors
 - **Field Mappings**: Configure field-to-field mappings with inline transformations
 - **Execution Tracking**: Real-time progress tracking with detailed logging
+- **Real-Time Log Streaming**: SignalR-powered live log streaming to SPAs (see [Vue.js Integration Guide](docs/SIGNALR_VUE_INTEGRATION.md))
 - **Batch Processing**: Memory-efficient streaming with configurable batch sizes (default 1,000 rows)
 - **Scheduling Support**: Schedule configuration for automated pipeline runs
 

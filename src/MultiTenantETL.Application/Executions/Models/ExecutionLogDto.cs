@@ -2,6 +2,7 @@ namespace MultiTenantETL.Application.Executions.Models;
 
 public class ExecutionLogDto
 {
+    public Guid Id { get; set; }
     public DateTimeOffset Timestamp { get; set; }
     public required string Level { get; set; }
     public required string Source { get; set; }

@@ -373,6 +373,7 @@ public class ExecutionService : IExecutionService
             ErrorMessage = execution.ErrorMessage,
             Logs = logEntries.Select(l => new ExecutionLogDto
             {
+                Id = l.Id,
                 Timestamp = l.Timestamp,
                 Level = l.Level,
                 Source = l.Source,
@@ -403,6 +404,7 @@ public class ExecutionService : IExecutionService
             .OrderBy(l => l.Timestamp)
             .Select(l => new ExecutionLogDto
             {
+                Id = l.Id,
                 Timestamp = l.Timestamp,
                 Level = l.Level,
                 Source = l.Source,
