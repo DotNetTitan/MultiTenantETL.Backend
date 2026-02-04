@@ -2,6 +2,27 @@
   <div>
     <div class="d-flex align-center mb-4">
       <h1 class="text-h4 mr-4">{{ $t('executions.title') }}</h1>
+      
+      <!-- Real-time connection indicator -->
+      <v-chip
+        v-if="hubConnected"
+        color="success"
+        size="small"
+        class="mr-2"
+        prepend-icon="mdi-access-point"
+      >
+        Live Updates
+      </v-chip>
+      <v-chip
+        v-else
+        color="grey"
+        size="small"
+        class="mr-2"
+        prepend-icon="mdi-access-point-off"
+      >
+        Offline
+      </v-chip>
+      
       <v-spacer />
       <v-btn 
         color="primary" 
@@ -411,9 +432,13 @@ import { useTenantStore } from '@/stores/tenant';
 import { useTheme } from 'vuetify';
 import { getExecutions, getExecutionById } from '@/services/pipelineService';
 import { useGlobalState } from '@/composables/useGlobalState';
+import { useExecutionHub } from '@/composables/useExecutionHub';
 
 const { t } = useI18n();
 const { showSuccess, showError, showInfo } = useGlobalState();
+
+// SignalR hub for real-time updates
+const { isConnected: hubConnected, onStatusChanged, onProgressUpdated, onLogAdded } = useExecutionHub();
 
 const tenantStore = useTenantStore();
 const theme = useTheme();
@@ -740,6 +765,94 @@ async function fetchExecutions() {
 
 onMounted(async () => {
   await fetchExecutions();
+});
+
+// SignalR event handlers for real-time updates
+onStatusChanged((update) => {
+  console.log('Received status update:', update);
+  
+  // Find and update the execution in the list
+  const index = executions.value.findIndex(e => e.id === update.executionId);
+  if (index !== -1) {
+    executions.value[index].status = update.status;
+    if (update.endTime) {
+      executions.value[index].endTime = update.endTime;
+    }
+    if (update.duration) {
+      // Convert duration to milliseconds for display
+      const durationMatch = update.duration.match(/(\d+):(\d+):(\d+)\.?(\d+)?/);
+      if (durationMatch) {
+        const hours = parseInt(durationMatch[1]);
+        const minutes = parseInt(durationMatch[2]);
+        const seconds = parseInt(durationMatch[3]);
+        const ms = durationMatch[4] ? parseInt(durationMatch[4]) : 0;
+        executions.value[index].durationMs = ((hours * 3600 + minutes * 60 + seconds) * 1000) + ms;
+      }
+    }
+    
+    // Update the selected execution if it's the same one
+    if (selectedExecution.value && selectedExecution.value.id === update.executionId) {
+      selectedExecution.value.status = update.status;
+      if (update.endTime) {
+        selectedExecution.value.endTime = update.endTime;
+      }
+      if (update.duration) {
+        selectedExecution.value.duration = update.duration;
+      }
+      if (update.errorMessage) {
+        selectedExecution.value.errorMessage = update.errorMessage;
+      }
+    }
+    
+    // Show notification for status changes
+    if (update.status === 'Completed') {
+      showSuccess(t('executions.notifications.completed'));
+    } else if (update.status === 'Failed') {
+      showError(t('executions.notifications.failed'));
+    }
+  }
+});
+
+onProgressUpdated((update) => {
+  console.log('Received progress update:', update);
+  
+  // Find and update the execution in the list
+  const index = executions.value.findIndex(e => e.id === update.executionId);
+  if (index !== -1) {
+    executions.value[index].rowsProcessed = update.recordsProcessed;
+    executions.value[index].progressPercent = update.progressPercent;
+    
+    // Update the selected execution if it's the same one
+    if (selectedExecution.value && selectedExecution.value.id === update.executionId) {
+      selectedExecution.value.recordsProcessed = update.recordsProcessed;
+      selectedExecution.value.recordsSucceeded = update.recordsSucceeded;
+      selectedExecution.value.recordsFailed = update.recordsFailed;
+      selectedExecution.value.progressPercent = update.progressPercent;
+      selectedExecution.value.batchCount = update.batchCount;
+    }
+  }
+});
+
+onLogAdded((data) => {
+  console.log('Received log entry:', data);
+  
+  // Update the selected execution's logs if it's the same one
+  if (selectedExecution.value && selectedExecution.value.id === data.executionId) {
+    if (!selectedExecution.value.logs) {
+      selectedExecution.value.logs = [];
+    }
+    
+    // Add the new log entry
+    selectedExecution.value.logs.push(data.log);
+    
+    // Scroll to the latest log if on the logs tab
+    nextTick(() => {
+      const logsContainer = document.querySelector('.logs-container');
+      if (logsContainer) {
+        logsContainer.scrollTop = logsContainer.scrollHeight;
+      }
+    });
+  }
 });
 
 // Clean up the component setup
