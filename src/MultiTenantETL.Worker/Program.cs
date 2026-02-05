@@ -134,6 +134,11 @@ builder.Services.AddSingleton<MultiTenantETL.Infrastructure.Services.Storage.ISt
     MultiTenantETL.Infrastructure.Services.Storage.StorageClientFactory>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.Services.Http.IHttpClientAuthenticator,
     MultiTenantETL.Infrastructure.Services.Http.HttpClientAuthenticator>();
+
+// Execution notification service - use null implementation for worker (no SignalR context)
+builder.Services.AddScoped<MultiTenantETL.Application.Executions.Notifications.IExecutionNotificationService,
+    MultiTenantETL.Infrastructure.Services.NullExecutionNotificationService>();
+
 // Orchestration Services
 builder.Services.AddScoped<IPipelineOrchestrator, PipelineOrchestrator>();
 builder.Services.AddScoped<MultiTenantETL.Application.Orchestration.IFieldMappingService,
