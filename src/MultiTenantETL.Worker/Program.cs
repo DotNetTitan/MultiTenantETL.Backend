@@ -135,9 +135,16 @@ builder.Services.AddSingleton<MultiTenantETL.Infrastructure.Services.Storage.ISt
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.Services.Http.IHttpClientAuthenticator,
     MultiTenantETL.Infrastructure.Services.Http.HttpClientAuthenticator>();
 
-// Execution notification service - use null implementation for worker (no SignalR context)
-builder.Services.AddScoped<MultiTenantETL.Application.Executions.Notifications.IExecutionNotificationService,
-    MultiTenantETL.Infrastructure.Services.NullExecutionNotificationService>();
+// Execution notification service - use HTTP to send to API which broadcasts via SignalR
+// Configure named HttpClient for notification service
+var apiBaseUrl = builder.Configuration.GetValue<string>("ApiBaseUrl") ?? "http://localhost:5244";
+builder.Services.AddHttpClient<MultiTenantETL.Application.Executions.Notifications.IExecutionNotificationService, 
+    MultiTenantETL.Infrastructure.Services.HttpExecutionNotificationService>(client =>
+{
+    client.BaseAddress = new Uri(apiBaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(10);
+    // TODO: Add authentication token for worker-to-API communication
+});
 
 // Orchestration Services
 builder.Services.AddScoped<IPipelineOrchestrator, PipelineOrchestrator>();
