@@ -7,5 +7,6 @@ namespace MultiTenantETL.Infrastructure.Configuration
     {
         public string? ConnectionString { get; set; }
         public string? SenderEmailAddress { get; set; }
+        public string? FrontendUrl { get; set; }
     }
 }

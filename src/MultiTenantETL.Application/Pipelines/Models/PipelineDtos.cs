@@ -14,6 +14,8 @@ public record CreatePipelineRequest
     public Guid DestinationConnectorId { get; init; }
 
     public required JsonElement FieldMappings { get; init; } // Array of field mappings
+    
+    public List<string>? NotificationEmails { get; init; } // Email addresses to notify after execution
 }
 
 public record UpdatePipelineRequest
@@ -25,6 +27,8 @@ public record UpdatePipelineRequest
     public required JsonElement FieldMappings { get; init; }
 
     public bool? IsActive { get; init; }
+    
+    public List<string>? NotificationEmails { get; init; } // Email addresses to notify after execution
 }
 
 public record PipelineResponse
@@ -42,6 +46,7 @@ public record PipelineResponse
     public bool IsScheduled { get; init; }
     public ScheduleResponse? Schedule { get; init; }
     public bool IsActive { get; init; }
+    public List<string>? NotificationEmails { get; init; }
     public DateTime? LastRunAt { get; init; }
     public string? LastRunStatus { get; init; }
     public int? LastRunRecordsProcessed { get; init; }

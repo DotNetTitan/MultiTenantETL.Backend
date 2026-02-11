@@ -65,6 +65,36 @@ namespace MultiTenantETL.Infrastructure.Services
             var htmlContent = EmailTemplates.GetPasswordChanged(firstName);
             await SendEmailAsync(email, subject, htmlContent);
         }
+        
+        public async Task SendPipelineExecutionReportAsync(
+            string recipientEmail,
+            string pipelineName,
+            string executionId,
+            string executionStatus,
+            DateTimeOffset startTime,
+            DateTimeOffset? endTime,
+            TimeSpan? duration,
+            long recordsProcessed,
+            long recordsSucceeded,
+            long recordsFailed,
+            string? errorMessage,
+            string executionDetailsUrl)
+        {
+            var subject = $"Pipeline Execution Report: {pipelineName} - {executionStatus}";
+            var htmlContent = EmailTemplates.GetPipelineExecutionReport(
+                pipelineName,
+                executionId,
+                executionStatus,
+                startTime,
+                endTime,
+                duration,
+                recordsProcessed,
+                recordsSucceeded,
+                recordsFailed,
+                errorMessage,
+                executionDetailsUrl);
+            await SendEmailAsync(recipientEmail, subject, htmlContent);
+        }
 
         private async Task<bool> SendEmailAsync(string to, string subject, string htmlContent)
         {

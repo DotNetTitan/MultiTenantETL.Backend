@@ -1,8 +1,10 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
-// PostgreSQL database
-var postgres = builder.AddPostgres("postgres")
+// PostgreSQL database with fixed credentials
+var postgresPassword = builder.AddParameter("postgres-password");
+var postgres = builder.AddPostgres("postgres", password: postgresPassword)
     .WithDataVolume("multitenant-etl-postgres-data")
+    .WithHostPort(5432) // Fixed port for PostgreSQL
     .WithPgAdmin();
 
 // Resource name must use hyphens (Aspire naming rules), but actual database name can use underscores

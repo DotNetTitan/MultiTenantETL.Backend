@@ -45,6 +45,10 @@ builder.Services.Configure<ServiceBusSettings>(options =>
 });
 builder.Services.Configure<EtlSettings>(builder.Configuration.GetSection(EtlSettings.SectionName));
 
+// Configuration - bind Azure Communication Services settings
+builder.Services.Configure<AzureCommunicationSettings>(
+    builder.Configuration.GetSection("AzureCommunicationServices"));
+
 // Tenant context provider (scoped per job)
 builder.Services.AddScoped<ITenantProvider, TenantProvider>();
 
@@ -58,6 +62,19 @@ builder.Services.AddSingleton<IEncryptionService, MultiTenantETL.Infrastructure.
 // Audit Service - use null implementation for worker (actions already audited at API level)
 builder.Services.AddScoped<MultiTenantETL.Application.Interfaces.IAuditService,
     MultiTenantETL.Infrastructure.Services.NullAuditService>();
+
+// Email Service - for pipeline execution notifications
+var useStubEmailService = builder.Configuration.GetValue<bool>("EmailService:UseStub", true);
+if (useStubEmailService)
+{
+    builder.Services.AddScoped<MultiTenantETL.Application.Interfaces.IEmailService,
+        MultiTenantETL.Infrastructure.Services.StubEmailService>();
+}
+else
+{
+    builder.Services.AddScoped<MultiTenantETL.Application.Interfaces.IEmailService,
+        MultiTenantETL.Infrastructure.Services.AzureCommunicationEmailService>();
+}
 
 // Database
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");

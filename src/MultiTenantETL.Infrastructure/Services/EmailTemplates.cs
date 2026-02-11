@@ -280,5 +280,119 @@ namespace MultiTenantETL.Infrastructure.Services
             
             return GetBaseTemplate(content);
         }
+        
+        /// <summary>
+        /// Pipeline execution report with execution summary and statistics
+        /// </summary>
+        public static string GetPipelineExecutionReport(
+            string pipelineName,
+            string executionId,
+            string executionStatus,
+            DateTimeOffset startTime,
+            DateTimeOffset? endTime,
+            TimeSpan? duration,
+            long recordsProcessed,
+            long recordsSucceeded,
+            long recordsFailed,
+            string? errorMessage,
+            string executionDetailsUrl)
+        {
+            var statusColor = executionStatus.ToLower() switch
+            {
+                "completed" => "#4CAF50",
+                "failed" => "#F44336",
+                "cancelled" => "#FF9800",
+                _ => "#9E9E9E"
+            };
+            
+            var statusBgColor = executionStatus.ToLower() switch
+            {
+                "completed" => "#E8F5E9",
+                "failed" => "#FFEBEE",
+                "cancelled" => "#FFF3E0",
+                _ => "#F5F5F5"
+            };
+            
+            var statusIcon = executionStatus.ToLower() switch
+            {
+                "completed" => "✓",
+                "failed" => "✗",
+                "cancelled" => "⊘",
+                _ => "•"
+            };
+            
+            var durationText = duration.HasValue 
+                ? $"{(int)duration.Value.TotalMinutes}m {duration.Value.Seconds}s"
+                : "N/A";
+                
+            var endTimeText = endTime.HasValue 
+                ? endTime.Value.ToString("MMMM dd, yyyy 'at' HH:mm 'UTC'")
+                : "N/A";
+            
+            var errorSection = !string.IsNullOrEmpty(errorMessage) 
+                ? $@"
+            <div class='security-note'>
+                <strong>Error Details</strong>
+                {System.Net.WebUtility.HtmlEncode(errorMessage)}
+            </div>" 
+                : "";
+            
+            var content = $@"
+            <h2>Pipeline Execution Report</h2>
+            <div style='background: {statusBgColor}; border-left: 4px solid {statusColor}; padding: 16px; margin: 20px 0; border-radius: 4px;'>
+                <div style='display: flex; align-items: center;'>
+                    <span style='font-size: 24px; margin-right: 12px;'>{statusIcon}</span>
+                    <div>
+                        <strong style='color: {statusColor}; font-size: 16px; display: block;'>{executionStatus.ToUpper()}</strong>
+                        <span style='color: #666; font-size: 14px;'>{pipelineName}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div style='background: #F5F5F5; padding: 20px; border-radius: 6px; margin: 20px 0;'>
+                <table style='width: 100%; border-collapse: collapse;'>
+                    <tr>
+                        <td style='padding: 8px 0; color: #666; font-size: 14px;'>Execution ID</td>
+                        <td style='padding: 8px 0; color: #1a1a1a; font-size: 14px; text-align: right; font-family: monospace;'>{executionId}</td>
+                    </tr>
+                    <tr style='border-top: 1px solid #E0E0E0;'>
+                        <td style='padding: 8px 0; color: #666; font-size: 14px;'>Started At</td>
+                        <td style='padding: 8px 0; color: #1a1a1a; font-size: 14px; text-align: right;'>{startTime:MMMM dd, yyyy 'at' HH:mm 'UTC'}</td>
+                    </tr>
+                    <tr style='border-top: 1px solid #E0E0E0;'>
+                        <td style='padding: 8px 0; color: #666; font-size: 14px;'>Completed At</td>
+                        <td style='padding: 8px 0; color: #1a1a1a; font-size: 14px; text-align: right;'>{endTimeText}</td>
+                    </tr>
+                    <tr style='border-top: 1px solid #E0E0E0;'>
+                        <td style='padding: 8px 0; color: #666; font-size: 14px;'>Duration</td>
+                        <td style='padding: 8px 0; color: #1a1a1a; font-size: 14px; text-align: right;'>{durationText}</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <h2 style='font-size: 16px; margin: 24px 0 12px;'>Execution Statistics</h2>
+            <div style='display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 20px 0;'>
+                <div style='background: white; border: 1px solid #E0E0E0; padding: 16px; border-radius: 6px; text-align: center;'>
+                    <div style='font-size: 24px; font-weight: 600; color: #0066FF; margin-bottom: 4px;'>{recordsProcessed:N0}</div>
+                    <div style='font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;'>Processed</div>
+                </div>
+                <div style='background: white; border: 1px solid #E0E0E0; padding: 16px; border-radius: 6px; text-align: center;'>
+                    <div style='font-size: 24px; font-weight: 600; color: #4CAF50; margin-bottom: 4px;'>{recordsSucceeded:N0}</div>
+                    <div style='font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;'>Succeeded</div>
+                </div>
+                <div style='background: white; border: 1px solid #E0E0E0; padding: 16px; border-radius: 6px; text-align: center;'>
+                    <div style='font-size: 24px; font-weight: 600; color: #F44336; margin-bottom: 4px;'>{recordsFailed:N0}</div>
+                    <div style='font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;'>Failed</div>
+                </div>
+            </div>
+            {errorSection}
+            <div class='button-wrapper'>
+                <a href='{executionDetailsUrl}' class='button'>View Full Execution Details</a>
+            </div>
+            <div class='divider'></div>
+            <p style='text-align: center; color: #666; font-size: 13px;'>This is an automated notification from your MultiTenant ETL pipeline.</p>";
+            
+            return GetBaseTemplate(content);
+        }
     }
 }

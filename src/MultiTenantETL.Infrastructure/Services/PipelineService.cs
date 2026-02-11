@@ -74,6 +74,9 @@ public class PipelineService : IPipelineService
             DestinationConnectorId = request.DestinationConnectorId,
             Status = "Idle",
             FieldMappingsJson = NormalizeFieldMappings(request.FieldMappings),
+            NotificationEmailsJson = request.NotificationEmails != null && request.NotificationEmails.Count > 0
+                ? JsonSerializer.Serialize(request.NotificationEmails)
+                : null,
             IsActive = true,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = userId
@@ -205,6 +208,9 @@ public class PipelineService : IPipelineService
         pipeline.Name = request.Name;
         pipeline.Description = request.Description;
         pipeline.FieldMappingsJson = NormalizeFieldMappings(request.FieldMappings);
+        pipeline.NotificationEmailsJson = request.NotificationEmails != null && request.NotificationEmails.Count > 0
+            ? JsonSerializer.Serialize(request.NotificationEmails)
+            : null;
 
         if (request.IsActive.HasValue)
         {
@@ -393,6 +399,9 @@ public class PipelineService : IPipelineService
                 UpdatedAt = pipeline.Schedule.UpdatedAt
             } : null,
             IsActive = pipeline.IsActive,
+            NotificationEmails = !string.IsNullOrEmpty(pipeline.NotificationEmailsJson)
+                ? JsonSerializer.Deserialize<List<string>>(pipeline.NotificationEmailsJson)
+                : null,
             LastRunAt = pipeline.LastRunAt,
             LastRunStatus = pipeline.LastRunStatus,
             LastRunRecordsProcessed = pipeline.LastRunRecordsProcessed,

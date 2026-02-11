@@ -1,12 +1,15 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Application.DataAccess;
+using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Application.Orchestration;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Domain.Enums;
+using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.Persistence;
 
 namespace MultiTenantETL.Infrastructure.Orchestration;
@@ -17,6 +20,8 @@ public class PipelineOrchestrator : IPipelineOrchestrator
     private readonly IDataReaderFactory _readerFactory;
     private readonly IDataWriterFactory _writerFactory;
     private readonly IFieldMappingService _fieldMappingService;
+    private readonly IEmailService _emailService;
+    private readonly string? _frontendUrl;
     private readonly ILogger<PipelineOrchestrator> _logger;
 
     public PipelineOrchestrator(
@@ -24,12 +29,16 @@ public class PipelineOrchestrator : IPipelineOrchestrator
         IDataReaderFactory readerFactory,
         IDataWriterFactory writerFactory,
         IFieldMappingService fieldMappingService,
+        IEmailService emailService,
+        IOptions<AzureCommunicationSettings> azureSettings,
         ILogger<PipelineOrchestrator> logger)
     {
         _context = context;
         _readerFactory = readerFactory;
         _writerFactory = writerFactory;
         _fieldMappingService = fieldMappingService;
+        _emailService = emailService;
+        _frontendUrl = azureSettings.Value.FrontendUrl;
         _logger = logger;
     }
 
@@ -125,6 +134,9 @@ public class PipelineOrchestrator : IPipelineOrchestrator
 
         _logger.LogInformation("Execution {ExecutionId} completed: {TotalProcessed} records processed",
             execution.Id, result.TotalProcessed);
+        
+        // Send notification emails
+        await SendExecutionNotificationAsync(execution, cancellationToken);
     }
 
     private async Task FailExecutionAsync(PipelineExecution execution, string errorMessage, CancellationToken cancellationToken)
@@ -143,6 +155,9 @@ public class PipelineOrchestrator : IPipelineOrchestrator
 
         await _context.SaveChangesAsync(cancellationToken);
         await AddLogEntryAsync(execution, "Error", "System", errorMessage, cancellationToken);
+        
+        // Send notification emails
+        await SendExecutionNotificationAsync(execution, cancellationToken);
     }
 
     private async Task CancelExecutionAsync(PipelineExecution execution, CancellationToken cancellationToken)
@@ -160,6 +175,9 @@ public class PipelineOrchestrator : IPipelineOrchestrator
 
         await _context.SaveChangesAsync(cancellationToken);
         await AddLogEntryAsync(execution, "Warning", "System", "Execution cancelled by user", cancellationToken);
+        
+        // Send notification emails
+        await SendExecutionNotificationAsync(execution, cancellationToken);
     }
 
     private async Task<BatchProcessingResult> ProcessBatchesAsync(
@@ -304,6 +322,81 @@ public class PipelineOrchestrator : IPipelineOrchestrator
         }
 
         return options;
+    }
+    
+    private async Task SendExecutionNotificationAsync(PipelineExecution execution, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (execution.Pipeline == null || string.IsNullOrEmpty(execution.Pipeline.NotificationEmailsJson))
+            {
+                return; // No notification emails configured
+            }
+
+            List<string>? notificationEmails = null;
+            try
+            {
+                notificationEmails = JsonSerializer.Deserialize<List<string>>(execution.Pipeline.NotificationEmailsJson);
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogWarning(ex, "Failed to deserialize notification emails for pipeline {PipelineId}", execution.Pipeline.Id);
+                return;
+            }
+
+            if (notificationEmails == null || notificationEmails.Count == 0)
+            {
+                return; // No notification emails to send
+            }
+
+            if (string.IsNullOrEmpty(_frontendUrl))
+            {
+                _logger.LogWarning("Frontend URL not configured, cannot send execution notification emails");
+                return;
+            }
+
+            var executionDetailsUrl = $"{_frontendUrl}/executions/{execution.Id}";
+            
+            foreach (var email in notificationEmails)
+            {
+                if (string.IsNullOrWhiteSpace(email))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    await _emailService.SendPipelineExecutionReportAsync(
+                        recipientEmail: email.Trim(),
+                        pipelineName: execution.Pipeline.Name,
+                        executionId: execution.Id.ToString(),
+                        executionStatus: execution.Status.ToString(),
+                        startTime: execution.StartTime,
+                        endTime: execution.EndTime,
+                        duration: execution.Duration,
+                        recordsProcessed: execution.RecordsProcessed,
+                        recordsSucceeded: execution.RecordsSucceeded,
+                        recordsFailed: execution.RecordsFailed,
+                        errorMessage: execution.ErrorMessage,
+                        executionDetailsUrl: executionDetailsUrl);
+                        
+                    _logger.LogInformation("Sent execution notification email to {Email} for execution {ExecutionId}", 
+                        email, execution.Id);
+                }
+                catch (Exception ex)
+                {
+                    // Log but don't fail the execution
+                    _logger.LogError(ex, "Failed to send execution notification email to {Email} for execution {ExecutionId}", 
+                        email, execution.Id);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // Catch-all to ensure email failures don't affect execution completion
+            _logger.LogError(ex, "Unexpected error sending execution notification emails for execution {ExecutionId}", 
+                execution.Id);
+        }
     }
 
     private sealed class BatchProcessingResult

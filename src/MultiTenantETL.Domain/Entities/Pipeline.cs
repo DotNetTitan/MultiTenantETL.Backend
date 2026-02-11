@@ -22,6 +22,9 @@ public class Pipeline : ITenantResource
     // Pipeline active state (can be used to disable a pipeline without deleting)
     public bool IsActive { get; set; }
     
+    // Notification settings - email addresses to notify after pipeline execution
+    public string? NotificationEmailsJson { get; set; } // JSON array of email addresses
+    
     // Execution tracking
     public DateTime? LastRunAt { get; set; }
     public string? LastRunStatus { get; set; } // Completed, Failed, Cancelled
