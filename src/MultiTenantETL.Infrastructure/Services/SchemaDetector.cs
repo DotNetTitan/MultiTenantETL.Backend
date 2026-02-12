@@ -172,7 +172,7 @@ public class SchemaDetector : ISchemaDetector
             fields.Add(new SchemaField
             {
                 Name = reader.GetString(0),
-                DataType = reader.GetString(1),
+                DataType = NormalizeDataType(reader.GetString(1)),
                 IsNullable = reader.GetString(2) == "YES",
                 IsPrimaryKey = reader.GetInt32(7) == 1,
                 MaxLength = reader.IsDBNull(3) ? null : reader.GetInt32(3),
@@ -226,7 +226,7 @@ public class SchemaDetector : ISchemaDetector
             fields.Add(new SchemaField
             {
                 Name = reader.GetString(0),
-                DataType = reader.GetString(1),
+                DataType = NormalizeDataType(reader.GetString(1)),
                 IsNullable = reader.GetString(2) == "YES",
                 IsPrimaryKey = reader.GetBoolean(7),
                 MaxLength = reader.IsDBNull(3) ? null : reader.GetInt32(3),
@@ -273,7 +273,7 @@ public class SchemaDetector : ISchemaDetector
             fields.Add(new SchemaField
             {
                 Name = reader.GetString(0),
-                DataType = reader.GetString(1),
+                DataType = NormalizeDataType(reader.GetString(1)),
                 IsNullable = reader.GetString(2) == "YES",
                 IsPrimaryKey = reader.GetInt32(7) == 1,
                 MaxLength = reader.IsDBNull(3) ? null : Convert.ToInt32(reader.GetInt64(3)),
@@ -325,7 +325,7 @@ public class SchemaDetector : ISchemaDetector
             fields.Add(new SchemaField
             {
                 Name = reader.GetString(0),
-                DataType = reader.GetString(1),
+                DataType = NormalizeDataType(reader.GetString(1)),
                 IsNullable = reader.GetString(2) == "Y",
                 IsPrimaryKey = reader.GetInt32(7) == 1,
                 MaxLength = reader.IsDBNull(3) ? null : Convert.ToInt32(reader.GetInt64(3)),
@@ -689,6 +689,78 @@ public class SchemaDetector : ISchemaDetector
         };
     }
 
+    /// <summary>
+    /// Normalizes database-specific data types to standardized types defined in MetadataConstants.
+    /// This ensures consistent type representation across different database providers.
+    /// </summary>
+    /// <param name="dbType">The database-specific type name</param>
+    /// <returns>The normalized type name from MetadataConstants.DataTypes</returns>
+    private static string NormalizeDataType(string? dbType)
+    {
+        if (string.IsNullOrWhiteSpace(dbType))
+            return "varchar";
+
+        var normalizedInput = dbType.Trim().ToLowerInvariant();
+
+        // Database-specific type mappings to MetadataConstants standard types
+        return normalizedInput switch
+        {
+            // PostgreSQL types → Standard types
+            "integer" or "int4" => "int",
+            "int2" => "smallint",
+            "int8" => "bigint",
+            "smallserial" => "smallint",
+            "serial" => "int",
+            "bigserial" => "bigint",
+            "double precision" => "decimal",
+            "real" => "float",
+            "character varying" => "varchar",
+            "character" => "char",
+            "timestamp without time zone" or "timestamp with time zone" => "timestamp",
+            "time without time zone" or "time with time zone" => "time",
+            "bytea" => "varbinary",
+
+            // MySQL types → Standard types
+            "tinyint unsigned" => "smallint",
+            "smallint unsigned" => "int",
+            "mediumint" or "mediumint unsigned" => "int",
+            "int unsigned" => "bigint",
+            "bigint unsigned" => "bigint",
+            "longtext" or "mediumtext" => "text",
+            "tinytext" => "varchar",
+            "longblob" or "mediumblob" or "tinyblob" or "blob" => "varbinary",
+
+            // Oracle types → Standard types
+            "number" or "numeric" or "bignumeric" => "decimal",
+            "varchar2" => "varchar",
+            "nvarchar2" => "nvarchar",
+            "clob" or "long" => "text",
+            "nclob" => "ntext",
+            "raw" or "long raw" => "varbinary",
+
+            // SQL Server types (most are already standard, but handle some variations)
+            "nvarchar(max)" => "ntext",
+            "varchar(max)" => "text",
+
+            // BigQuery & MongoDB common types → Standard types
+            "string" => "varchar",  // BigQuery, MongoDB
+            "bytes" or "binary" => "varbinary",  // BigQuery, MongoDB
+            "int32" => "int",  // MongoDB
+            "int64" => "bigint",  // BigQuery, MongoDB
+            "float" or "float64" or "double" => "decimal",  // BigQuery, MongoDB
+            "bool" => "boolean",  // BigQuery
+            "record" or "struct" or "document" or "array" => "json",  // BigQuery, MongoDB
+            "objectid" => "varchar",  // MongoDB
+
+            // If the type is already in MetadataConstants.DataTypes, return as-is
+            _ when MetadataConstants.DataTypes.Types.Any(t => t.Value.Equals(normalizedInput, StringComparison.OrdinalIgnoreCase))
+                => MetadataConstants.DataTypes.Types.First(t => t.Value.Equals(normalizedInput, StringComparison.OrdinalIgnoreCase)).Value,
+
+            // Unknown types default to varchar
+            _ => "varchar"
+        };
+    }
+
     // Connection string builders (same as ConnectionTester)
     private static string BuildSqlServerConnectionString(DatabaseConfig config)
     {
@@ -803,7 +875,7 @@ public class SchemaDetector : ISchemaDetector
             fields.Add(new SchemaField
             {
                 Name = reader.GetString(0),
-                DataType = reader.GetString(1),
+                DataType = NormalizeDataType(reader.GetString(1)),
                 IsNullable = reader.GetString(2) == "YES",
                 MaxLength = reader.IsDBNull(3) ? null : reader.GetInt32(3),
                 Precision = reader.IsDBNull(4) ? null : reader.GetInt32(4),
@@ -851,7 +923,7 @@ public class SchemaDetector : ISchemaDetector
         return table.Schema.Fields.Select(f => new SchemaField
         {
             Name = f.Name,
-            DataType = f.Type,
+            DataType = NormalizeDataType(f.Type),
             IsNullable = f.Mode != "REQUIRED",
             IsPrimaryKey = false
         }).ToList();
@@ -903,7 +975,7 @@ public class SchemaDetector : ISchemaDetector
             fields.Add(new SchemaField
             {
                 Name = reader.GetString(0),
-                DataType = reader.GetString(1),
+                DataType = NormalizeDataType(reader.GetString(1)),
                 IsNullable = reader.GetString(2) == "YES",
                 IsPrimaryKey = reader.GetBoolean(4),
                 MaxLength = reader.IsDBNull(3) ? null : reader.GetInt32(3)
@@ -936,7 +1008,7 @@ public class SchemaDetector : ISchemaDetector
                 fieldMap[element.Name] = new SchemaField
                 {
                     Name = element.Name,
-                    DataType = element.Value.BsonType.ToString().ToLower(),
+                    DataType = NormalizeDataType(element.Value.BsonType.ToString()),
                     IsNullable = true,
                     IsPrimaryKey = element.Name == "_id"
                 };
