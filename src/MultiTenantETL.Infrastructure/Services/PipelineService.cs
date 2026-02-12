@@ -77,6 +77,7 @@ public class PipelineService : IPipelineService
             NotificationEmailsJson = request.NotificationEmails != null && request.NotificationEmails.Count > 0
                 ? JsonSerializer.Serialize(request.NotificationEmails)
                 : null,
+            EmailNotificationsEnabled = request.EmailNotificationsEnabled,
             IsActive = true,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = userId
@@ -215,6 +216,11 @@ public class PipelineService : IPipelineService
         if (request.IsActive.HasValue)
         {
             pipeline.IsActive = request.IsActive.Value;
+        }
+
+        if (request.EmailNotificationsEnabled.HasValue)
+        {
+            pipeline.EmailNotificationsEnabled = request.EmailNotificationsEnabled.Value;
         }
 
         pipeline.UpdatedAt = DateTime.UtcNow;
@@ -399,6 +405,7 @@ public class PipelineService : IPipelineService
                 UpdatedAt = pipeline.Schedule.UpdatedAt
             } : null,
             IsActive = pipeline.IsActive,
+            EmailNotificationsEnabled = pipeline.EmailNotificationsEnabled,
             NotificationEmails = !string.IsNullOrEmpty(pipeline.NotificationEmailsJson)
                 ? JsonSerializer.Deserialize<List<string>>(pipeline.NotificationEmailsJson)
                 : null,

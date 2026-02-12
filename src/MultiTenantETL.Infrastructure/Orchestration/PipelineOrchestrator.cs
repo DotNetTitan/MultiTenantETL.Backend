@@ -333,6 +333,14 @@ public class PipelineOrchestrator : IPipelineOrchestrator
                 return; // No notification emails configured
             }
 
+            // Check if email notifications are enabled for this pipeline
+            if (!execution.Pipeline.EmailNotificationsEnabled)
+            {
+                _logger.LogInformation("Email notifications are disabled for pipeline {PipelineId}, skipping notification",
+                    execution.Pipeline.Id);
+                return;
+            }
+
             List<string>? notificationEmails = null;
             try
             {

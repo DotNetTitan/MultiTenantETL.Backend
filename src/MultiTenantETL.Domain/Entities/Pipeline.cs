@@ -24,7 +24,10 @@ public class Pipeline : ITenantResource
     
     // Notification settings - email addresses to notify after pipeline execution
     public string? NotificationEmailsJson { get; set; } // JSON array of email addresses
-    
+
+    // Email notification enabled state (allows disabling emails without removing addresses)
+    public bool EmailNotificationsEnabled { get; set; } = true;
+
     // Execution tracking
     public DateTime? LastRunAt { get; set; }
     public string? LastRunStatus { get; set; } // Completed, Failed, Cancelled
