@@ -138,7 +138,8 @@ public static class DbSeeder
         var configuration = services.GetRequiredService<IConfiguration>();
 
         const string adminEmail = "admin@multitenant-etl.com";
-        const string adminPassword = "Admin@123456";
+        var adminPassword = configuration["Seeding:AdminPassword"]
+            ?? throw new InvalidOperationException("Seeding:AdminPassword is not configured. Set it in appsettings.json or environment variables.");
 
         var existingAdmin = await userManager.FindByEmailAsync(adminEmail);
         if (existingAdmin == null)
@@ -194,9 +195,13 @@ public static class DbSeeder
         var configuration = services.GetRequiredService<IConfiguration>();
 
         var oauthClientSecret = configuration["Seeding:OAuthClientSecret"] ?? "postman-secret-key-change-in-production";
+        var frontendUrl = configuration["AppSettings:FrontendUrl"]
+            ?? throw new InvalidOperationException("AppSettings:FrontendUrl is not configured. Set it in appsettings.json or environment variables.");
 
         if (await applicationManager.FindByClientIdAsync("multitenant-etl-spa") == null)
         {
+            var normalizedUrl = frontendUrl.TrimEnd('/');
+
             await applicationManager.CreateAsync(new OpenIddictApplicationDescriptor
             {
                 ClientId = "multitenant-etl-spa",
@@ -220,13 +225,11 @@ public static class DbSeeder
 
                 RedirectUris =
                 {
-                    new Uri("http://localhost:5173/auth/callback"),
-                    new Uri("https://app.example.com/auth/callback")
+                    new Uri($"{normalizedUrl}/auth/callback")
                 },
                 PostLogoutRedirectUris =
                 {
-                    new Uri("http://localhost:5173/"),
-                    new Uri("https://app.example.com/")
+                    new Uri($"{normalizedUrl}/")
                 }
             });
 
@@ -264,9 +267,11 @@ public static class DbSeeder
     {
         var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
         var dbContext = services.GetRequiredService<ApplicationDbContext>();
+        var configuration = services.GetRequiredService<IConfiguration>();
 
         const string guestEmail = "guest@multitenant-etl.com";
-        const string guestPassword = "Guest@123456";
+        var guestPassword = configuration["Seeding:GuestPassword"]
+            ?? throw new InvalidOperationException("Seeding:GuestPassword is not configured. Set it in appsettings.json or environment variables.");
 
         var existingGuest = await userManager.FindByEmailAsync(guestEmail);
         if (existingGuest == null)
@@ -702,7 +707,7 @@ public static class DbSeeder
             Id = Guid.NewGuid(),
             TenantId = tenantId,
             PipelineId = scheduledPipelines[0].Id,
-            CronExpression = "0 2 * * *", // Daily at 2 AM
+            CronExpression = "0 0 2 * * ?", // Daily at 2 AM
             Timezone = "UTC",
             Description = "Daily at 2:00 AM UTC",
             IsActive = true,
@@ -716,7 +721,7 @@ public static class DbSeeder
             Id = Guid.NewGuid(),
             TenantId = tenantId,
             PipelineId = scheduledPipelines[1].Id,
-            CronExpression = "0 */6 * * *", // Every 6 hours
+            CronExpression = "0 0 */6 * * ?", // Every 6 hours
             Timezone = "UTC",
             Description = "Every 6 hours",
             IsActive = true,
@@ -730,7 +735,7 @@ public static class DbSeeder
             Id = Guid.NewGuid(),
             TenantId = tenantId,
             PipelineId = scheduledPipelines[2].Id,
-            CronExpression = "0 */4 * * *", // Every 4 hours
+            CronExpression = "0 0 */4 * * ?", // Every 4 hours
             Timezone = "UTC",
             Description = "Every 4 hours",
             IsActive = true,

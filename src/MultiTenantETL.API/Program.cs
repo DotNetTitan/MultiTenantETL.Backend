@@ -335,7 +335,7 @@ builder.Services.AddSingleton<IProcessingStrategy, AsyncKeyLockProcessingStrateg
 // CORS Configuration
 var allowedOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")
-    .Get<string[]>() ?? new[] { "http://localhost:5173" };
+    .Get<string[]>() ?? throw new InvalidOperationException("Cors:AllowedOrigins is not configured in appsettings.");
 
 builder.Services.AddCors(options =>
 {

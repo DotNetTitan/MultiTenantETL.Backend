@@ -1,5 +1,6 @@
 using Azure;
 using Azure.Communication.Email;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MultiTenantETL.Application.Interfaces;
@@ -14,10 +15,12 @@ namespace MultiTenantETL.Infrastructure.Services
     {
         private readonly EmailClient _emailClient;
         private readonly string _senderAddress;
+        private readonly string _frontendUrl;
         private readonly ILogger<AzureCommunicationEmailService> _logger;
 
         public AzureCommunicationEmailService(
             IOptions<AzureCommunicationSettings> settings,
+            IConfiguration configuration,
             ILogger<AzureCommunicationEmailService> logger)
         {
             _logger = logger;
@@ -36,6 +39,8 @@ namespace MultiTenantETL.Infrastructure.Services
 
             _emailClient = new EmailClient(settings.Value.ConnectionString);
             _senderAddress = settings.Value.SenderEmailAddress;
+            _frontendUrl = configuration["AppSettings:FrontendUrl"]
+                ?? throw new InvalidOperationException("AppSettings:FrontendUrl is not configured.");
         }
 
         public async Task SendEmailConfirmationAsync(string email, string firstName, string confirmationUrl)
@@ -55,7 +60,7 @@ namespace MultiTenantETL.Infrastructure.Services
         public async Task SendWelcomeEmailAsync(string email, string firstName)
         {
             var subject = "Welcome to MultiTenant ETL!";
-            var htmlContent = EmailTemplates.GetWelcome(firstName);
+            var htmlContent = EmailTemplates.GetWelcome(firstName, _frontendUrl);
             await SendEmailAsync(email, subject, htmlContent);
         }
 

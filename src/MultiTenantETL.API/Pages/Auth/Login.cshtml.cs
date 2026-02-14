@@ -44,8 +44,8 @@ public class LoginModel : PageModel
 
     public string? ErrorMessage { get; set; }
 
-    public string FrontendUrl => _configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()?.FirstOrDefault() 
-        ?? "http://localhost:5173";
+    public string FrontendUrl => _configuration["AppSettings:FrontendUrl"]
+        ?? throw new InvalidOperationException("AppSettings:FrontendUrl is not configured.");
 
     public async Task<IActionResult> OnGetAsync(string? returnUrl = null)
     {

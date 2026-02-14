@@ -176,7 +176,7 @@ namespace MultiTenantETL.Infrastructure.Services
         <div class='content'>{content}</div>
         <div class='footer'>
             <p><strong>© 2025 MultiTenant ETL</strong> · All rights reserved</p>
-            <p>If you didn't request this email, please ignore it or <a href='mailto:support@multitenanteti.com'>contact support</a></p>
+            <p>If you didn't request this email, please ignore it or <a href='mailto:support@multitenantetl.com'>contact support</a></p>
         </div>
     </div>
 </body>
@@ -236,8 +236,9 @@ namespace MultiTenantETL.Infrastructure.Services
         /// <summary>
         /// Welcome email sent after successful email confirmation
         /// </summary>
-        public static string GetWelcome(string firstName)
+        public static string GetWelcome(string firstName, string frontendUrl)
         {
+            var loginUrl = $"{frontendUrl.TrimEnd('/')}/login";
             var content = $@"
             <h2>Welcome {firstName}</h2>
             <div class='success-note'>
@@ -252,7 +253,7 @@ namespace MultiTenantETL.Infrastructure.Services
                 <li><strong>Automation</strong> – Schedule automated data flows</li>
             </ul>
             <div class='button-wrapper'>
-                <a href='http://localhost:5173/login' class='button'>Get Started</a>
+                <a href='{loginUrl}' class='button'>Get Started</a>
             </div>
             <div class='divider'></div>
             <p style='text-align: center; color: #666; font-size: 14px;'>Need help getting started? Check out our <a href='#' style='color: #0066FF;'>documentation</a> or <a href='#' style='color: #0066FF;'>contact support</a>.</p>";
@@ -275,7 +276,7 @@ namespace MultiTenantETL.Infrastructure.Services
             <div class='divider'></div>
             <div class='security-note'>
                 <strong>Security Alert</strong>
-                If you didn't make this change, please <a href='mailto:support@multitenanteti.com' style='color: #5D4037; font-weight: 600;'>contact support immediately</a> to secure your account.
+                If you didn't make this change, please <a href='mailto:support@multitenantetl.com' style='color: #5D4037; font-weight: 600;'>contact support immediately</a> to secure your account.
             </div>";
             
             return GetBaseTemplate(content);
