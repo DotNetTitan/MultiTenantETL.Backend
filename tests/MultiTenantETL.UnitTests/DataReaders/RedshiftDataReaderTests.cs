@@ -7,6 +7,7 @@ using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.DataReaders;
+using MultiTenantETL.Infrastructure.Security;
 using NSubstitute;
 using Xunit;
 using Npgsql;
@@ -17,7 +18,7 @@ public class RedshiftDataReaderTests
 {
     private readonly ILogger<RedshiftDataReader> _logger;
     private readonly IOptions<EtlSettings> _settings;
-    private readonly IEncryptionService _encryptionService;
+    private readonly ISecretResolver _secretResolver;
     private readonly RedshiftDataReader _sut;
 
     public RedshiftDataReaderTests()
@@ -27,18 +28,18 @@ public class RedshiftDataReaderTests
         {
             CommandTimeoutSeconds = 300
         });
-        _encryptionService = Substitute.For<IEncryptionService>();
-        _encryptionService.DecryptJsonFields(Arg.Any<JsonElement>(), Arg.Any<string[]>())
-            .Returns(x => x.ArgAt<JsonElement>(0));
+        _secretResolver = Substitute.For<ISecretResolver>();
+        _secretResolver.ResolveSecretsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(x => Task.FromResult(JsonDocument.Parse(x.ArgAt<string>(0)).RootElement));
 
-        _sut = new RedshiftDataReader(_logger, _settings, _encryptionService);
+        _sut = new RedshiftDataReader(_logger, _settings, _secretResolver);
     }
 
     [Fact]
     public void Constructor_WithValidParameters_ShouldCreateInstance()
     {
         // Act
-        var instance = new RedshiftDataReader(_logger, _settings, _encryptionService);
+        var instance = new RedshiftDataReader(_logger, _settings, _secretResolver);
 
         // Assert
         instance.Should().NotBeNull();
@@ -58,13 +59,16 @@ public class RedshiftDataReaderTests
         };
         var options = new ReadOptions();
 
-        // Act & Assert
-        await Assert.ThrowsAsync<JsonException>(async () =>
+        // Act
+        Func<Task> act = async () =>
         {
             await foreach (var batch in _sut.ReadAsync(connector, options, CancellationToken.None))
             {
             }
-        });
+        };
+
+        // Assert - JsonReaderException is a subclass of JsonException
+        await act.Should().ThrowAsync<JsonException>();
     }
 
     [Fact]

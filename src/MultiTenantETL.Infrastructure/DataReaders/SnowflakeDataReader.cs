@@ -4,9 +4,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Connectors.DataReaders;
-using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
+using MultiTenantETL.Infrastructure.Security;
 using Snowflake.Data.Client;
 using IDataReader = MultiTenantETL.Application.Connectors.DataReaders.IDataReader;
 
@@ -16,16 +16,16 @@ public class SnowflakeDataReader : IDataReader
 {
     private readonly ILogger<SnowflakeDataReader> _logger;
     private readonly EtlSettings _settings;
-    private readonly IEncryptionService _encryptionService;
+    private readonly ISecretResolver _secretResolver;
 
     public SnowflakeDataReader(
         ILogger<SnowflakeDataReader> logger,
         IOptions<EtlSettings> settings,
-        IEncryptionService encryptionService)
+        ISecretResolver secretResolver)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
-        _encryptionService = encryptionService ?? throw new ArgumentNullException(nameof(encryptionService));
+        _secretResolver = secretResolver ?? throw new ArgumentNullException(nameof(secretResolver));
     }
 
     public async IAsyncEnumerable<ReadBatch> ReadAsync(
@@ -162,12 +162,10 @@ public class SnowflakeDataReader : IDataReader
 
     private SnowflakeConfig ParseConfig(string configJson)
     {
-        var jsonElement = JsonSerializer.Deserialize<JsonElement>(configJson);
+        // Resolve Key Vault secrets
+        var resolvedElement = _secretResolver.ResolveSecretsAsync(configJson).GetAwaiter().GetResult();
 
-        // Decrypt sensitive fields
-        var decryptedElement = _encryptionService.DecryptJsonFields(jsonElement, EncryptionConstants.SensitiveFields);
-
-        var config = JsonSerializer.Deserialize<SnowflakeConfig>(decryptedElement.GetRawText(), JsonSerializerOptionsProvider.Default)
+        var config = JsonSerializer.Deserialize<SnowflakeConfig>(resolvedElement.GetRawText(), JsonSerializerOptionsProvider.Default)
             ?? throw new InvalidOperationException("Invalid Snowflake configuration");
 
         // Build connection string if not provided directly

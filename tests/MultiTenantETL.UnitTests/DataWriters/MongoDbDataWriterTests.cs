@@ -6,6 +6,7 @@ using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.DataWriters;
+using MultiTenantETL.Infrastructure.Security;
 using NSubstitute;
 using Xunit;
 
@@ -14,24 +15,24 @@ namespace MultiTenantETL.UnitTests.DataWriters;
 public class MongoDbDataWriterTests
 {
     private readonly ILogger<MongoDbDataWriter> _logger;
-    private readonly IEncryptionService _encryptionService;
+    private readonly ISecretResolver _secretResolver;
     private readonly MongoDbDataWriter _sut;
 
     public MongoDbDataWriterTests()
     {
         _logger = Substitute.For<ILogger<MongoDbDataWriter>>();
-        _encryptionService = Substitute.For<IEncryptionService>();
-        _encryptionService.DecryptJsonFields(Arg.Any<JsonElement>(), Arg.Any<string[]>())
-            .Returns(x => x.ArgAt<JsonElement>(0));
+        _secretResolver = Substitute.For<ISecretResolver>();
+        _secretResolver.ResolveSecretsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(x => Task.FromResult(JsonDocument.Parse(x.ArgAt<string>(0)).RootElement));
 
-        _sut = new MongoDbDataWriter(_logger, _encryptionService);
+        _sut = new MongoDbDataWriter(_logger, _secretResolver);
     }
 
     [Fact]
     public void Constructor_WithValidParameters_ShouldCreateInstance()
     {
         // Act
-        var instance = new MongoDbDataWriter(_logger, _encryptionService);
+        var instance = new MongoDbDataWriter(_logger, _secretResolver);
 
         // Assert
         instance.Should().NotBeNull();

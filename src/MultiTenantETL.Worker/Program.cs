@@ -59,6 +59,16 @@ builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 // Encryption Service (needed for decrypting connector credentials)
 builder.Services.AddSingleton<IEncryptionService, MultiTenantETL.Infrastructure.Security.EncryptionService>();
 
+// Azure Key Vault Configuration
+builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.AzureKeyVaultSettings>(
+    builder.Configuration.GetSection("AzureKeyVault"));
+
+// Secret Storage Services (Azure Key Vault)
+builder.Services.AddSingleton<MultiTenantETL.Application.Common.Interfaces.ISecretStorageService,
+    MultiTenantETL.Infrastructure.Security.KeyVaultSecretStorageService>();
+builder.Services.AddScoped<MultiTenantETL.Application.Common.Interfaces.ISecretResolver,
+    MultiTenantETL.Infrastructure.Security.SecretResolver>();
+
 // Audit Service - use null implementation for worker (actions already audited at API level)
 builder.Services.AddScoped<MultiTenantETL.Application.Interfaces.IAuditService,
     MultiTenantETL.Infrastructure.Services.NullAuditService>();

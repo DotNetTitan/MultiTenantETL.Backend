@@ -385,6 +385,16 @@ builder.Services.AddSingleton<IInputSanitizer, InputSanitizer>();
 builder.Services.AddSingleton<IMetadataService, MetadataService>();
 builder.Services.AddSingleton<IEncryptionService, MultiTenantETL.Infrastructure.Security.EncryptionService>();
 
+// Azure Key Vault Configuration
+builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.AzureKeyVaultSettings>(
+    builder.Configuration.GetSection("AzureKeyVault"));
+
+// Secret Storage Services (Azure Key Vault)
+builder.Services.AddSingleton<MultiTenantETL.Application.Common.Interfaces.ISecretStorageService,
+    MultiTenantETL.Infrastructure.Security.KeyVaultSecretStorageService>();
+builder.Services.AddScoped<MultiTenantETL.Application.Common.Interfaces.ISecretResolver,
+    MultiTenantETL.Infrastructure.Security.SecretResolver>();
+
 // Connector Services
 builder.Services.AddScoped<MultiTenantETL.Application.Connectors.IConnectorService,
     MultiTenantETL.Infrastructure.Services.ConnectorService>();

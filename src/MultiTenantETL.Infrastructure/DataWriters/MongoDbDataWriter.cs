@@ -6,9 +6,9 @@ using MongoDB.Driver;
 using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
-using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
+using MultiTenantETL.Infrastructure.Security;
 
 namespace MultiTenantETL.Infrastructure.DataWriters;
 
@@ -19,12 +19,12 @@ namespace MultiTenantETL.Infrastructure.DataWriters;
 public class MongoDbDataWriter : IDataWriter
 {
     private readonly ILogger<MongoDbDataWriter> _logger;
-    private readonly IEncryptionService _encryptionService;
+    private readonly ISecretResolver _secretResolver;
 
-    public MongoDbDataWriter(ILogger<MongoDbDataWriter> logger, IEncryptionService encryptionService)
+    public MongoDbDataWriter(ILogger<MongoDbDataWriter> logger, ISecretResolver secretResolver)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _encryptionService = encryptionService ?? throw new ArgumentNullException(nameof(encryptionService));
+        _secretResolver = secretResolver ?? throw new ArgumentNullException(nameof(secretResolver));
     }
 
     public async Task<DataWriteResult> WriteBatchAsync(
@@ -103,10 +103,10 @@ public class MongoDbDataWriter : IDataWriter
 
     private MongoDbConfig ParseConfig(string configJson)
     {
-        var jsonElement = JsonSerializer.Deserialize<JsonElement>(configJson);
-        var decryptedElement = _encryptionService.DecryptJsonFields(jsonElement, EncryptionConstants.SensitiveFields);
+        // Resolve Key Vault secrets
+        var resolvedElement = _secretResolver.ResolveSecretsAsync(configJson).GetAwaiter().GetResult();
         
-        var config = JsonSerializer.Deserialize<MongoDbConfig>(decryptedElement.GetRawText(), JsonSerializerOptionsProvider.Default)
+        var config = JsonSerializer.Deserialize<MongoDbConfig>(resolvedElement.GetRawText(), JsonSerializerOptionsProvider.Default)
             ?? throw new InvalidOperationException("Invalid MongoDB configuration");
 
         if (string.IsNullOrEmpty(config.CollectionName) && config.WriteConfig != null)

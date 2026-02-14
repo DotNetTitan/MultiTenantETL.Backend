@@ -34,7 +34,7 @@ public class PostgreSqlDataWriterTests : IAsyncLifetime
         var logger = LoggerFactory.Create(builder => builder.AddConsole())
             .CreateLogger<PostgreSqlDataWriter>();
         
-        _writer = new PostgreSqlDataWriter(logger, new StubEncryptionService());
+        _writer = new PostgreSqlDataWriter(logger, new StubSecretResolver());
 
         // Create test table
         await using var connection = new NpgsqlConnection(_connectionString);

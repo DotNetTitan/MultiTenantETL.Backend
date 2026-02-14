@@ -38,7 +38,7 @@ public class PostgreSqlDataReaderTests : IAsyncLifetime
             CommandTimeoutSeconds = 300
         });
         
-        _reader = new PostgreSqlDataReader(logger, settings, new StubEncryptionService());
+        _reader = new PostgreSqlDataReader(logger, settings, new StubSecretResolver());
 
         // Create and populate test table
         await using var connection = new NpgsqlConnection(_connectionString);

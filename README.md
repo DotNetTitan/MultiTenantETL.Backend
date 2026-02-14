@@ -56,6 +56,7 @@ A production-ready, secure multi-tenant ASP.NET Core 8.0 platform designed for E
 - Token revocation on password change and logout
 - Input sanitization utilities
 - Email enumeration prevention
+- **Azure Key Vault integration** for connector credential storage
 
 ### Clean Architecture
 - Strict separation of concerns with Domain, Application, Infrastructure, API, and Worker layers
@@ -494,6 +495,14 @@ For manual testing of the Authorization Code + PKCE flow, you can use cURL comma
 - ✅ **CORS Configuration**: Configured for `http://localhost:5173` (Vue dev server)
 - ✅ **Security Headers**: X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy
 - ✅ **Input Sanitization**: Utilities for preventing injection attacks
+
+### Credential Storage
+- ✅ **Azure Key Vault Integration**: All connector credentials stored in Azure Key Vault
+- ✅ **Automatic Secret Management**: Secrets automatically created, retrieved, and deleted
+- ✅ **Managed Identity Support**: Production uses Azure Managed Identity (no credentials in code)
+- ✅ **Reference-Based Storage**: Database stores Key Vault references (e.g., `keyvault:secret-name`)
+- ✅ **Sensitive Field Detection**: Passwords, API keys, and secrets automatically identified
+- 📚 **Setup Guide**: See [Azure Key Vault Setup Guide](./docs/guides/AZURE-KEY-VAULT-SETUP.md)
 
 ## 🗄️ Database Schema
 

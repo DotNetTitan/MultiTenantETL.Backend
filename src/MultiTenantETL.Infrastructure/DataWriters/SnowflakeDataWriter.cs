@@ -4,9 +4,9 @@ using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
-using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
+using MultiTenantETL.Infrastructure.Security;
 using Snowflake.Data.Client;
 
 namespace MultiTenantETL.Infrastructure.DataWriters;
@@ -14,12 +14,12 @@ namespace MultiTenantETL.Infrastructure.DataWriters;
 public class SnowflakeDataWriter : IDataWriter
 {
     private readonly ILogger<SnowflakeDataWriter> _logger;
-    private readonly IEncryptionService _encryptionService;
+    private readonly ISecretResolver _secretResolver;
 
-    public SnowflakeDataWriter(ILogger<SnowflakeDataWriter> logger, IEncryptionService encryptionService)
+    public SnowflakeDataWriter(ILogger<SnowflakeDataWriter> logger, ISecretResolver secretResolver)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _encryptionService = encryptionService ?? throw new ArgumentNullException(nameof(encryptionService));
+        _secretResolver = secretResolver ?? throw new ArgumentNullException(nameof(secretResolver));
     }
 
     public async Task<DataWriteResult> WriteBatchAsync(
@@ -190,12 +190,10 @@ public class SnowflakeDataWriter : IDataWriter
 
         try
         {
-            var jsonElement = JsonSerializer.Deserialize<JsonElement>(configJson);
+            // Resolve Key Vault secrets
+            var resolvedElement = _secretResolver.ResolveSecretsAsync(configJson).GetAwaiter().GetResult();
 
-            // Decrypt sensitive fields
-            var decryptedElement = _encryptionService.DecryptJsonFields(jsonElement, EncryptionConstants.SensitiveFields);
-
-            config = JsonSerializer.Deserialize<SnowflakeConfig>(decryptedElement.GetRawText(), JsonSerializerOptionsProvider.Default)
+            config = JsonSerializer.Deserialize<SnowflakeConfig>(resolvedElement.GetRawText(), JsonSerializerOptionsProvider.Default)
                 ?? throw new InvalidOperationException("Invalid Snowflake configuration");
         }
         catch (JsonException ex)

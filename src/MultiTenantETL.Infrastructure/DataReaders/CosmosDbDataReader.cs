@@ -5,9 +5,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Connectors.DataReaders;
-using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
+using MultiTenantETL.Infrastructure.Security;
 
 namespace MultiTenantETL.Infrastructure.DataReaders;
 
@@ -15,16 +15,16 @@ public class CosmosDbDataReader : IDataReader
 {
     private readonly ILogger<CosmosDbDataReader> _logger;
     private readonly IOptions<EtlSettings> _settings;
-    private readonly IEncryptionService _encryptionService;
+    private readonly ISecretResolver _secretResolver;
 
     public CosmosDbDataReader(
         ILogger<CosmosDbDataReader> logger,
         IOptions<EtlSettings> _settings,
-        IEncryptionService encryptionService)
+        ISecretResolver secretResolver)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         this._settings = _settings ?? throw new ArgumentNullException(nameof(_settings));
-        _encryptionService = encryptionService ?? throw new ArgumentNullException(nameof(encryptionService));
+        _secretResolver = secretResolver ?? throw new ArgumentNullException(nameof(secretResolver));
     }
 
     public async IAsyncEnumerable<ReadBatch> ReadAsync(
@@ -136,10 +136,10 @@ public class CosmosDbDataReader : IDataReader
 
     private CosmosConfig ParseConfig(string configJson)
     {
-        var jsonElement = JsonSerializer.Deserialize<JsonElement>(configJson);
-        var decryptedElement = _encryptionService.DecryptJsonFields(jsonElement, EncryptionConstants.SensitiveFields);
+        // Resolve Key Vault secrets
+        var resolvedElement = _secretResolver.ResolveSecretsAsync(configJson).GetAwaiter().GetResult();
         
-        var config = JsonSerializer.Deserialize<CosmosConfig>(decryptedElement.GetRawText(), JsonSerializerOptionsProvider.Default)
+        var config = JsonSerializer.Deserialize<CosmosConfig>(resolvedElement.GetRawText(), JsonSerializerOptionsProvider.Default)
             ?? throw new InvalidOperationException("Invalid Cosmos DB configuration");
 
         if (string.IsNullOrEmpty(config.Endpoint) || string.IsNullOrEmpty(config.Key))

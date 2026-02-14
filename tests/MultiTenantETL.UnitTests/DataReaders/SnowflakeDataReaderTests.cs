@@ -7,6 +7,7 @@ using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.DataReaders;
+using MultiTenantETL.Infrastructure.Security;
 using NSubstitute;
 using IDataReader = MultiTenantETL.Application.Connectors.DataReaders.IDataReader;
 
@@ -16,7 +17,7 @@ public class SnowflakeDataReaderTests : IDisposable
 {
     private readonly ILogger<SnowflakeDataReader> _logger;
     private readonly IOptions<EtlSettings> _settings;
-    private readonly IEncryptionService _encryptionService;
+    private readonly ISecretResolver _secretResolver;
     private readonly SnowflakeDataReader _sut;
 
     public SnowflakeDataReaderTests()
@@ -26,13 +27,13 @@ public class SnowflakeDataReaderTests : IDisposable
         {
             CommandTimeoutSeconds = 300
         });
-        _encryptionService = Substitute.For<IEncryptionService>();
+        _secretResolver = Substitute.For<ISecretResolver>();
         
-        // Setup encryption service to return the input JsonElement unchanged
-        _encryptionService.DecryptJsonFields(Arg.Any<System.Text.Json.JsonElement>(), Arg.Any<string[]>())
-            .Returns(x => x.Arg<System.Text.Json.JsonElement>());
+        // Setup secret resolver to return the input JSON unchanged
+        _secretResolver.ResolveSecretsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(x => Task.FromResult(JsonDocument.Parse(x.ArgAt<string>(0)).RootElement));
 
-        _sut = new SnowflakeDataReader(_logger, _settings, _encryptionService);
+        _sut = new SnowflakeDataReader(_logger, _settings, _secretResolver);
     }
 
     public void Dispose()
@@ -44,7 +45,7 @@ public class SnowflakeDataReaderTests : IDisposable
     public void Constructor_WithValidParameters_ShouldCreateInstance()
     {
         // Act
-        var instance = new SnowflakeDataReader(_logger, _settings, _encryptionService);
+        var instance = new SnowflakeDataReader(_logger, _settings, _secretResolver);
 
         // Assert
         instance.Should().NotBeNull();
@@ -54,7 +55,7 @@ public class SnowflakeDataReaderTests : IDisposable
     public void Constructor_WithNullLogger_ShouldThrowArgumentNullException()
     {
         // Act
-        var act = () => new SnowflakeDataReader(null!, _settings, _encryptionService);
+        var act = () => new SnowflakeDataReader(null!, _settings, _secretResolver);
 
         // Assert
         act.Should().Throw<ArgumentNullException>().WithParameterName("logger");
@@ -64,7 +65,7 @@ public class SnowflakeDataReaderTests : IDisposable
     public void Constructor_WithNullSettings_ShouldThrowArgumentNullException()
     {
         // Act
-        var act = () => new SnowflakeDataReader(_logger, null!, _encryptionService);
+        var act = () => new SnowflakeDataReader(_logger, null!, _secretResolver);
 
         // Assert
         act.Should().Throw<ArgumentNullException>().WithParameterName("settings");
@@ -77,7 +78,7 @@ public class SnowflakeDataReaderTests : IDisposable
         var act = () => new SnowflakeDataReader(_logger, _settings, null!);
 
         // Assert
-        act.Should().Throw<ArgumentNullException>().WithParameterName("encryptionService");
+        act.Should().Throw<ArgumentNullException>().WithParameterName("secretResolver");
     }
 
     [Fact]

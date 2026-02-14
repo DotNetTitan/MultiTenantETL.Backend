@@ -8,6 +8,7 @@ using MultiTenantETL.Application.Connectors.Models;
 using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Persistence;
+using MultiTenantETL.Infrastructure.Security;
 using MultiTenantETL.Infrastructure.Services;
 using NSubstitute;
 
@@ -19,7 +20,8 @@ public class ConnectorServiceTests : IDisposable
     private readonly ILogger<ConnectorService> _logger;
     private readonly IConnectionTester _connectionTester;
     private readonly ISchemaDetector _schemaDetector;
-    private readonly IEncryptionService _encryptionService;
+    private readonly ISecretStorageService _secretStorageService;
+    private readonly ISecretResolver _secretResolver;
     private readonly ICurrentUserService _currentUserService;
     private readonly IAuditService _auditService;
     private readonly ITenantProvider _tenantProvider;
@@ -36,16 +38,26 @@ public class ConnectorServiceTests : IDisposable
         _logger = Substitute.For<ILogger<ConnectorService>>();
         _connectionTester = Substitute.For<IConnectionTester>();
         _schemaDetector = Substitute.For<ISchemaDetector>();
-        _encryptionService = Substitute.For<IEncryptionService>();
+        _secretStorageService = Substitute.For<ISecretStorageService>();
+        _secretResolver = Substitute.For<ISecretResolver>();
         _currentUserService = Substitute.For<ICurrentUserService>();
         _auditService = Substitute.For<IAuditService>();
+
+        // Setup default behaviors
+        _secretResolver.ResolveSecretsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(x => Task.FromResult(JsonDocument.Parse(x.ArgAt<string>(0)).RootElement));
+        _secretStorageService.StoreSecretAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+        _secretStorageService.GenerateSecretName(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>())
+            .Returns(x => $"connector-{x.ArgAt<Guid>(0):N}-{x.ArgAt<Guid>(1):N}-{x.ArgAt<string>(2).ToLowerInvariant()}");
 
         _sut = new ConnectorService(
             _context,
             _logger,
             _connectionTester,
             _schemaDetector,
-            _encryptionService,
+            _secretStorageService,
+            _secretResolver,
             _auditService);
     }
 
@@ -55,7 +67,7 @@ public class ConnectorServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateAsync_ValidInput_CreatesConnectorAndEncryptsConfig()
+    public async Task CreateAsync_ValidInput_CreatesConnectorAndStoresSecretsInKeyVault()
     {
         // Arrange
         var tenantId = Guid.NewGuid();
@@ -70,10 +82,6 @@ public class ConnectorServiceTests : IDisposable
             Direction = "Source",
             Config = JsonDocument.Parse("{\"Host\":\"localhost\",\"Password\":\"secret\"}").RootElement
         };
-
-        var encryptedConfig = JsonDocument.Parse("{\"Host\":\"localhost\",\"Password\":\"encrypted_secret\"}").RootElement;
-        _encryptionService.EncryptJsonFields(Arg.Any<JsonElement>(), Arg.Any<string[]>())
-            .Returns(encryptedConfig);
 
         // Act
         var result = await _sut.CreateAsync(request, tenantId, userId);
@@ -92,8 +100,11 @@ public class ConnectorServiceTests : IDisposable
         connector!.TenantId.Should().Be(tenantId);
         connector.CreatedBy.Should().Be(userId);
         
-        // Verify encryption was called
-        _encryptionService.Received(1).EncryptJsonFields(Arg.Any<JsonElement>(), Arg.Any<string[]>());
+        // Verify secrets were stored in Key Vault (Password field should be stored)
+        await _secretStorageService.Received().StoreSecretAsync(
+            Arg.Is<string>(name => name.Contains("password")), 
+            Arg.Any<string>(), 
+            Arg.Any<CancellationToken>());
         
         // Verify audit log
         await _auditService.Received(1).LogAsync(
@@ -133,10 +144,6 @@ public class ConnectorServiceTests : IDisposable
         _context.Connectors.Add(connector);
         await _context.SaveChangesAsync();
 
-        var decryptedConfig = JsonDocument.Parse("{\"Host\":\"localhost\",\"Password\":\"secret\"}").RootElement;
-        _encryptionService.DecryptJsonFields(Arg.Any<JsonElement>(), Arg.Any<string[]>())
-            .Returns(decryptedConfig);
-
         // Act
         var result = await _sut.GetByIdAsync(connectorId, tenantId);
 
@@ -145,8 +152,9 @@ public class ConnectorServiceTests : IDisposable
         result.Id.Should().Be(connectorId);
         result.Name.Should().Be("Test Connector");
         
-        // Verify decryption was called
-        _encryptionService.Received(1).DecryptJsonFields(Arg.Any<JsonElement>(), Arg.Any<string[]>());
+        // Note: GetByIdAsync does NOT resolve secrets - it returns config with Key Vault references intact
+        // Secrets are only resolved when actually used (connections, pipelines, etc.)
+        // Therefore, we should NOT expect ResolveSecretsAsync to be called
     }
 
     [Fact]
@@ -237,12 +245,8 @@ public class ConnectorServiceTests : IDisposable
             Description = "Updated Description",
             Direction = "Destination",
             IsActive = true,
-            Config = JsonDocument.Parse("{\"Host\":\"newhost\"}").RootElement
+            Config = JsonDocument.Parse("{\"Host\":\"newhost\",\"Password\":\"newpass\"}").RootElement
         };
-
-        var encryptedConfig = JsonDocument.Parse("{\"Host\":\"newhost_encrypted\"}").RootElement;
-        _encryptionService.EncryptJsonFields(Arg.Any<JsonElement>(), Arg.Any<string[]>())
-            .Returns(encryptedConfig);
 
         // Act
         var result = await _sut.UpdateAsync(connectorId, request, tenantId, userId);
@@ -260,8 +264,11 @@ public class ConnectorServiceTests : IDisposable
         updatedConnector.UpdatedBy.Should().Be(userId);
         updatedConnector.UpdatedAt.Should().NotBeNull();
         
-        // Verify encryption called
-        _encryptionService.Received(1).EncryptJsonFields(Arg.Any<JsonElement>(), Arg.Any<string[]>());
+        // Verify secrets were stored in Key Vault
+        await _secretStorageService.Received().StoreSecretAsync(
+            Arg.Is<string>(name => name.Contains("password")), 
+            Arg.Any<string>(), 
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]

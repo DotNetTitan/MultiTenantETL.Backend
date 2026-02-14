@@ -3,9 +3,9 @@ using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
-using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
+using MultiTenantETL.Infrastructure.Security;
 using Npgsql;
 
 namespace MultiTenantETL.Infrastructure.DataWriters;
@@ -18,12 +18,12 @@ namespace MultiTenantETL.Infrastructure.DataWriters;
 public class RedshiftDataWriter : IDataWriter
 {
     private readonly ILogger<RedshiftDataWriter> _logger;
-    private readonly IEncryptionService _encryptionService;
+    private readonly ISecretResolver _secretResolver;
 
-    public RedshiftDataWriter(ILogger<RedshiftDataWriter> logger, IEncryptionService encryptionService)
+    public RedshiftDataWriter(ILogger<RedshiftDataWriter> logger, ISecretResolver secretResolver)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _encryptionService = encryptionService ?? throw new ArgumentNullException(nameof(encryptionService));
+        _secretResolver = secretResolver ?? throw new ArgumentNullException(nameof(secretResolver));
     }
 
     public async Task<DataWriteResult> WriteBatchAsync(
@@ -121,10 +121,10 @@ public class RedshiftDataWriter : IDataWriter
 
     private RedshiftConfig ParseConfig(string configJson)
     {
-        var jsonElement = JsonSerializer.Deserialize<JsonElement>(configJson);
-        var decryptedElement = _encryptionService.DecryptJsonFields(jsonElement, EncryptionConstants.SensitiveFields);
+        // Resolve Key Vault secrets
+        var resolvedElement = _secretResolver.ResolveSecretsAsync(configJson).GetAwaiter().GetResult();
         
-        var config = JsonSerializer.Deserialize<RedshiftConfig>(decryptedElement.GetRawText(), JsonSerializerOptionsProvider.Default)
+        var config = JsonSerializer.Deserialize<RedshiftConfig>(resolvedElement.GetRawText(), JsonSerializerOptionsProvider.Default)
             ?? throw new InvalidOperationException("Invalid Redshift configuration");
 
         if (string.IsNullOrEmpty(config.ConnectionString))

@@ -9,6 +9,7 @@ using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.DataWriters;
+using MultiTenantETL.Infrastructure.Security;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 
@@ -18,7 +19,7 @@ public class PostgreSqlDataWriterTests : IDisposable
 {
     private readonly ILogger<PostgreSqlDataWriter> _logger;
     private readonly IOptions<EtlSettings> _settings;
-    private readonly IEncryptionService _encryptionService;
+    private readonly ISecretResolver _secretResolver;
     private readonly PostgreSqlDataWriter _sut;
     private readonly string _tempFilePath;
 
@@ -29,11 +30,11 @@ public class PostgreSqlDataWriterTests : IDisposable
         {
             CommandTimeoutSeconds = 300
         });
-        _encryptionService = Substitute.For<IEncryptionService>();
-        _encryptionService.DecryptJsonFields(Arg.Any<System.Text.Json.JsonElement>(), Arg.Any<string[]>())
-            .Returns(x => x.ArgAt<System.Text.Json.JsonElement>(0));
+        _secretResolver = Substitute.For<ISecretResolver>();
+        _secretResolver.ResolveSecretsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(x => Task.FromResult(JsonDocument.Parse(x.ArgAt<string>(0)).RootElement));
 
-        _sut = new PostgreSqlDataWriter(_logger, _encryptionService);
+        _sut = new PostgreSqlDataWriter(_logger, _secretResolver);
         _tempFilePath = Path.Combine(Path.GetTempPath(), $"test_{Guid.NewGuid()}.csv");
     }
 
@@ -49,7 +50,7 @@ public class PostgreSqlDataWriterTests : IDisposable
     public void Constructor_WithValidParameters_ShouldCreateInstance()
     {
         // Act
-        var instance = new PostgreSqlDataWriter(_logger, _encryptionService);
+        var instance = new PostgreSqlDataWriter(_logger, _secretResolver);
 
         // Assert
         instance.Should().NotBeNull();
@@ -59,7 +60,7 @@ public class PostgreSqlDataWriterTests : IDisposable
     public void Constructor_WithNullLogger_ShouldThrowArgumentNullException()
     {
         // Act
-        var act = () => new PostgreSqlDataWriter(null!, _encryptionService);
+        var act = () => new PostgreSqlDataWriter(null!, _secretResolver);
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
@@ -67,14 +68,14 @@ public class PostgreSqlDataWriterTests : IDisposable
     }
 
     [Fact]
-    public void Constructor_WithNullEncryptionService_ShouldThrowArgumentNullException()
+    public void Constructor_WithNullSecretResolver_ShouldThrowArgumentNullException()
     {
         // Act
         var act = () => new PostgreSqlDataWriter(_logger, null!);
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
-            .WithParameterName("encryptionService");
+            .WithParameterName("secretResolver");
     }
 
     [Fact]
@@ -229,14 +230,9 @@ public class PostgreSqlDataWriterTests : IDisposable
     }
 
     [Fact]
-    public async Task WriteBatchAsync_WithEncryptionEnabled_ShouldDecryptConnectionString()
+    public async Task WriteBatchAsync_WithSecretsInConfig_ShouldResolveFromKeyVault()
     {
-        // Arrange
-        var encryptedConnectionString = "encrypted:Host=localhost;Database=test";
-        var decryptedConnectionString = "Host=localhost;Database=test;Username=user;Password=pass";
-
-        _encryptionService.Decrypt(encryptedConnectionString).Returns(decryptedConnectionString);
-
+        // Arrange - Config contains Key Vault references
         var connector = new Connector
         {
             Id = Guid.NewGuid(),
@@ -249,11 +245,10 @@ public class PostgreSqlDataWriterTests : IDisposable
             IsDestination = true,
             RequiresCredentials = true,
             IsActive = true,
-            ConfigJson = $@"{{
-                ""ConnectionString"": ""{encryptedConnectionString}"",
-                ""TableName"": ""test_table"",
-                ""UseEncryption"": true
-            }}",
+            ConfigJson = @"{
+                ""ConnectionString"": ""keyvault:connector-test-connectionstring"",
+                ""TableName"": ""test_table""
+            }",
             CreatedAt = DateTime.UtcNow,
             CreatedBy = Guid.NewGuid()
         };
@@ -264,11 +259,12 @@ public class PostgreSqlDataWriterTests : IDisposable
         // Act
         var result = await _sut.WriteBatchAsync(connector, batch, options, CancellationToken.None);
 
-        // Assert - Should fail at database connection, but should have decrypted
+        // Assert - Should fail at database connection, but should have attempted secret resolution
         result.Should().NotBeNull();
         result.Errors.Should().NotBeEmpty();
 
-        _encryptionService.Received(1).DecryptJsonFields(Arg.Any<JsonElement>(), Arg.Any<string[]>());
+        // Verify secret resolution was attempted
+        await _secretResolver.Received(1).ResolveSecretsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     private static Connector CreateValidConnector()

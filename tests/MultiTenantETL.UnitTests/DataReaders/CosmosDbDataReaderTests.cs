@@ -8,6 +8,7 @@ using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.DataReaders;
+using MultiTenantETL.Infrastructure.Security;
 using NSubstitute;
 using FluentAssertions;
 using Xunit;
@@ -18,17 +19,15 @@ public class CosmosDbDataReaderTests
 {
     private readonly ILogger<CosmosDbDataReader> _logger = Substitute.For<ILogger<CosmosDbDataReader>>();
     private readonly IOptions<EtlSettings> _settings = Substitute.For<IOptions<EtlSettings>>();
-    private readonly IEncryptionService _encryptionService = Substitute.For<IEncryptionService>();
+    private readonly ISecretResolver _secretResolver = Substitute.For<ISecretResolver>();
     private readonly CosmosDbDataReader _reader;
 
     public CosmosDbDataReaderTests()
     {
         _settings.Value.Returns(new EtlSettings());
-        _reader = new CosmosDbDataReader(_logger, _settings, _encryptionService);
-
-        // Default mock behavior for encryption service (no-op)
-        _encryptionService.DecryptJsonFields(Arg.Any<JsonElement>(), Arg.Any<string[]>())
-            .Returns(x => x[0]);
+        _secretResolver.ResolveSecretsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(x => Task.FromResult(JsonDocument.Parse(x.ArgAt<string>(0)).RootElement));
+        _reader = new CosmosDbDataReader(_logger, _settings, _secretResolver);
     }
 
     [Fact]

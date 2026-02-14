@@ -386,9 +386,10 @@ dotnet user-secrets init
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;..."
 dotnet user-secrets set "AzureCommunicationServices:ConnectionString" "endpoint=..."
 dotnet user-secrets set "AzureCommunicationServices:FromEmail" "noreply@domain.com"
+dotnet user-secrets set "AzureKeyVault:VaultUri" "https://your-vault.vault.azure.net/"
 ```
 
-### Production (Azure Key Vault)
+### Production (Azure Key Vault for Configuration)
 
 ```bash
 # Install package
@@ -402,7 +403,7 @@ using Azure.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add Azure Key Vault
+// Add Azure Key Vault for application configuration
 if (builder.Environment.IsProduction())
 {
     var keyVaultName = builder.Configuration["KeyVaultName"];
@@ -415,6 +416,67 @@ if (builder.Environment.IsProduction())
 
 // Now you can access secrets like normal configuration
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+```
+
+### Connector Credentials (Azure Key Vault)
+
+**All connector credentials are automatically stored in Azure Key Vault** for enhanced security.
+
+```csharp
+// When creating a connector via API:
+POST /api/connectors
+{
+  "name": "Production PostgreSQL",
+  "type": "PostgreSQL",
+  "config": {
+    "host": "prod-db.postgres.database.azure.com",
+    "password": "MySecretPassword123!"  // Automatically stored in Key Vault
+  }
+}
+
+// Saved in database as:
+{
+  "host": "prod-db.postgres.database.azure.com",
+  "password": "keyvault:connector-{tenantId}-{connectorId}-password"
+}
+
+// Actual password stored securely in Azure Key Vault
+```
+
+**Setup Guide:** See [Azure Key Vault Setup Guide](../guides/AZURE-KEY-VAULT-SETUP.md) for complete configuration.
+
+**Sensitive Fields** (automatically detected and stored in Key Vault):
+- `password`
+- `apiKey`
+- `secret`
+- `accessKey`
+- `secretKey`
+- `connectionString`
+- `privateKey`
+
+**Architecture:**
+```
+┌──────────────┐         ┌──────────────┐         ┌──────────────────┐
+│   API/Client │ ──────> │   Database   │         │  Azure Key Vault │
+│              │         │  (ConfigJson)│         │  (Actual Secrets)│
+└──────────────┘         └──────────────┘         └──────────────────┘
+                                │                          │
+                                │  "keyvault:secret-name"  │
+                                └─────────────────────────>│
+                                                           │
+                         During pipeline execution ───────┘
+                         SecretResolver retrieves actual value
+```
+
+**Configuration:**
+```json
+{
+  "AzureKeyVault": {
+    "VaultUri": "https://your-vault.vault.azure.net/",
+    "UseKeyVault": true,
+    "SecretNamePrefix": "connector"
+  }
+}
 ```
 
 ### Environment Variables

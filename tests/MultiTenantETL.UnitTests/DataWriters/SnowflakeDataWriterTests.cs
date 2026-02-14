@@ -8,6 +8,7 @@ using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.DataWriters;
+using MultiTenantETL.Infrastructure.Security;
 using NSubstitute;
 
 namespace MultiTenantETL.UnitTests.DataWriters;
@@ -16,7 +17,7 @@ public class SnowflakeDataWriterTests : IDisposable
 {
     private readonly ILogger<SnowflakeDataWriter> _logger;
     private readonly IOptions<EtlSettings> _settings;
-    private readonly IEncryptionService _encryptionService;
+    private readonly ISecretResolver _secretResolver;
     private readonly SnowflakeDataWriter _sut;
 
     public SnowflakeDataWriterTests()
@@ -26,11 +27,11 @@ public class SnowflakeDataWriterTests : IDisposable
         {
             CommandTimeoutSeconds = 300
         });
-        _encryptionService = Substitute.For<IEncryptionService>();        
-        // Setup encryption service to return the input JsonElement unchanged
-        _encryptionService.DecryptJsonFields(Arg.Any<System.Text.Json.JsonElement>(), Arg.Any<string[]>())
-            .Returns(x => x.Arg<System.Text.Json.JsonElement>());
-        _sut = new SnowflakeDataWriter(_logger, _encryptionService);
+        _secretResolver = Substitute.For<ISecretResolver>();
+        // Setup secret resolver to return the input JsonElement unchanged
+        _secretResolver.ResolveSecretsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(x => Task.FromResult(JsonDocument.Parse(x.ArgAt<string>(0)).RootElement));
+        _sut = new SnowflakeDataWriter(_logger, _secretResolver);
     }
 
     public void Dispose()
@@ -42,7 +43,7 @@ public class SnowflakeDataWriterTests : IDisposable
     public void Constructor_WithValidParameters_ShouldCreateInstance()
     {
         // Act
-        var instance = new SnowflakeDataWriter(_logger, _encryptionService);
+        var instance = new SnowflakeDataWriter(_logger, _secretResolver);
 
         // Assert
         instance.Should().NotBeNull();
@@ -52,20 +53,20 @@ public class SnowflakeDataWriterTests : IDisposable
     public void Constructor_WithNullLogger_ShouldThrowArgumentNullException()
     {
         // Act
-        var act = () => new SnowflakeDataWriter(null!, _encryptionService);
+        var act = () => new SnowflakeDataWriter(null!, _secretResolver);
 
         // Assert
         act.Should().Throw<ArgumentNullException>().WithParameterName("logger");
     }
 
     [Fact]
-    public void Constructor_WithNullEncryptionService_ShouldThrowArgumentNullException()
+    public void Constructor_WithNullSecretResolver_ShouldThrowArgumentNullException()
     {
         // Act
         var act = () => new SnowflakeDataWriter(_logger, null!);
 
         // Assert
-        act.Should().Throw<ArgumentNullException>().WithParameterName("encryptionService");
+        act.Should().Throw<ArgumentNullException>().WithParameterName("secretResolver");
     }
 
     [Fact]

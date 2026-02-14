@@ -7,6 +7,7 @@ using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.DataWriters;
+using MultiTenantETL.Infrastructure.Security;
 using NSubstitute;
 using FluentAssertions;
 using Xunit;
@@ -16,16 +17,14 @@ namespace MultiTenantETL.UnitTests.DataWriters;
 public class CosmosDbDataWriterTests
 {
     private readonly ILogger<CosmosDbDataWriter> _logger = Substitute.For<ILogger<CosmosDbDataWriter>>();
-    private readonly IEncryptionService _encryptionService = Substitute.For<IEncryptionService>();
+    private readonly ISecretResolver _secretResolver = Substitute.For<ISecretResolver>();
     private readonly CosmosDbDataWriter _writer;
 
     public CosmosDbDataWriterTests()
     {
-        _writer = new CosmosDbDataWriter(_logger, _encryptionService);
-
-        // Default mock behavior for encryption service (no-op)
-        _encryptionService.DecryptJsonFields(Arg.Any<JsonElement>(), Arg.Any<string[]>())
-            .Returns(x => x[0]);
+        _secretResolver.ResolveSecretsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(x => Task.FromResult(JsonDocument.Parse(x.ArgAt<string>(0)).RootElement));
+        _writer = new CosmosDbDataWriter(_logger, _secretResolver);
     }
 
     [Fact]
@@ -43,8 +42,11 @@ public class CosmosDbDataWriterTests
         var batch = new ReadBatch { BatchId = Guid.NewGuid(), Rows = new List<Dictionary<string, object?>>() };
         var options = new WriteOptions { UseUpsert = false };
 
-        // Act & Assert
-        await Assert.ThrowsAsync<JsonException>(() => _writer.WriteBatchAsync(connector, batch, options, CancellationToken.None));
+        // Act
+        Func<Task> act = async () => await _writer.WriteBatchAsync(connector, batch, options, CancellationToken.None);
+
+        // Assert - JsonReaderException is a subclass of JsonException
+        await act.Should().ThrowAsync<JsonException>();
     }
 
     [Fact]

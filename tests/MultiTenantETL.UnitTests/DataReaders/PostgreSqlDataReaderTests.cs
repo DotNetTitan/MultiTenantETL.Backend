@@ -8,6 +8,7 @@ using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.DataReaders;
+using MultiTenantETL.Infrastructure.Security;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using System.Collections.Generic;
@@ -20,7 +21,7 @@ public class PostgreSqlDataReaderTests : IDisposable
 {
     private readonly ILogger<PostgreSqlDataReader> _logger;
     private readonly IOptions<EtlSettings> _settings;
-    private readonly IEncryptionService _encryptionService;
+    private readonly ISecretResolver _secretResolver;
     private readonly PostgreSqlDataReader _sut;
 
     public PostgreSqlDataReaderTests()
@@ -30,11 +31,11 @@ public class PostgreSqlDataReaderTests : IDisposable
         {
             CommandTimeoutSeconds = 300
         });
-        _encryptionService = Substitute.For<IEncryptionService>();
-        _encryptionService.DecryptJsonFields(Arg.Any<System.Text.Json.JsonElement>(), Arg.Any<string[]>())
-            .Returns(x => x.ArgAt<System.Text.Json.JsonElement>(0));
+        _secretResolver = Substitute.For<ISecretResolver>();
+        _secretResolver.ResolveSecretsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(x => Task.FromResult(JsonDocument.Parse(x.ArgAt<string>(0)).RootElement));
 
-        _sut = new PostgreSqlDataReader(_logger, _settings, _encryptionService);
+        _sut = new PostgreSqlDataReader(_logger, _settings, _secretResolver);
     }
 
     public void Dispose()
@@ -46,7 +47,7 @@ public class PostgreSqlDataReaderTests : IDisposable
     public void Constructor_WithValidParameters_ShouldCreateInstance()
     {
         // Act
-        var instance = new PostgreSqlDataReader(_logger, _settings, _encryptionService);
+        var instance = new PostgreSqlDataReader(_logger, _settings, _secretResolver);
 
         // Assert
         instance.Should().NotBeNull();
@@ -56,7 +57,7 @@ public class PostgreSqlDataReaderTests : IDisposable
     public void Constructor_WithNullLogger_ShouldThrowArgumentNullException()
     {
         // Act
-        var act = () => new PostgreSqlDataReader(null!, _settings, _encryptionService);
+        var act = () => new PostgreSqlDataReader(null!, _settings, _secretResolver);
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
@@ -67,7 +68,7 @@ public class PostgreSqlDataReaderTests : IDisposable
     public void Constructor_WithNullSettings_ShouldThrowArgumentNullException()
     {
         // Act
-        var act = () => new PostgreSqlDataReader(_logger, null!, _encryptionService);
+        var act = () => new PostgreSqlDataReader(_logger, null!, _secretResolver);
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
@@ -82,7 +83,7 @@ public class PostgreSqlDataReaderTests : IDisposable
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
-            .WithParameterName("encryptionService");
+            .WithParameterName("secretResolver");
     }
 
     [Fact]
@@ -108,14 +109,17 @@ public class PostgreSqlDataReaderTests : IDisposable
 
         var options = new ReadOptions { BatchSize = 100 };
 
-        // Act & Assert - Should throw during enumeration
-        await Assert.ThrowsAsync<JsonException>(async () =>
+        // Act
+        Func<Task> act = async () =>
         {
             await foreach (var batch in _sut.ReadAsync(connector, options, CancellationToken.None))
             {
                 // Should not reach here
             }
-        });
+        };
+
+        // Assert - JsonReaderException is a subclass of JsonException
+        await act.Should().ThrowAsync<JsonException>();
     }
 
     [Fact]
