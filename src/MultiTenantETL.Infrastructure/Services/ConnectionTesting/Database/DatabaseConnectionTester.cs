@@ -36,7 +36,7 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
             };
         }
 
-        // Validate required fields
+        // Validate required fields (skip validation for providers with custom validation)
         if (dbConfig.UseCustomConnectionString)
         {
             if (string.IsNullOrEmpty(dbConfig.ConnectionString))
@@ -48,8 +48,13 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
                 };
             }
         }
-        else
+        else if (provider != ConnectorProviders.CosmosDb && 
+                 provider != ConnectorProviders.MongoDb && 
+                 provider != ConnectorProviders.BigQuery &&
+                 provider != ConnectorProviders.Snowflake)
         {
+            // Standard SQL database providers require host, database, username, password
+            // CosmosDB, MongoDB, BigQuery, and Snowflake have their own validation
             if (string.IsNullOrEmpty(dbConfig.Host) || string.IsNullOrEmpty(dbConfig.Database) ||
                 string.IsNullOrEmpty(dbConfig.Username) || string.IsNullOrEmpty(dbConfig.Password))
             {
@@ -174,6 +179,34 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
 
     private static async Task<ConnectionTestResult> TestSnowflakeConnectionAsync(DatabaseConfig config)
     {
+        // Validate required fields for Snowflake
+        if (string.IsNullOrEmpty(config.Account) && string.IsNullOrEmpty(config.Host))
+        {
+            return new ConnectionTestResult 
+            { 
+                Success = false, 
+                Message = "Snowflake account or host is required" 
+            };
+        }
+
+        if (string.IsNullOrEmpty(config.Username))
+        {
+            return new ConnectionTestResult 
+            { 
+                Success = false, 
+                Message = "Username is required for Snowflake" 
+            };
+        }
+
+        if (string.IsNullOrEmpty(config.Password))
+        {
+            return new ConnectionTestResult 
+            { 
+                Success = false, 
+                Message = "Password is required for Snowflake" 
+            };
+        }
+
         using var connection = new SnowflakeDbConnection(BuildSnowflakeConnectionString(config));
         await connection.OpenAsync();
 
@@ -183,6 +216,15 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
             ["Database"] = connection.Database ?? "Unknown",
             ["State"] = connection.State.ToString()
         };
+
+        if (!string.IsNullOrEmpty(config.Account))
+        {
+            details["Account"] = config.Account;
+        }
+        if (!string.IsNullOrEmpty(config.Warehouse))
+        {
+            details["Warehouse"] = config.Warehouse;
+        }
 
         return new ConnectionTestResult
         {
@@ -275,14 +317,38 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
     {
         var endpoint = config.CosmosEndpoint ?? config.Host;
         var key = config.CosmosKey ?? config.Password;
+        var database = config.Database;
+        var container = config.Container;
 
-        if (string.IsNullOrEmpty(endpoint) || string.IsNullOrEmpty(key))
+        // Validate required fields for CosmosDB
+        if (string.IsNullOrEmpty(endpoint))
         {
-            return new ConnectionTestResult { Success = false, Message = "Cosmos DB Endpoint and Key are required" };
+            return new ConnectionTestResult { Success = false, Message = "Cosmos DB endpoint is required" };
+        }
+
+        if (string.IsNullOrEmpty(key))
+        {
+            return new ConnectionTestResult { Success = false, Message = "Cosmos DB key is required" };
+        }
+
+        if (string.IsNullOrEmpty(database))
+        {
+            return new ConnectionTestResult { Success = false, Message = "Cosmos DB database name is required" };
+        }
+
+        if (string.IsNullOrEmpty(container))
+        {
+            return new ConnectionTestResult { Success = false, Message = "Cosmos DB container name is required" };
         }
 
         using var client = new CosmosClient(endpoint, key);
+        
+        // Test connection by reading account info
         await client.ReadAccountAsync();
+
+        // Verify database and container exist
+        var db = client.GetDatabase(database);
+        var containerResponse = await db.GetContainer(container).ReadContainerAsync();
 
         return new ConnectionTestResult
         {
@@ -290,7 +356,10 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
             Message = "Successfully connected to Azure Cosmos DB",
             Details = new Dictionary<string, object>
             {
-                ["Endpoint"] = endpoint
+                ["Endpoint"] = endpoint,
+                ["Database"] = database,
+                ["Container"] = container,
+                ["Throughput"] = containerResponse.Resource.Id ?? "N/A"
             }
         };
     }

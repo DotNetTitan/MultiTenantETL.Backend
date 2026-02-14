@@ -88,7 +88,7 @@ public class S3ConnectionTester
             {
                 ["Bucket"] = config.S3Bucket!,
                 ["Region"] = config.S3Region!,
-                ["BucketLocation"] = bucketResponse.Location.Value ?? string.Empty,
+                ["BucketLocation"] = bucketResponse.Location?.Value ?? string.Empty,
                 ["ObjectKey"] = config.Path ?? string.Empty
             };
 
