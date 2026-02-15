@@ -45,6 +45,66 @@ steps:
   env:
     DOTNET_ENVIRONMENT: ${{ parameters.aspnetcoreEnvironment }}
 
+# --- Configure ACR access for Container Apps ---
+- task: AzureCLI@2
+  displayName: 'Configure ACR Registry Access'
+  inputs:
+    azureSubscription: 'AzureServiceConnection'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      # Enable system-assigned managed identity on both container apps
+      az containerapp identity assign \
+        --name ${{ parameters.apiContainerAppName }} \
+        --resource-group ${{ parameters.resourceGroupName }} \
+        --system-assigned
+
+      az containerapp identity assign \
+        --name ${{ parameters.workerContainerAppName }} \
+        --resource-group ${{ parameters.resourceGroupName }} \
+        --system-assigned
+
+      # Get the managed identity principal IDs
+      API_PRINCIPAL_ID=$(az containerapp identity show \
+        --name ${{ parameters.apiContainerAppName }} \
+        --resource-group ${{ parameters.resourceGroupName }} \
+        --query principalId -o tsv)
+
+      WORKER_PRINCIPAL_ID=$(az containerapp identity show \
+        --name ${{ parameters.workerContainerAppName }} \
+        --resource-group ${{ parameters.resourceGroupName }} \
+        --query principalId -o tsv)
+
+      # Get the ACR resource ID
+      ACR_ID=$(az acr show --name ${{ parameters.acrLoginServer }} --query id -o tsv 2>/dev/null || \
+               az acr show --name $(echo ${{ parameters.acrLoginServer }} | cut -d'.' -f1) --query id -o tsv)
+
+      # Grant AcrPull role to both container apps
+      az role assignment create \
+        --assignee "$API_PRINCIPAL_ID" \
+        --role "AcrPull" \
+        --scope "$ACR_ID" \
+        2>/dev/null || true
+
+      az role assignment create \
+        --assignee "$WORKER_PRINCIPAL_ID" \
+        --role "AcrPull" \
+        --scope "$ACR_ID" \
+        2>/dev/null || true
+
+      # Configure registry on both container apps to use managed identity
+      az containerapp registry set \
+        --name ${{ parameters.apiContainerAppName }} \
+        --resource-group ${{ parameters.resourceGroupName }} \
+        --server ${{ parameters.acrLoginServer }} \
+        --identity system
+
+      az containerapp registry set \
+        --name ${{ parameters.workerContainerAppName }} \
+        --resource-group ${{ parameters.resourceGroupName }} \
+        --server ${{ parameters.acrLoginServer }} \
+        --identity system
+
 # --- Deploy API (Container App) ---
 - task: AzureCLI@2
   displayName: 'Deploy API to Container App'
@@ -75,6 +135,12 @@ steps:
           "Certificates__EtlEncryption__Password=$(CertPassword)" \
           "Certificates__EtlSigning__PfxBase64=$(EtlSigningCertBase64)" \
           "Certificates__EtlSigning__Password=$(CertPassword)"
+
+      # Update ingress target port to 8080
+      az containerapp ingress update \
+        --name ${{ parameters.apiContainerAppName }} \
+        --resource-group ${{ parameters.resourceGroupName }} \
+        --target-port 8080
 
 # --- Deploy Worker (Container App) ---
 - task: AzureCLI@2
