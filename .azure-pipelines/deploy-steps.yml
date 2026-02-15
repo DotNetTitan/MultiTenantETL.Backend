@@ -1,6 +1,11 @@
 # Reusable deployment steps template
 # Called from azure-pipelines.yml for each environment
 # Both API and Worker are deployed as Container Apps
+#
+# PRE-REQUISITE (one-time manual setup per environment):
+#   az containerapp identity assign --name <app-name> --resource-group <rg> --system-assigned
+#   az containerapp registry set --name <app-name> --resource-group <rg> --server <acr>.azurecr.io --identity system
+#   Grant AcrPull role to the Container App's managed identity on the ACR
 
 parameters:
 - name: environmentName
@@ -44,66 +49,6 @@ steps:
   displayName: 'Apply Database Migrations'
   env:
     DOTNET_ENVIRONMENT: ${{ parameters.aspnetcoreEnvironment }}
-
-# --- Configure ACR access for Container Apps ---
-- task: AzureCLI@2
-  displayName: 'Configure ACR Registry Access'
-  inputs:
-    azureSubscription: 'AzureServiceConnection'
-    scriptType: 'bash'
-    scriptLocation: 'inlineScript'
-    inlineScript: |
-      # Enable system-assigned managed identity on both container apps
-      az containerapp identity assign \
-        --name ${{ parameters.apiContainerAppName }} \
-        --resource-group ${{ parameters.resourceGroupName }} \
-        --system-assigned
-
-      az containerapp identity assign \
-        --name ${{ parameters.workerContainerAppName }} \
-        --resource-group ${{ parameters.resourceGroupName }} \
-        --system-assigned
-
-      # Get the managed identity principal IDs
-      API_PRINCIPAL_ID=$(az containerapp identity show \
-        --name ${{ parameters.apiContainerAppName }} \
-        --resource-group ${{ parameters.resourceGroupName }} \
-        --query principalId -o tsv)
-
-      WORKER_PRINCIPAL_ID=$(az containerapp identity show \
-        --name ${{ parameters.workerContainerAppName }} \
-        --resource-group ${{ parameters.resourceGroupName }} \
-        --query principalId -o tsv)
-
-      # Get the ACR resource ID
-      ACR_ID=$(az acr show --name ${{ parameters.acrLoginServer }} --query id -o tsv 2>/dev/null || \
-               az acr show --name $(echo ${{ parameters.acrLoginServer }} | cut -d'.' -f1) --query id -o tsv)
-
-      # Grant AcrPull role to both container apps
-      az role assignment create \
-        --assignee "$API_PRINCIPAL_ID" \
-        --role "AcrPull" \
-        --scope "$ACR_ID" \
-        2>/dev/null || true
-
-      az role assignment create \
-        --assignee "$WORKER_PRINCIPAL_ID" \
-        --role "AcrPull" \
-        --scope "$ACR_ID" \
-        2>/dev/null || true
-
-      # Configure registry on both container apps to use managed identity
-      az containerapp registry set \
-        --name ${{ parameters.apiContainerAppName }} \
-        --resource-group ${{ parameters.resourceGroupName }} \
-        --server ${{ parameters.acrLoginServer }} \
-        --identity system
-
-      az containerapp registry set \
-        --name ${{ parameters.workerContainerAppName }} \
-        --resource-group ${{ parameters.resourceGroupName }} \
-        --server ${{ parameters.acrLoginServer }} \
-        --identity system
 
 # --- Deploy API (Container App) ---
 - task: AzureCLI@2
