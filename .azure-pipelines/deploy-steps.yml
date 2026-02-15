@@ -1,0 +1,109 @@
+# Reusable deployment steps template
+# Called from azure-pipelines.yml for each environment
+# API: Code deploy (zip) to App Service
+# Worker: Container deploy to Container App
+
+parameters:
+- name: environmentName
+  type: string
+- name: aspnetcoreEnvironment
+  type: string
+- name: resourceGroupName
+  type: string
+- name: apiAppServiceName
+  type: string
+- name: workerContainerAppName
+  type: string
+- name: acrLoginServer
+  type: string
+- name: workerImageName
+  type: string
+- name: imageTag
+  type: string
+
+steps:
+# --- Database Migration ---
+- task: UseDotNet@2
+  displayName: 'Install .NET 8 SDK'
+  inputs:
+    packageType: 'sdk'
+    version: '8.0.x'
+
+- script: dotnet tool install --global dotnet-ef --version 8.*
+  displayName: 'Install EF Core CLI'
+
+- checkout: self
+
+- script: >
+    dotnet ef database update
+    --project src/MultiTenantETL.Infrastructure/MultiTenantETL.Infrastructure.csproj
+    --startup-project src/MultiTenantETL.API/MultiTenantETL.API.csproj
+    --connection "$(SupabaseMigrationConnectionString)"
+    --verbose
+  displayName: 'Apply Database Migrations'
+  env:
+    DOTNET_ENVIRONMENT: ${{ parameters.aspnetcoreEnvironment }}
+
+# --- Deploy API (code deploy to App Service) ---
+- task: AzureWebApp@1
+  displayName: 'Deploy API to App Service'
+  inputs:
+    azureSubscription: 'AzureServiceConnection'
+    appType: 'webAppLinux'
+    appName: '${{ parameters.apiAppServiceName }}'
+    package: '$(Pipeline.Workspace)/api/**/*.zip'
+    runtimeStack: 'DOTNETCORE|8.0'
+    deploymentMethod: 'auto'
+
+- task: AzureAppServiceSettings@1
+  displayName: 'Configure API App Settings'
+  inputs:
+    azureSubscription: 'AzureServiceConnection'
+    appName: '${{ parameters.apiAppServiceName }}'
+    resourceGroupName: '${{ parameters.resourceGroupName }}'
+    appSettings: |
+      [
+        { "name": "ASPNETCORE_ENVIRONMENT", "value": "${{ parameters.aspnetcoreEnvironment }}" },
+        { "name": "ConnectionStrings__DefaultConnection", "value": "$(SupabaseConnectionString)" },
+        { "name": "AzureKeyVault__VaultUri", "value": "$(KeyVaultUri)" },
+        { "name": "ApplicationInsights__ConnectionString", "value": "$(AppInsightsConnectionString)" },
+        { "name": "ServiceBus__ConnectionString", "value": "$(ServiceBusConnectionString)" },
+        { "name": "AzureCommunicationServices__ConnectionString", "value": "$(AcsCommunicationConnectionString)" },
+        { "name": "AzureCommunicationServices__SenderEmailAddress", "value": "$(AcsSenderEmail)" },
+        { "name": "AppSettings__FrontendUrl", "value": "$(FrontendUrl)" },
+        { "name": "Cors__AllowedOrigins__0", "value": "$(FrontendUrl)" },
+        { "name": "Encryption__Key", "value": "$(EncryptionKey)" },
+        { "name": "Encryption__Salt", "value": "$(EncryptionSalt)" },
+        { "name": "Seeding__AdminPassword", "value": "$(AdminPassword)" },
+        { "name": "Seeding__OAuthClientSecret", "value": "$(OAuthClientSecret)" },
+        { "name": "Certificates__CN=ETL-Encryption__PfxBase64", "value": "$(EtlEncryptionCertBase64)" },
+        { "name": "Certificates__CN=ETL-Encryption__Password", "value": "$(CertPassword)" },
+        { "name": "Certificates__CN=ETL-Signing__PfxBase64", "value": "$(EtlSigningCertBase64)" },
+        { "name": "Certificates__CN=ETL-Signing__Password", "value": "$(CertPassword)" }
+      ]
+
+# --- Deploy Worker (container to Container App) ---
+- task: AzureCLI@2
+  displayName: 'Deploy Worker to Container App'
+  inputs:
+    azureSubscription: 'AzureServiceConnection'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      az containerapp update \
+        --name ${{ parameters.workerContainerAppName }} \
+        --resource-group ${{ parameters.resourceGroupName }} \
+        --image ${{ parameters.acrLoginServer }}/${{ parameters.workerImageName }}:${{ parameters.imageTag }} \
+        --set-env-vars \
+          "DOTNET_ENVIRONMENT=${{ parameters.aspnetcoreEnvironment }}" \
+          "ConnectionStrings__DefaultConnection=$(SupabaseConnectionString)" \
+          "AzureKeyVault__VaultUri=$(KeyVaultUri)" \
+          "ApplicationInsights__ConnectionString=$(AppInsightsConnectionString)" \
+          "ServiceBus__ConnectionString=$(ServiceBusConnectionString)" \
+          "AzureCommunicationServices__ConnectionString=$(AcsCommunicationConnectionString)" \
+          "AzureCommunicationServices__SenderEmailAddress=$(AcsSenderEmail)" \
+          "AzureCommunicationServices__FrontendUrl=$(FrontendUrl)" \
+          "AppSettings__FrontendUrl=$(FrontendUrl)" \
+          "Encryption__Key=$(EncryptionKey)" \
+          "Encryption__Salt=$(EncryptionSalt)" \
+          "Messaging__Provider=ServiceBus"
