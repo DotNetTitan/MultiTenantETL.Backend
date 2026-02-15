@@ -139,79 +139,79 @@ stages:
               imageTag: $(imageTag)
 
 # --- Beta ---
-- stage: DeployBeta
-  displayName: 'Deploy to Beta'
-  dependsOn: DeployDev
-  condition: succeeded()
-  variables:
-  - group: multitenant-etl-beta
-  jobs:
-  - deployment: DeployBeta
-    displayName: 'Deploy to Beta'
-    environment: 'beta'
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - template: .azure-pipelines/deploy-steps.yml
-            parameters:
-              environmentName: 'beta'
-              aspnetcoreEnvironment: 'Beta'
-              resourceGroupName: 'rg-multitenant-etl-beta'
-              apiAppServiceName: 'multitenant-etl-beta-api'
-              workerContainerAppName: 'multitenant-etl-beta-worker'
-              acrLoginServer: $(acrLoginServer)
-              workerImageName: $(workerImageName)
-              imageTag: $(imageTag)
+# - stage: DeployBeta
+#   displayName: 'Deploy to Beta'
+#   dependsOn: DeployDev
+#   condition: succeeded()
+#   variables:
+#   - group: multitenant-etl-beta
+#   jobs:
+#   - deployment: DeployBeta
+#     displayName: 'Deploy to Beta'
+#     environment: 'beta'
+#     strategy:
+#       runOnce:
+#         deploy:
+#           steps:
+#           - template: .azure-pipelines/deploy-steps.yml
+#             parameters:
+#               environmentName: 'beta'
+#               aspnetcoreEnvironment: 'Beta'
+#               resourceGroupName: 'rg-multitenant-etl-beta'
+#               apiAppServiceName: 'multitenant-etl-beta-api'
+#               workerContainerAppName: 'multitenant-etl-beta-worker'
+#               acrLoginServer: $(acrLoginServer)
+#               workerImageName: $(workerImageName)
+#               imageTag: $(imageTag)
 
 # --- Staging ---
-- stage: DeployStaging
-  displayName: 'Deploy to Staging'
-  dependsOn: DeployBeta
-  condition: succeeded()
-  variables:
-  - group: multitenant-etl-staging
-  jobs:
-  - deployment: DeployStaging
-    displayName: 'Deploy to Staging'
-    environment: 'staging'
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - template: .azure-pipelines/deploy-steps.yml
-            parameters:
-              environmentName: 'staging'
-              aspnetcoreEnvironment: 'Staging'
-              resourceGroupName: 'rg-multitenant-etl-staging'
-              apiAppServiceName: 'multitenant-etl-staging-api'
-              workerContainerAppName: 'multitenant-etl-staging-worker'
-              acrLoginServer: $(acrLoginServer)
-              workerImageName: $(workerImageName)
-              imageTag: $(imageTag)
+# - stage: DeployStaging
+#   displayName: 'Deploy to Staging'
+#   dependsOn: DeployBeta
+#   condition: succeeded()
+#   variables:
+#   - group: multitenant-etl-staging
+#   jobs:
+#   - deployment: DeployStaging
+#     displayName: 'Deploy to Staging'
+#     environment: 'staging'
+#     strategy:
+#       runOnce:
+#         deploy:
+#           steps:
+#           - template: .azure-pipelines/deploy-steps.yml
+#             parameters:
+#               environmentName: 'staging'
+#               aspnetcoreEnvironment: 'Staging'
+#               resourceGroupName: 'rg-multitenant-etl-staging'
+#               apiAppServiceName: 'multitenant-etl-staging-api'
+#               workerContainerAppName: 'multitenant-etl-staging-worker'
+#               acrLoginServer: $(acrLoginServer)
+#               workerImageName: $(workerImageName)
+#               imageTag: $(imageTag)
 
 # --- Production ---
-- stage: DeployProd
-  displayName: 'Deploy to Production'
-  dependsOn: DeployStaging
-  condition: succeeded()
-  variables:
-  - group: multitenant-etl-prod
-  jobs:
-  - deployment: DeployProd
-    displayName: 'Deploy to Production'
-    environment: 'prod'
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - template: .azure-pipelines/deploy-steps.yml
-            parameters:
-              environmentName: 'prod'
-              aspnetcoreEnvironment: 'Production'
-              resourceGroupName: 'rg-multitenant-etl-prod'
-              apiAppServiceName: 'multitenant-etl-prod-api'
-              workerContainerAppName: 'multitenant-etl-prod-worker'
-              acrLoginServer: $(acrLoginServer)
-              workerImageName: $(workerImageName)
-              imageTag: $(imageTag)
+# - stage: DeployProd
+#   displayName: 'Deploy to Production'
+#   dependsOn: DeployStaging
+#   condition: succeeded()
+#   variables:
+#   - group: multitenant-etl-prod
+#   jobs:
+#   - deployment: DeployProd
+#     displayName: 'Deploy to Production'
+#     environment: 'prod'
+#     strategy:
+#       runOnce:
+#         deploy:
+#           steps:
+#           - template: .azure-pipelines/deploy-steps.yml
+#             parameters:
+#               environmentName: 'prod'
+#               aspnetcoreEnvironment: 'Production'
+#               resourceGroupName: 'rg-multitenant-etl-prod'
+#               apiAppServiceName: 'multitenant-etl-prod-api'
+#               workerContainerAppName: 'multitenant-etl-prod-worker'
+#               acrLoginServer: $(acrLoginServer)
+#               workerImageName: $(workerImageName)
+#               imageTag: $(imageTag)
