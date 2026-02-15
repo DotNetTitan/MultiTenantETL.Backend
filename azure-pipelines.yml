@@ -74,8 +74,16 @@ stages:
         dotnet publish src/MultiTenantETL.API/MultiTenantETL.API.csproj
         --configuration $(buildConfiguration)
         --no-build
-        --output $(Build.ArtifactStagingDirectory)/api
+        --output $(Build.ArtifactStagingDirectory)/api-publish
       displayName: 'Publish API'
+
+    - task: ArchiveFiles@2
+      displayName: 'Zip API for deployment'
+      inputs:
+        rootFolderOrFile: '$(Build.ArtifactStagingDirectory)/api-publish'
+        includeRootFolder: false
+        archiveType: 'zip'
+        archiveFile: '$(Build.ArtifactStagingDirectory)/api/api.zip'
 
     - publish: $(Build.ArtifactStagingDirectory)/api
       artifact: api
