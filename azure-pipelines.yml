@@ -44,7 +44,7 @@ stages:
       displayName: 'Install .NET 8 SDK'
       inputs:
         packageType: 'sdk'
-        version: '8.0.x'
+        version: '9.0.x'
 
     - script: dotnet restore
       displayName: 'Restore Dependencies'
@@ -91,7 +91,7 @@ stages:
 - stage: DockerBuild
   displayName: 'Docker Build Worker'
   dependsOn: BuildAndTest
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop'))
   jobs:
   - job: BuildWorkerImage
     displayName: 'Build & Push Worker Image'
