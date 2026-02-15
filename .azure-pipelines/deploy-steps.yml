@@ -24,10 +24,10 @@ parameters:
 steps:
 # --- Database Migration ---
 - task: UseDotNet@2
-  displayName: 'Install .NET 9 SDK'
+  displayName: 'Install .NET 8 SDK'
   inputs:
     packageType: 'sdk'
-    version: '9.0.x'
+    version: '8.0.x'
 
 - script: dotnet tool install --global dotnet-ef --version 8.*
   displayName: 'Install EF Core CLI'
