@@ -6,7 +6,7 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
 # Copy solution and project files first for layer caching
-COPY MultiTenantETL.slnx ./
+COPY MultiTenantETL.sln ./
 COPY src/MultiTenantETL.Worker/MultiTenantETL.Worker.csproj src/MultiTenantETL.Worker/
 COPY src/MultiTenantETL.Application/MultiTenantETL.Application.csproj src/MultiTenantETL.Application/
 COPY src/MultiTenantETL.Domain/MultiTenantETL.Domain.csproj src/MultiTenantETL.Domain/
