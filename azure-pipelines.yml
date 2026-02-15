@@ -4,7 +4,7 @@
 # Prerequisites:
 #   1. Service Connections:
 #      - "AzureServiceConnection" (Azure Resource Manager) - for deploying to Azure
-#      - "ACRServiceConnection" (Docker Registry) - for pushing Worker image to multitenantetlacr.azurecr.io
+#      - "ACRServiceConnection" (Docker Registry) - for pushing images to multitenantetlacr.azurecr.io
 #   2. Variable Groups (one per environment):
 #      - multitenant-etl-dev / multitenant-etl-beta / multitenant-etl-staging / multitenant-etl-prod
 #      Each must contain: SupabaseConnectionString, SupabaseMigrationConnectionString,
@@ -27,6 +27,7 @@ variables:
   buildConfiguration: 'Release'
   acrName: 'multitenantetlacr'
   acrLoginServer: 'multitenantetlacr.azurecr.io'
+  apiImageName: 'multitenant-etl-api'
   workerImageName: 'multitenant-etl-worker'
   imageTag: '$(Build.BuildId)'
 
@@ -69,41 +70,33 @@ stages:
         mergeTestResults: true
         failTaskOnFailedTests: true
 
-    # Publish API as zip for App Service code deploy
-    - script: >
-        dotnet publish src/MultiTenantETL.API/MultiTenantETL.API.csproj
-        --configuration $(buildConfiguration)
-        --no-build
-        --output $(Build.ArtifactStagingDirectory)/api-publish
-      displayName: 'Publish API'
-
-    - task: ArchiveFiles@2
-      displayName: 'Zip API for deployment'
-      inputs:
-        rootFolderOrFile: '$(Build.ArtifactStagingDirectory)/api-publish'
-        includeRootFolder: false
-        archiveType: 'zip'
-        archiveFile: '$(Build.ArtifactStagingDirectory)/api/api.zip'
-
-    - publish: $(Build.ArtifactStagingDirectory)/api
-      artifact: api
-      displayName: 'Upload API Artifact'
-
     - publish: infrastructure/
       artifact: infrastructure
       displayName: 'Upload Infrastructure Artifact'
 
 # =============================================================================
-# Stage 2: Build & Push Worker Docker Image
+# Stage 2: Build & Push Docker Images (API + Worker)
 # =============================================================================
 - stage: DockerBuild
-  displayName: 'Docker Build Worker'
+  displayName: 'Docker Build'
   dependsOn: BuildAndTest
   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop'))
   jobs:
-  - job: BuildWorkerImage
-    displayName: 'Build & Push Worker Image'
+  - job: BuildImages
+    displayName: 'Build & Push Docker Images'
     steps:
+    - task: Docker@2
+      displayName: 'Build & Push API Image'
+      inputs:
+        containerRegistry: 'ACRServiceConnection'
+        repository: '$(apiImageName)'
+        command: 'buildAndPush'
+        Dockerfile: 'src/MultiTenantETL.API/Dockerfile'
+        buildContext: '.'
+        tags: |
+          $(imageTag)
+          latest
+
     - task: Docker@2
       displayName: 'Build & Push Worker Image'
       inputs:
@@ -140,9 +133,10 @@ stages:
               environmentName: 'dev'
               aspnetcoreEnvironment: 'Development'
               resourceGroupName: 'rg-multitenant-etl-dev'
-              apiAppServiceName: 'multitenant-etl-dev-api'
+              apiContainerAppName: 'multitenant-etl-dev-api'
               workerContainerAppName: 'multitenant-etl-dev-worker'
               acrLoginServer: $(acrLoginServer)
+              apiImageName: $(apiImageName)
               workerImageName: $(workerImageName)
               imageTag: $(imageTag)
 
@@ -166,9 +160,10 @@ stages:
 #               environmentName: 'beta'
 #               aspnetcoreEnvironment: 'Beta'
 #               resourceGroupName: 'rg-multitenant-etl-beta'
-#               apiAppServiceName: 'multitenant-etl-beta-api'
+#               apiContainerAppName: 'multitenant-etl-beta-api'
 #               workerContainerAppName: 'multitenant-etl-beta-worker'
 #               acrLoginServer: $(acrLoginServer)
+#               apiImageName: $(apiImageName)
 #               workerImageName: $(workerImageName)
 #               imageTag: $(imageTag)
 
@@ -192,9 +187,10 @@ stages:
 #               environmentName: 'staging'
 #               aspnetcoreEnvironment: 'Staging'
 #               resourceGroupName: 'rg-multitenant-etl-staging'
-#               apiAppServiceName: 'multitenant-etl-staging-api'
+#               apiContainerAppName: 'multitenant-etl-staging-api'
 #               workerContainerAppName: 'multitenant-etl-staging-worker'
 #               acrLoginServer: $(acrLoginServer)
+#               apiImageName: $(apiImageName)
 #               workerImageName: $(workerImageName)
 #               imageTag: $(imageTag)
 
@@ -218,8 +214,9 @@ stages:
 #               environmentName: 'prod'
 #               aspnetcoreEnvironment: 'Production'
 #               resourceGroupName: 'rg-multitenant-etl-prod'
-#               apiAppServiceName: 'multitenant-etl-prod-api'
+#               apiContainerAppName: 'multitenant-etl-prod-api'
 #               workerContainerAppName: 'multitenant-etl-prod-worker'
 #               acrLoginServer: $(acrLoginServer)
+#               apiImageName: $(apiImageName)
 #               workerImageName: $(workerImageName)
 #               imageTag: $(imageTag)

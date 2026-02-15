@@ -1,7 +1,6 @@
 # Reusable deployment steps template
 # Called from azure-pipelines.yml for each environment
-# API: Code deploy (zip) to App Service
-# Worker: Container deploy to Container App
+# Both API and Worker are deployed as Container Apps
 
 parameters:
 - name: environmentName
@@ -10,11 +9,13 @@ parameters:
   type: string
 - name: resourceGroupName
   type: string
-- name: apiAppServiceName
+- name: apiContainerAppName
   type: string
 - name: workerContainerAppName
   type: string
 - name: acrLoginServer
+  type: string
+- name: apiImageName
   type: string
 - name: workerImageName
   type: string
@@ -44,45 +45,38 @@ steps:
   env:
     DOTNET_ENVIRONMENT: ${{ parameters.aspnetcoreEnvironment }}
 
-# --- Deploy API (code deploy to App Service) ---
-- task: AzureWebApp@1
-  displayName: 'Deploy API to App Service'
+# --- Deploy API (Container App) ---
+- task: AzureCLI@2
+  displayName: 'Deploy API to Container App'
   inputs:
     azureSubscription: 'AzureServiceConnection'
-    appType: 'webAppLinux'
-    appName: '${{ parameters.apiAppServiceName }}'
-    package: '$(Pipeline.Workspace)/api/**/*.zip'
-    runtimeStack: 'DOTNETCORE|8.0'
-    deploymentMethod: 'auto'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      az containerapp update \
+        --name ${{ parameters.apiContainerAppName }} \
+        --resource-group ${{ parameters.resourceGroupName }} \
+        --image ${{ parameters.acrLoginServer }}/${{ parameters.apiImageName }}:${{ parameters.imageTag }} \
+        --set-env-vars \
+          "ASPNETCORE_ENVIRONMENT=${{ parameters.aspnetcoreEnvironment }}" \
+          "ConnectionStrings__DefaultConnection=$(SupabaseConnectionString)" \
+          "AzureKeyVault__VaultUri=$(KeyVaultUri)" \
+          "ApplicationInsights__ConnectionString=$(AppInsightsConnectionString)" \
+          "ServiceBus__ConnectionString=$(ServiceBusConnectionString)" \
+          "AzureCommunicationServices__ConnectionString=$(AcsCommunicationConnectionString)" \
+          "AzureCommunicationServices__SenderEmailAddress=$(AcsSenderEmail)" \
+          "AppSettings__FrontendUrl=$(FrontendUrl)" \
+          "Cors__AllowedOrigins__0=$(FrontendUrl)" \
+          "Encryption__Key=$(EncryptionKey)" \
+          "Encryption__Salt=$(EncryptionSalt)" \
+          "Seeding__AdminPassword=$(AdminPassword)" \
+          "Seeding__OAuthClientSecret=$(OAuthClientSecret)" \
+          "Certificates__EtlEncryption__PfxBase64=$(EtlEncryptionCertBase64)" \
+          "Certificates__EtlEncryption__Password=$(CertPassword)" \
+          "Certificates__EtlSigning__PfxBase64=$(EtlSigningCertBase64)" \
+          "Certificates__EtlSigning__Password=$(CertPassword)"
 
-- task: AzureAppServiceSettings@1
-  displayName: 'Configure API App Settings'
-  inputs:
-    azureSubscription: 'AzureServiceConnection'
-    appName: '${{ parameters.apiAppServiceName }}'
-    resourceGroupName: '${{ parameters.resourceGroupName }}'
-    appSettings: |
-      [
-        { "name": "ASPNETCORE_ENVIRONMENT", "value": "${{ parameters.aspnetcoreEnvironment }}" },
-        { "name": "ConnectionStrings__DefaultConnection", "value": "$(SupabaseConnectionString)" },
-        { "name": "AzureKeyVault__VaultUri", "value": "$(KeyVaultUri)" },
-        { "name": "ApplicationInsights__ConnectionString", "value": "$(AppInsightsConnectionString)" },
-        { "name": "ServiceBus__ConnectionString", "value": "$(ServiceBusConnectionString)" },
-        { "name": "AzureCommunicationServices__ConnectionString", "value": "$(AcsCommunicationConnectionString)" },
-        { "name": "AzureCommunicationServices__SenderEmailAddress", "value": "$(AcsSenderEmail)" },
-        { "name": "AppSettings__FrontendUrl", "value": "$(FrontendUrl)" },
-        { "name": "Cors__AllowedOrigins__0", "value": "$(FrontendUrl)" },
-        { "name": "Encryption__Key", "value": "$(EncryptionKey)" },
-        { "name": "Encryption__Salt", "value": "$(EncryptionSalt)" },
-        { "name": "Seeding__AdminPassword", "value": "$(AdminPassword)" },
-        { "name": "Seeding__OAuthClientSecret", "value": "$(OAuthClientSecret)" },
-        { "name": "Certificates__EtlEncryption__PfxBase64", "value": "$(EtlEncryptionCertBase64)" },
-        { "name": "Certificates__EtlEncryption__Password", "value": "$(CertPassword)" },
-        { "name": "Certificates__EtlSigning__PfxBase64", "value": "$(EtlSigningCertBase64)" },
-        { "name": "Certificates__EtlSigning__Password", "value": "$(CertPassword)" }
-      ]
-
-# --- Deploy Worker (container to Container App) ---
+# --- Deploy Worker (Container App) ---
 - task: AzureCLI@2
   displayName: 'Deploy Worker to Container App'
   inputs:
