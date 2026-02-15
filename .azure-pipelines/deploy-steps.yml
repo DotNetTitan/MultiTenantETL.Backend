@@ -76,10 +76,10 @@ steps:
         { "name": "Encryption__Salt", "value": "$(EncryptionSalt)" },
         { "name": "Seeding__AdminPassword", "value": "$(AdminPassword)" },
         { "name": "Seeding__OAuthClientSecret", "value": "$(OAuthClientSecret)" },
-        { "name": "Certificates__CN=ETL-Encryption__PfxBase64", "value": "$(EtlEncryptionCertBase64)" },
-        { "name": "Certificates__CN=ETL-Encryption__Password", "value": "$(CertPassword)" },
-        { "name": "Certificates__CN=ETL-Signing__PfxBase64", "value": "$(EtlSigningCertBase64)" },
-        { "name": "Certificates__CN=ETL-Signing__Password", "value": "$(CertPassword)" }
+        { "name": "Certificates__EtlEncryption__PfxBase64", "value": "$(EtlEncryptionCertBase64)" },
+        { "name": "Certificates__EtlEncryption__Password", "value": "$(CertPassword)" },
+        { "name": "Certificates__EtlSigning__PfxBase64", "value": "$(EtlSigningCertBase64)" },
+        { "name": "Certificates__EtlSigning__Password", "value": "$(CertPassword)" }
       ]
 
 # --- Deploy Worker (container to Container App) ---

@@ -160,8 +160,8 @@ builder.Services.AddOpenIddict()
         else
         {
             // Production certificates
-            options.AddEncryptionCertificate(LoadCertificate("CN=ETL-Encryption", builder.Configuration));
-            options.AddSigningCertificate(LoadCertificate("CN=ETL-Signing", builder.Configuration));
+            options.AddEncryptionCertificate(LoadCertificate("EtlEncryption", "CN=ETL-Encryption", builder.Configuration));
+            options.AddSigningCertificate(LoadCertificate("EtlSigning", "CN=ETL-Signing", builder.Configuration));
         }
 
         // ASP.NET Core integration
@@ -624,13 +624,13 @@ if (app.Environment.IsDevelopment())
 app.Run();
 
 // Helper method to load certificate
-static X509Certificate2 LoadCertificate(string subjectName, IConfiguration configuration)
+static X509Certificate2 LoadCertificate(string configKey, string subjectName, IConfiguration configuration)
 {
     // First, try to load from file if configured
-    var certPath = configuration[$"Certificates:{subjectName}:Path"];
+    var certPath = configuration[$"Certificates:{configKey}:Path"];
     if (!string.IsNullOrEmpty(certPath))
     {
-        var password = configuration[$"Certificates:{subjectName}:Password"];
+        var password = configuration[$"Certificates:{configKey}:Password"];
         if (File.Exists(certPath))
         {
             return new X509Certificate2(certPath, password);
@@ -642,11 +642,11 @@ static X509Certificate2 LoadCertificate(string subjectName, IConfiguration confi
     }
 
     // Fallback to base64 PFX from environment/config
-    var pfxBase64 = configuration[$"Certificates:{subjectName}:PfxBase64"];
+    var pfxBase64 = configuration[$"Certificates:{configKey}:PfxBase64"];
     if (!string.IsNullOrEmpty(pfxBase64))
     {
         var pfxBytes = Convert.FromBase64String(pfxBase64);
-        var password = configuration[$"Certificates:{subjectName}:Password"];
+        var password = configuration[$"Certificates:{configKey}:Password"];
         return new X509Certificate2(pfxBytes, password);
     }
 
