@@ -55,7 +55,6 @@ public class FileDataReaderFactory : IFileDataReaderFactory
             ConnectorProviders.SFTP => _sftpReader,
             ConnectorProviders.FTP => _ftpReader,
             ConnectorProviders.GCS => _gcsReader,
-            ConnectorProviders.Local => CreateLocalFileReader(connector),
             _ => throw new NotSupportedException($"File provider '{connector.Provider}' is not supported")
         };
     }

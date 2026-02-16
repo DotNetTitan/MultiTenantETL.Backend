@@ -46,7 +46,6 @@ public static class MetadataConstants
                 Constants.ConnectorTypes.File, 
                 new[] 
                 { 
-                    Constants.ConnectorProviders.Local, 
                     Constants.ConnectorProviders.FTP, 
                     Constants.ConnectorProviders.SFTP, 
                     Constants.ConnectorProviders.S3, 
@@ -73,7 +72,6 @@ public static class MetadataConstants
             { Constants.ConnectorProviders.CosmosDb, ("mdi-infinity", "blue-lighten-2") },
             
             // File providers
-            { Constants.ConnectorProviders.Local, ("mdi-folder", "grey-darken-1") },
             { Constants.ConnectorProviders.FTP, ("mdi-server-network", "green-darken-1") },
             { Constants.ConnectorProviders.SFTP, ("mdi-server-security", "green-darken-2") },
             { Constants.ConnectorProviders.S3, ("mdi-aws", "orange-darken-2") },

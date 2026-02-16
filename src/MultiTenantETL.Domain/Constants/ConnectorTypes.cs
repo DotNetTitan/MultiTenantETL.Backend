@@ -21,7 +21,6 @@ public static class ConnectorProviders
     public const string CosmosDb = "CosmosDb";
     
     // File providers (storage locations)
-    public const string Local = "Local";
     public const string FTP = "FTP";
     public const string SFTP = "SFTP";
     public const string S3 = "S3";

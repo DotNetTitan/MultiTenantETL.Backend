@@ -55,7 +55,6 @@ public class FileDataWriterFactory : IFileDataWriterFactory
             ConnectorProviders.SFTP => _sftpWriter,
             ConnectorProviders.FTP => _ftpWriter,
             ConnectorProviders.GCS => _gcsWriter,
-            ConnectorProviders.Local => CreateLocalFileWriter(connector),
             _ => throw new NotSupportedException($"File provider '{connector.Provider}' is not supported")
         };
     }

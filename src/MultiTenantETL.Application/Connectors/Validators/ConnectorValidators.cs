@@ -48,7 +48,7 @@ public class CreateConnectorRequestValidator : AbstractValidator<CreateConnector
         var validProviders = type switch
         {
             ConnectorTypes.Database => new[] { ConnectorProviders.SqlServer, ConnectorProviders.PostgreSQL, ConnectorProviders.MySQL },
-            ConnectorTypes.File => new[] { ConnectorProviders.Local, ConnectorProviders.FTP, ConnectorProviders.SFTP, ConnectorProviders.S3, ConnectorProviders.AzureBlob },
+            ConnectorTypes.File => new[] { ConnectorProviders.FTP, ConnectorProviders.SFTP, ConnectorProviders.S3, ConnectorProviders.AzureBlob },
             ConnectorTypes.Api => new[] { ConnectorProviders.REST },
             _ => Array.Empty<string>()
         };

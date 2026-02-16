@@ -449,7 +449,7 @@ public class ConnectorService : IConnectorService
         var validProviders = type switch
         {
             ConnectorTypes.Database => new[] { ConnectorProviders.SqlServer, ConnectorProviders.PostgreSQL, ConnectorProviders.MySQL, ConnectorProviders.Oracle, ConnectorProviders.Snowflake, ConnectorProviders.BigQuery, ConnectorProviders.Redshift, ConnectorProviders.MongoDb, ConnectorProviders.CosmosDb },
-            ConnectorTypes.File => new[] { ConnectorProviders.Local, ConnectorProviders.FTP, ConnectorProviders.SFTP, ConnectorProviders.S3, ConnectorProviders.AzureBlob, ConnectorProviders.GCS },
+            ConnectorTypes.File => new[] { ConnectorProviders.FTP, ConnectorProviders.SFTP, ConnectorProviders.S3, ConnectorProviders.AzureBlob, ConnectorProviders.GCS }, // Removed Local
             ConnectorTypes.Api => new[] { ConnectorProviders.REST },
             _ => Array.Empty<string>()
         };
@@ -474,7 +474,8 @@ public class ConnectorService : IConnectorService
     private static bool DetermineRequiresCredentials(string type, string provider)
     {
         // Most connectors require credentials except local files
-        return !(type == ConnectorTypes.File && provider == ConnectorProviders.Local);
+        // return !(type == ConnectorTypes.File && provider == ConnectorProviders.Local); // Removed Local
+        return true; // All file providers now require credentials
     }
 
     private ConnectorResponse MapToResponse(Connector connector)
