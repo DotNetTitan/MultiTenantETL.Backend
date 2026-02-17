@@ -101,6 +101,70 @@ namespace MultiTenantETL.Infrastructure.Services
             await SendEmailAsync(recipientEmail, subject, htmlContent);
         }
 
+        /// <inheritdoc/>
+        public async Task<bool> SendDataExportEmailAsync(
+            List<string> recipients,
+            List<string>? ccRecipients,
+            string subject,
+            string htmlBody,
+            string attachmentFileName,
+            string attachmentMediaType,
+            byte[] attachmentContent)
+        {
+            try
+            {
+                if (recipients == null || recipients.Count == 0)
+                {
+                    _logger.LogError("Cannot send data export email: no recipients specified");
+                    return false;
+                }
+
+                var toRecipients = recipients
+                    .Select(r => new EmailAddress(r))
+                    .ToList();
+
+                var ccList = ccRecipients?
+                    .Where(cc => !string.IsNullOrWhiteSpace(cc))
+                    .Select(cc => new EmailAddress(cc))
+                    .ToList() ?? new List<EmailAddress>();
+
+                var emailRecipients = new EmailRecipients(toRecipients, ccList);
+
+                var emailMessage = new EmailMessage(
+                    senderAddress: _senderAddress,
+                    recipients: emailRecipients,
+                    content: new EmailContent(subject)
+                    {
+                        Html = htmlBody
+                    }
+                );
+
+                var attachment = new EmailAttachment(
+                    attachmentFileName,
+                    attachmentMediaType,
+                    new BinaryData(attachmentContent));
+                emailMessage.Attachments.Add(attachment);
+
+                await _emailClient.SendAsync(WaitUntil.Started, emailMessage);
+
+                _logger.LogInformation(
+                    "Data export email sent to {RecipientCount} recipients with attachment '{FileName}' ({Size} bytes)",
+                    recipients.Count, attachmentFileName, attachmentContent.Length);
+                return true;
+            }
+            catch (RequestFailedException ex)
+            {
+                _logger.LogError(ex, "Azure Communication Services error sending data export email: {ErrorCode} - {Message}",
+                    ex.ErrorCode, ex.Message);
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send data export email to {RecipientCount} recipients", recipients.Count);
+                return false;
+            }
+        }
+
         private async Task<bool> SendEmailAsync(string to, string subject, string htmlContent)
         {
             try

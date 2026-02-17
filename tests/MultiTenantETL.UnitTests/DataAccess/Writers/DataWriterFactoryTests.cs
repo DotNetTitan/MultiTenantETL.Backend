@@ -6,6 +6,7 @@ using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.DataAccess.Writers;
 using MultiTenantETL.Infrastructure.DataAccess.Writers.Api;
 using MultiTenantETL.Infrastructure.DataAccess.Writers.Database;
+using MultiTenantETL.Infrastructure.DataAccess.Writers.Email;
 using MultiTenantETL.Infrastructure.DataAccess.Writers.File;
 using NSubstitute;
 
@@ -16,6 +17,7 @@ public class DataWriterFactoryTests
     private readonly IDatabaseDataWriterFactory _databaseFactory;
     private readonly IFileDataWriterFactory _fileFactory;
     private readonly IApiDataWriterFactory _apiFactory;
+    private readonly IEmailDataWriterFactory _emailFactory;
     private readonly ILogger<DataWriterFactory> _logger;
     private readonly DataWriterFactory _sut;
 
@@ -24,12 +26,14 @@ public class DataWriterFactoryTests
         _databaseFactory = Substitute.For<IDatabaseDataWriterFactory>();
         _fileFactory = Substitute.For<IFileDataWriterFactory>();
         _apiFactory = Substitute.For<IApiDataWriterFactory>();
+        _emailFactory = Substitute.For<IEmailDataWriterFactory>();
         _logger = Substitute.For<ILogger<DataWriterFactory>>();
 
         _sut = new DataWriterFactory(
             _databaseFactory,
             _fileFactory,
             _apiFactory,
+            _emailFactory,
             _logger);
     }
 

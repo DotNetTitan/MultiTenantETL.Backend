@@ -69,5 +69,27 @@ namespace MultiTenantETL.Infrastructure.Services
             _logger.LogInformation("   Details URL: {Url}", executionDetailsUrl);
             return Task.CompletedTask;
         }
+
+        /// <inheritdoc/>
+        public Task<bool> SendDataExportEmailAsync(
+            List<string> recipients,
+            List<string>? ccRecipients,
+            string subject,
+            string htmlBody,
+            string attachmentFileName,
+            string attachmentMediaType,
+            byte[] attachmentContent)
+        {
+            _logger.LogInformation("[STUB] Data Export Email would be sent:");
+            _logger.LogInformation("   Recipients: {Recipients}", string.Join(", ", recipients));
+            if (ccRecipients != null && ccRecipients.Count > 0)
+            {
+                _logger.LogInformation("   CC: {CcRecipients}", string.Join(", ", ccRecipients));
+            }
+            _logger.LogInformation("   Subject: {Subject}", subject);
+            _logger.LogInformation("   Attachment: {FileName} ({MediaType}, {Size} bytes)",
+                attachmentFileName, attachmentMediaType, attachmentContent.Length);
+            return Task.FromResult(true);
+        }
     }
 }

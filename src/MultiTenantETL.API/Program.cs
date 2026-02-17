@@ -506,6 +506,9 @@ builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataAccess.Writers.File
     MultiTenantETL.Infrastructure.DataAccess.Writers.File.FileDataWriterFactory>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataAccess.Writers.Api.IApiDataWriterFactory,
     MultiTenantETL.Infrastructure.DataAccess.Writers.Api.ApiDataWriterFactory>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataAccess.Writers.Email.IEmailDataWriterFactory,
+    MultiTenantETL.Infrastructure.DataAccess.Writers.Email.EmailDataWriterFactory>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.EmailDataWriter>();
 
 // Connection Tester Services
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.Services.ConnectionTesting.Database.IDatabaseConnectionTester,

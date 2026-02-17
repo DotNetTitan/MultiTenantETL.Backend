@@ -275,3 +275,52 @@ public record ApiWriteConfig
     public string? RootKey { get; init; }
     public int BatchSize { get; init; } = 100;
 }
+
+/// <summary>
+/// Configuration model for Email connector type.
+/// The email body contains only a summary; all data rows go into the file attachment.
+/// </summary>
+public record EmailConfig
+{
+    /// <summary>Recipient email addresses (required, at least one)</summary>
+    public List<string> Recipients { get; init; } = new();
+
+    /// <summary>CC recipient email addresses (optional)</summary>
+    public List<string>? CcRecipients { get; init; }
+
+    /// <summary>Email subject line (required)</summary>
+    public string? Subject { get; init; }
+
+    /// <summary>Optional custom message included in the email body alongside the auto-generated summary</summary>
+    public string? BodyMessage { get; init; }
+
+    /// <summary>File format for the data attachment: CSV, JSON, or Excel</summary>
+    public string? AttachmentFormat { get; init; } // CSV, JSON, Excel
+
+    /// <summary>Base filename for the attachment (timestamp is appended automatically)</summary>
+    public string? AttachmentFileName { get; init; }
+}
+
+/// <summary>
+/// Write configuration for Email connector destination.
+/// </summary>
+public record EmailWriteConfig
+{
+    /// <summary>Whether to send email when the pipeline produces no data rows</summary>
+    public bool SendEmptyReport { get; init; } = false;
+}
+
+/// <summary>
+/// Request model for previewing the email template with the user's configuration values.
+/// </summary>
+public record EmailPreviewRequest
+{
+    /// <summary>Optional custom body message to include in the email</summary>
+    public string? BodyMessage { get; init; }
+
+    /// <summary>Attachment format: CSV, JSON, or Excel</summary>
+    public string? AttachmentFormat { get; init; }
+
+    /// <summary>Base filename for the attachment</summary>
+    public string? AttachmentFileName { get; init; }
+}
