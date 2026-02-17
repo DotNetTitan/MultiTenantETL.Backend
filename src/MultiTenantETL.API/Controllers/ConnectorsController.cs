@@ -272,6 +272,18 @@ public class ConnectorsController : ControllerBase
     }
 
     /// <summary>
+    /// Preview the email template with the user's configuration values.
+    /// Returns the exact same HTML that would be sent in the actual email.
+    /// </summary>
+    [HttpPost("email-preview")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public IActionResult PreviewEmail([FromBody] EmailPreviewRequest request)
+    {
+        var html = _connectorService.GenerateEmailPreviewHtml(request);
+        return Content(html, "text/html");
+    }
+
+    /// <summary>
     /// Detect schema from connection configuration (for new connectors before saving)
     /// </summary>
     [HttpPost("detect-schema-preview")]

@@ -14,4 +14,10 @@ public interface IConnectorService
     Task<DetectSchemaResponse> DetectSchemaAsync(DetectSchemaRequest request, Guid tenantId);
     Task<DetectSchemaResponse> DetectSchemaPreviewAsync(DetectSchemaPreviewRequest request, Guid tenantId);
     Task<List<ConnectorListResponse>> GetAllAsync(Guid tenantId);
+
+    /// <summary>
+    /// Generates the HTML preview for a data-export email based on the user's configuration.
+    /// Returns the same HTML that would be sent in an actual pipeline execution email.
+    /// </summary>
+    string GenerateEmailPreviewHtml(EmailPreviewRequest request);
 }

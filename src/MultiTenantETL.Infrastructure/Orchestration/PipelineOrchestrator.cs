@@ -7,6 +7,7 @@ using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Application.DataAccess;
 using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Application.Orchestration;
+using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Domain.Enums;
 using MultiTenantETL.Infrastructure.Configuration;
@@ -234,7 +235,16 @@ public class PipelineOrchestrator : IPipelineOrchestrator
 
         try
         {
-            var mappedBatch = _fieldMappingService.ApplyFieldMappings(batch, pipeline.FieldMappingsJson);
+            // For Email destinations, strip unmapped fields so only explicitly
+            // mapped columns appear in the attachment (Email has no schema to
+            // filter columns — it exports all row keys as headers).
+            var stripUnmapped = string.Equals(
+                pipeline.DestinationConnector?.Type,
+                ConnectorTypes.Email,
+                StringComparison.OrdinalIgnoreCase);
+
+            var mappedBatch = _fieldMappingService.ApplyFieldMappings(
+                batch, pipeline.FieldMappingsJson, stripUnmapped);
             
             await AddLogEntryAsync(execution, "Info", "FieldMapping",
                 $"Batch {result.BatchIndex}: Applied field mappings, {batch.RowCount} → {mappedBatch.RowCount} rows",

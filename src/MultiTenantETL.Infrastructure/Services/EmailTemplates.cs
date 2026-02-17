@@ -1,10 +1,50 @@
+using System.Globalization;
+using MultiTenantETL.Domain.Constants;
+
 namespace MultiTenantETL.Infrastructure.Services
 {
     /// <summary>
-    /// HTML email templates for authentication-related emails
+    /// HTML email templates and shared email utility helpers
     /// </summary>
     public static class EmailTemplates
     {
+        /// <summary>
+        /// Returns the file extension for a given attachment format.
+        /// Delegates to <see cref="MetadataConstants.FileFormats.GetExtension"/> as the single source of truth.
+        /// </summary>
+        public static string GetFileExtension(string? format)
+        {
+            return MetadataConstants.FileFormats.GetExtension(format);
+        }
+
+        /// <summary>
+        /// Builds the full export filename including a UTC timestamp and the correct extension.
+        /// Example: "data-export_20260216_143022.csv"
+        /// </summary>
+        public static string BuildExportFileName(string? baseFileName, string? format)
+        {
+            var safeName = string.IsNullOrWhiteSpace(baseFileName) ? "data-export" : baseFileName;
+            var timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
+            var extension = GetFileExtension(format);
+            return $"{safeName}_{timestamp}{extension}";
+        }
+
+        /// <summary>
+        /// Generates the complete HTML preview for a data-export email using sample data.
+        /// This is the single source of truth for email previews; both the API preview
+        /// endpoint and the actual email writer should produce identical output.
+        /// </summary>
+        public static string GenerateDataExportPreviewHtml(
+            string? bodyMessage,
+            string? attachmentFormat,
+            string? attachmentFileName,
+            int sampleRowCount = 1234)
+        {
+            var format = attachmentFormat ?? MetadataConstants.FileFormats.DefaultFormat;
+            var fileName = BuildExportFileName(attachmentFileName, format);
+            return GetDataExportEmail(bodyMessage, sampleRowCount, format, fileName);
+        }
+
         private static string GetBaseTemplate(string content)
         {
             return $@"
@@ -393,6 +433,54 @@ namespace MultiTenantETL.Infrastructure.Services
             <div class='divider'></div>
             <p style='text-align: center; color: #666; font-size: 13px;'>This is an automated notification from your MultiTenant ETL pipeline.</p>";
             
+            return GetBaseTemplate(content);
+        }
+
+        /// <summary>
+        /// Data export email template with summary information.
+        /// The email body contains only a summary; all data rows are in the file attachment.
+        /// </summary>
+        public static string GetDataExportEmail(
+            string? bodyMessage,
+            int totalRows,
+            string attachmentFormat,
+            string fileName)
+        {
+            var timestamp = DateTime.UtcNow.ToString("MMMM dd, yyyy 'at' HH:mm 'UTC'");
+            var customMessageSection = !string.IsNullOrWhiteSpace(bodyMessage)
+                ? $"<p>{System.Net.WebUtility.HtmlEncode(bodyMessage)}</p><div class='divider'></div>"
+                : "";
+
+            var content = $@"
+            <h2>Data Export Report</h2>
+            {customMessageSection}
+            <div class='success-note'>
+                <strong>Export Complete</strong>
+                Your data export has been completed and is attached to this email.
+            </div>
+            <div style='background: #F5F5F5; padding: 20px; border-radius: 6px; margin: 20px 0;'>
+                <table style='width: 100%; border-collapse: collapse;'>
+                    <tr>
+                        <td style='padding: 8px 0; color: #666; font-size: 14px;'>Total Rows Exported</td>
+                        <td style='padding: 8px 0; color: #1a1a1a; font-size: 14px; text-align: right; font-weight: 600;'>{totalRows:N0}</td>
+                    </tr>
+                    <tr style='border-top: 1px solid #E0E0E0;'>
+                        <td style='padding: 8px 0; color: #666; font-size: 14px;'>Attachment Format</td>
+                        <td style='padding: 8px 0; color: #1a1a1a; font-size: 14px; text-align: right;'>{System.Net.WebUtility.HtmlEncode(attachmentFormat)}</td>
+                    </tr>
+                    <tr style='border-top: 1px solid #E0E0E0;'>
+                        <td style='padding: 8px 0; color: #666; font-size: 14px;'>Filename</td>
+                        <td style='padding: 8px 0; color: #1a1a1a; font-size: 14px; text-align: right; font-family: monospace;'>{System.Net.WebUtility.HtmlEncode(fileName)}</td>
+                    </tr>
+                    <tr style='border-top: 1px solid #E0E0E0;'>
+                        <td style='padding: 8px 0; color: #666; font-size: 14px;'>Exported At</td>
+                        <td style='padding: 8px 0; color: #1a1a1a; font-size: 14px; text-align: right;'>{timestamp}</td>
+                    </tr>
+                </table>
+            </div>
+            <div class='divider'></div>
+            <p style='text-align: center; color: #666; font-size: 13px;'>This is an automated data export from your MultiTenant ETL pipeline.</p>";
+
             return GetBaseTemplate(content);
         }
     }

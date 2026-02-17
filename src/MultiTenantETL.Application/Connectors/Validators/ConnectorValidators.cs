@@ -20,7 +20,7 @@ public class CreateConnectorRequestValidator : AbstractValidator<CreateConnector
         RuleFor(x => x.Type)
             .NotEmpty().WithMessage("Type is required")
             .MaximumLength(50).WithMessage("Type must not exceed 50 characters")
-            .Must(BeValidType).WithMessage("Invalid connector type. Valid types are: Database, File, API");
+            .Must(BeValidType).WithMessage("Invalid connector type. Valid types are: Database, File, API, Email");
 
         RuleFor(x => x.Provider)
             .NotEmpty().WithMessage("Provider is required")
@@ -39,7 +39,7 @@ public class CreateConnectorRequestValidator : AbstractValidator<CreateConnector
 
     private static bool BeValidType(string type)
     {
-        var validTypes = new[] { ConnectorTypes.Database, ConnectorTypes.File, ConnectorTypes.Api };
+        var validTypes = new[] { ConnectorTypes.Database, ConnectorTypes.File, ConnectorTypes.Api, ConnectorTypes.Email };
         return validTypes.Contains(type);
     }
 
@@ -50,6 +50,7 @@ public class CreateConnectorRequestValidator : AbstractValidator<CreateConnector
             ConnectorTypes.Database => new[] { ConnectorProviders.SqlServer, ConnectorProviders.PostgreSQL, ConnectorProviders.MySQL },
             ConnectorTypes.File => new[] { ConnectorProviders.FTP, ConnectorProviders.SFTP, ConnectorProviders.S3, ConnectorProviders.AzureBlob },
             ConnectorTypes.Api => new[] { ConnectorProviders.REST },
+            ConnectorTypes.Email => new[] { ConnectorProviders.Email },
             _ => Array.Empty<string>()
         };
 

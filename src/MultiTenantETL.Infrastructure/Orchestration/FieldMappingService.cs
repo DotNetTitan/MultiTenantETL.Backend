@@ -20,7 +20,7 @@ public class FieldMappingService : IFieldMappingService
         _fieldProcessor = fieldProcessor;
     }
 
-    public ReadBatch ApplyFieldMappings(ReadBatch batch, string fieldMappingsJson)
+    public ReadBatch ApplyFieldMappings(ReadBatch batch, string fieldMappingsJson, bool stripUnmappedFields = false)
     {
         if (string.IsNullOrEmpty(fieldMappingsJson) || fieldMappingsJson == "[]")
         {
@@ -179,6 +179,26 @@ public class FieldMappingService : IFieldMappingService
                                 row.Remove(sourceField);
                             }
                         }
+                    }
+                }
+            }
+
+            // STEP 3: Strip unmapped fields if requested.
+            // Keeps only the destination fields from the mappings, removing any
+            // source fields that were not part of any mapping. This is essential
+            // for destinations like Email where the writer exports all row keys
+            // as column headers.
+            if (stripUnmappedFields)
+            {
+                foreach (var row in batch.Rows)
+                {
+                    var keysToRemove = row.Keys
+                        .Where(k => !allDestinationFields.Contains(k))
+                        .ToList();
+
+                    foreach (var key in keysToRemove)
+                    {
+                        row.Remove(key);
                     }
                 }
             }

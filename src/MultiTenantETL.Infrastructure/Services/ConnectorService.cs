@@ -440,7 +440,7 @@ public class ConnectorService : IConnectorService
     // Helper methods
     private static void ValidateTypeAndProvider(string type, string provider)
     {
-        var validTypes = new[] { ConnectorTypes.Database, ConnectorTypes.File, ConnectorTypes.Api };
+        var validTypes = new[] { ConnectorTypes.Database, ConnectorTypes.File, ConnectorTypes.Api, ConnectorTypes.Email };
         if (!validTypes.Contains(type))
         {
             throw new ArgumentException($"Invalid connector type: {type}");
@@ -449,8 +449,9 @@ public class ConnectorService : IConnectorService
         var validProviders = type switch
         {
             ConnectorTypes.Database => new[] { ConnectorProviders.SqlServer, ConnectorProviders.PostgreSQL, ConnectorProviders.MySQL, ConnectorProviders.Oracle, ConnectorProviders.Snowflake, ConnectorProviders.BigQuery, ConnectorProviders.Redshift, ConnectorProviders.MongoDb, ConnectorProviders.CosmosDb },
-            ConnectorTypes.File => new[] { ConnectorProviders.FTP, ConnectorProviders.SFTP, ConnectorProviders.S3, ConnectorProviders.AzureBlob, ConnectorProviders.GCS }, // Removed Local
+            ConnectorTypes.File => new[] { ConnectorProviders.FTP, ConnectorProviders.SFTP, ConnectorProviders.S3, ConnectorProviders.AzureBlob, ConnectorProviders.GCS },
             ConnectorTypes.Api => new[] { ConnectorProviders.REST },
+            ConnectorTypes.Email => new[] { ConnectorProviders.Email },
             _ => Array.Empty<string>()
         };
 
@@ -626,5 +627,14 @@ public class ConnectorService : IConnectorService
             LastTestResult = connector.LastTestResult,
             CreatedAt = connector.CreatedAt
         };
+    }
+
+    /// <inheritdoc />
+    public string GenerateEmailPreviewHtml(EmailPreviewRequest request)
+    {
+        return EmailTemplates.GenerateDataExportPreviewHtml(
+            request.BodyMessage,
+            request.AttachmentFormat,
+            request.AttachmentFileName);
     }
 }

@@ -12,7 +12,8 @@ public static class MetadataConstants
         {
             (Constants.ConnectorTypes.Database, "connectors.database", "mdi-database"),
             (Constants.ConnectorTypes.Api, "connectors.api", "mdi-api"),
-            (Constants.ConnectorTypes.File, "connectors.file", "mdi-file-document")
+            (Constants.ConnectorTypes.File, "connectors.file", "mdi-file-document"),
+            (Constants.ConnectorTypes.Email, "connectors.email", "mdi-email")
         };
     }
 
@@ -52,6 +53,13 @@ public static class MetadataConstants
                     Constants.ConnectorProviders.AzureBlob,
                     Constants.ConnectorProviders.GCS
                 } 
+            },
+            { 
+                Constants.ConnectorTypes.Email, 
+                new[] 
+                { 
+                    Constants.ConnectorProviders.Email
+                } 
             }
         };
 
@@ -79,7 +87,10 @@ public static class MetadataConstants
             { Constants.ConnectorProviders.GCS, ("mdi-google-cloud", "blue-lighten-1") },
             
             // API providers
-            { Constants.ConnectorProviders.REST, ("mdi-api", "purple-darken-1") }
+            { Constants.ConnectorProviders.REST, ("mdi-api", "purple-darken-1") },
+            
+            // Email providers
+            { Constants.ConnectorProviders.Email, ("mdi-email", "deep-orange-darken-1") }
         };
     }
 
@@ -111,9 +122,33 @@ public static class MetadataConstants
             ("CSV", "common.csv", ".csv"),
             ("JSON", "common.json", ".json"),
             ("Excel", "common.excel", ".xlsx"),
-            ("XML", "common.xml", ".xml"),
-            ("Parquet", "common.parquet", ".parquet")
+            ("XML", "common.xml", ".xml")
         };
+
+        /// <summary>
+        /// The default file format (first entry in <see cref="Formats"/>).
+        /// </summary>
+        public static string DefaultFormat => Formats[0].Value;
+
+        /// <summary>
+        /// Case-insensitive lookup from format value to file extension.
+        /// </summary>
+        private static readonly Dictionary<string, string> ExtensionByFormat =
+            Formats.ToDictionary(
+                f => f.Value,
+                f => f.Extension,
+                StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Returns the file extension for a given format value (e.g. "JSON" -> ".json").
+        /// Defaults to the extension of <see cref="DefaultFormat"/> for null or unrecognised formats.
+        /// </summary>
+        public static string GetExtension(string? format)
+        {
+            if (format is not null && ExtensionByFormat.TryGetValue(format, out var ext))
+                return ext;
+            return ExtensionByFormat[DefaultFormat];
+        }
     }
 
     public static class WriteOperations

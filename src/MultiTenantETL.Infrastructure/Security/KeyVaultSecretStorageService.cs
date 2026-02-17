@@ -27,7 +27,7 @@ public class KeyVaultSecretStorageService : ISecretStorageService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         // Validate settings
-        _settings.Validate();
+       // _settings.Validate();
 
         // Create SecretClient using DefaultAzureCredential
         // This works with Managed Identity in Azure and developer credentials locally

@@ -5,6 +5,7 @@ public static class ConnectorTypes
     public const string Database = "Database";
     public const string File = "File";
     public const string Api = "API";
+    public const string Email = "Email";
 }
 
 public static class ConnectorProviders
@@ -29,6 +30,9 @@ public static class ConnectorProviders
     
     // API providers
     public const string REST = "REST";
+    
+    // Email providers
+    public const string Email = "Email";
 }
 
 public static class ConnectorDirections

@@ -41,5 +41,18 @@ namespace MultiTenantETL.Application.Interfaces
             long recordsFailed,
             string? errorMessage,
             string executionDetailsUrl);
+
+        /// <summary>
+        /// Send data export email with file attachment. Used by the Email connector destination.
+        /// Exactly one email is sent per pipeline execution containing all exported data as a file attachment.
+        /// </summary>
+        Task<bool> SendDataExportEmailAsync(
+            List<string> recipients,
+            List<string>? ccRecipients,
+            string subject,
+            string htmlBody,
+            string attachmentFileName,
+            string attachmentMediaType,
+            byte[] attachmentContent);
     }
 }
