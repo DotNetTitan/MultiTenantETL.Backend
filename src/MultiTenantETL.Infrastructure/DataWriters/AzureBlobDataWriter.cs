@@ -150,7 +150,19 @@ public class AzureBlobDataWriter : IDataWriter
     {
         if (batch.Rows.Count == 0) return;
 
-        var headers = batch.Rows[0].Keys.ToList();
+        if (batch.Rows.Count == 0) return;
+
+        List<string> headers;
+
+        // Use configured column order if available, otherwise use keys from first row
+        if (_config?.ColumnOrder != null && _config.ColumnOrder.Any())
+        {
+            headers = _config.ColumnOrder;
+        }
+        else
+        {
+            headers = batch.Rows[0].Keys.ToList();
+        }
 
         // Write header only for first batch
         if (_isFirstBatch)
@@ -238,6 +250,14 @@ public class AzureBlobDataWriter : IDataWriter
                 config.FilenamePattern = pattern.GetString();
             }
 
+            // Look for ColumnOrder in writeConfig
+            if (root.TryGetProperty("writeConfig", out _) && 
+                writeConfig.TryGetProperty("columnOrder", out var columnOrderElement) &&
+                columnOrderElement.ValueKind == JsonValueKind.Array)
+            {
+                 config.ColumnOrder = JsonSerializer.Deserialize<List<string>>(columnOrderElement.GetRawText(), options);
+            }
+
             // Validate required fields
             if (string.IsNullOrWhiteSpace(config.AzureAccountName))
                 throw new InvalidOperationException("AzureAccountName is required");
@@ -290,6 +310,7 @@ public class AzureBlobDataWriter : IDataWriter
         public string Path { get; set; } = string.Empty;
         public string? Format { get; set; }
         public string? FilenamePattern { get; set; }
+        public List<string>? ColumnOrder { get; set; }
 
         // Mapped properties for internal use
         public string AccountName => AzureAccountName;
