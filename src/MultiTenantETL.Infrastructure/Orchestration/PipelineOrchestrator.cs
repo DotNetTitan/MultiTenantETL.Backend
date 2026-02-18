@@ -191,6 +191,16 @@ public class PipelineOrchestrator : IPipelineOrchestrator
 
         var readOptions = new ReadOptions { BatchSize = 1000 };
         var writeOptions = ExtractWriteOptions(pipeline.DestinationConnector!);
+        
+        // Add execution context parameters for filename resolution
+        writeOptions.Parameters = new Dictionary<string, object>
+        {
+            ["executionId"] = execution.Id,
+            ["pipelineId"] = pipeline.Id,
+            ["date"] = DateTime.UtcNow.ToString("yyyy-MM-dd"),
+            ["time"] = DateTime.UtcNow.ToString("HH-mm-ss"),
+            ["timestamp"] = DateTime.UtcNow.ToString("yyyyMMddHHmmss")
+        };
         var result = new BatchProcessingResult();
 
         await foreach (var batch in reader.ReadAsync(pipeline.SourceConnector!, readOptions, cancellationToken))

@@ -1,3 +1,4 @@
+using Azure.Storage;
 using Azure.Storage.Blobs;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors;
@@ -46,8 +47,9 @@ public class AzureBlobConnectionTester
 
         try
         {
-            // Build connection string
-            var connectionString = $"DefaultEndpointsProtocol=https;AccountName={config.AzureAccountName};AccountKey={config.AzureAccountKey};EndpointSuffix=core.windows.net";
+            // Create credentials securely
+            var credential = new StorageSharedKeyCredential(config.AzureAccountName, config.AzureAccountKey);
+            var serviceUri = new Uri($"https://{config.AzureAccountName}.blob.core.windows.net");
             
             // Configure retry options - reduce from default 6 to 3 attempts
             var blobClientOptions = new BlobClientOptions
@@ -61,7 +63,7 @@ public class AzureBlobConnectionTester
             };
             
             // Create blob service client with custom retry policy
-            var blobServiceClient = new BlobServiceClient(connectionString, blobClientOptions);
+            var blobServiceClient = new BlobServiceClient(serviceUri, credential, blobClientOptions);
             
             // Get container client
             var containerClient = blobServiceClient.GetBlobContainerClient(config.AzureContainer);
@@ -111,6 +113,14 @@ public class AzureBlobConnectionTester
             {
                 Success = false,
                 Message = $"Storage account '{config.AzureAccountName}' or container '{config.AzureContainer}' not found."
+            };
+        }
+        catch (FormatException ex)
+        {
+            return new ConnectionTestResult
+            {
+                Success = false,
+                Message = "Invalid Azure Storage Account Key format (must be Base64) or Account Name."
             };
         }
         catch (Exception ex)
