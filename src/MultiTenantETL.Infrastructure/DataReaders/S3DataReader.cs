@@ -73,12 +73,19 @@ public class S3DataReader : IDataReader
         using var response = await s3Client.GetObjectAsync(request, cancellationToken);
 
         // Pass stream directly to format-specific reader
-        var streamConnector = CreateStreamConnector(response.ResponseStream, format);
+        var streamConnector = CreateStreamConnector(response.ResponseStream, format, out var registryKey);
         var reader = GetReaderForFormat(format);
 
-        await foreach (var batch in reader.ReadAsync(streamConnector, options, cancellationToken))
+        try
         {
-            yield return batch;
+            await foreach (var batch in reader.ReadAsync(streamConnector, options, cancellationToken))
+            {
+                yield return batch;
+            }
+        }
+        finally
+        {
+            AzureBlobDataReader.RemoveStreamFromRegistry(registryKey);
         }
     }
 
@@ -93,19 +100,21 @@ public class S3DataReader : IDataReader
         };
     }
 
-    private Connector CreateStreamConnector(Stream stream, string format)
+    private static Connector CreateStreamConnector(Stream stream, string format, out Guid registryKey)
     {
+        registryKey = Guid.NewGuid();
+        AzureBlobDataReader.RegisterStream(registryKey, stream);
+
         var configJson = format.ToLower() switch
         {
-            "csv" => JsonSerializer.Serialize(new { Stream = stream, HasHeader = true, Delimiter = "," }),
-            "json" => JsonSerializer.Serialize(new { Stream = stream, IsArray = true }),
-            "jsonl" or "jsonlines" or "ndjson" => JsonSerializer.Serialize(new { Stream = stream }),
-            _ => JsonSerializer.Serialize(new { Stream = stream })
+            "csv"  => JsonSerializer.Serialize(new { StreamRegistryKey = registryKey, HasHeader = true, Delimiter = "," }),
+            "json" => JsonSerializer.Serialize(new { StreamRegistryKey = registryKey, IsArray = true }),
+            _      => JsonSerializer.Serialize(new { StreamRegistryKey = registryKey })
         };
 
         return new Connector
         {
-            Id = Guid.NewGuid(),
+            Id = registryKey,
             TenantId = Guid.Empty,
             Name = "S3StreamConnector",
             Type = "File",
@@ -159,10 +168,17 @@ public class S3DataReader : IDataReader
             using var response = await s3Client.GetObjectAsync(request, cancellationToken);
             var format = DetermineFormat(config.Key, config.Format);
 
-            var streamConnector = CreateStreamConnector(response.ResponseStream, format);
+            var streamConnector = CreateStreamConnector(response.ResponseStream, format, out var registryKey);
             var reader = GetReaderForFormat(format);
 
-            return await reader.DetectSchemaAsync(streamConnector, cancellationToken);
+            try
+            {
+                return await reader.DetectSchemaAsync(streamConnector, cancellationToken);
+            }
+            finally
+            {
+                AzureBlobDataReader.RemoveStreamFromRegistry(registryKey);
+            }
         }
         catch (Exception ex)
         {

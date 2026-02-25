@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
@@ -9,11 +10,19 @@ using IDataReader = MultiTenantETL.Application.Connectors.DataReaders.IDataReade
 namespace MultiTenantETL.Infrastructure.DataReaders;
 
 /// <summary>
-/// Reads files from Azure Blob Storage
-/// Downloads stream and delegates to existing format-specific readers
+/// Reads files from Azure Blob Storage.
+/// Downloads stream and delegates to existing format-specific readers.
+/// The Azure SDK returns a non-seekable RetriableStream that cannot be JSON-serialized
+/// (its Length property throws NotSupportedException). To pass the live stream to the
+/// sub-readers without going through JSON, we use a static registry keyed by a
+/// temporary connector GUID that is cleaned up after the read completes.
 /// </summary>
 public class AzureBlobDataReader : IDataReader
 {
+    // Registry used to pass live Stream references to sub-readers without JSON serialization.
+    // Entries are short-lived (created just before a read, removed immediately after).
+    private static readonly ConcurrentDictionary<Guid, Stream> _streamRegistry = new();
+
     private readonly IStorageClientFactory _clientFactory;
     private readonly CsvDataReader _csvReader;
     private readonly JsonDataReader _jsonReader;
@@ -41,18 +50,6 @@ public class AzureBlobDataReader : IDataReader
     {
         var config = ParseConfig(connector.ConfigJson);
 
-        if (string.IsNullOrEmpty(config.ContainerName))
-            throw new InvalidOperationException("Azure Blob configuration must include ContainerName");
-
-        if (string.IsNullOrEmpty(config.BlobName))
-            throw new InvalidOperationException("Azure Blob configuration must include BlobName");
-
-        if (string.IsNullOrEmpty(config.AccountName))
-            throw new InvalidOperationException("Azure Blob configuration must include AccountName");
-
-        if (string.IsNullOrEmpty(config.AccountKey))
-            throw new InvalidOperationException("Azure Blob configuration must include AccountKey");
-
         var format = DetermineFormat(config.BlobName, config.Format);
         if (!IsSupportedFormat(format))
             throw new NotSupportedException($"File format '{format}' is not supported for Azure Blob");
@@ -61,13 +58,21 @@ public class AzureBlobDataReader : IDataReader
         var blobClient = containerClient.GetBlobClient(config.BlobName);
 
         var response = await blobClient.DownloadStreamingAsync(cancellationToken: cancellationToken);
+        var stream = response.Value.Content;
 
-        var streamConnector = CreateStreamConnector(response.Value.Content, format);
+        var streamConnector = CreateStreamConnector(stream, format, out var registryKey);
         var reader = GetReaderForFormat(format);
 
-        await foreach (var batch in reader.ReadAsync(streamConnector, options, cancellationToken))
+        try
         {
-            yield return batch;
+            await foreach (var batch in reader.ReadAsync(streamConnector, options, cancellationToken))
+            {
+                yield return batch;
+            }
+        }
+        finally
+        {
+            _streamRegistry.TryRemove(registryKey, out _);
         }
     }
 
@@ -96,12 +101,20 @@ public class AzureBlobDataReader : IDataReader
             var blobClient = containerClient.GetBlobClient(config.BlobName);
 
             var response = await blobClient.DownloadStreamingAsync(cancellationToken: cancellationToken);
+            var stream = response.Value.Content;
             var format = DetermineFormat(config.BlobName, config.Format);
 
-            var streamConnector = CreateStreamConnector(response.Value.Content, format);
+            var streamConnector = CreateStreamConnector(stream, format, out var registryKey);
             var reader = GetReaderForFormat(format);
 
-            return await reader.DetectSchemaAsync(streamConnector, cancellationToken);
+            try
+            {
+                return await reader.DetectSchemaAsync(streamConnector, cancellationToken);
+            }
+            finally
+            {
+                _streamRegistry.TryRemove(registryKey, out _);
+            }
         }
         catch (Exception ex)
         {
@@ -115,30 +128,23 @@ public class AzureBlobDataReader : IDataReader
         }
     }
 
-    private IDataReader GetReaderForFormat(string format)
+    // Returns a Connector whose ConfigJson encodes the registry key.
+    // The sub-reader's ParseConfig will call GetStreamFromRegistry to retrieve the live stream.
+    private static Connector CreateStreamConnector(Stream stream, string format, out Guid registryKey)
     {
-        return format.ToLower() switch
-        {
-            "csv" => _csvReader,
-            "json" => _jsonReader,
-            "jsonl" or "jsonlines" or "ndjson" => _jsonLinesReader,
-            _ => throw new NotSupportedException($"File format '{format}' is not supported")
-        };
-    }
+        registryKey = Guid.NewGuid();
+        _streamRegistry[registryKey] = stream;
 
-    private Connector CreateStreamConnector(Stream stream, string format)
-    {
         var configJson = format.ToLower() switch
         {
-            "csv" => JsonSerializer.Serialize(new { Stream = stream, HasHeader = true, Delimiter = "," }),
-            "json" => JsonSerializer.Serialize(new { Stream = stream, IsArray = true }),
-            "jsonl" or "jsonlines" or "ndjson" => JsonSerializer.Serialize(new { Stream = stream }),
-            _ => JsonSerializer.Serialize(new { Stream = stream })
+            "csv"  => JsonSerializer.Serialize(new { StreamRegistryKey = registryKey, HasHeader = true, Delimiter = "," }),
+            "json" => JsonSerializer.Serialize(new { StreamRegistryKey = registryKey, IsArray = true }),
+            _      => JsonSerializer.Serialize(new { StreamRegistryKey = registryKey })
         };
 
         return new Connector
         {
-            Id = Guid.NewGuid(),
+            Id = registryKey,
             TenantId = Guid.Empty,
             Name = "AzureBlobStreamConnector",
             Type = "File",
@@ -154,6 +160,33 @@ public class AzureBlobDataReader : IDataReader
         };
     }
 
+    /// <summary>
+    /// Retrieves a stream that was previously registered via <see cref="CreateStreamConnector"/>.
+    /// Sub-readers call this instead of deserializing a Stream from JSON.
+    /// Returns null if the key is not found (e.g. normal file-based connectors).
+    /// </summary>
+    public static Stream? GetStreamFromRegistry(Guid key)
+        => _streamRegistry.TryGetValue(key, out var stream) ? stream : null;
+
+    /// <summary>Registers an externally obtained stream (e.g. from S3, GCS, FTP, SFTP).</summary>
+    public static void RegisterStream(Guid key, Stream stream)
+        => _streamRegistry[key] = stream;
+
+    /// <summary>Removes a stream from the registry after use.</summary>
+    public static void RemoveStreamFromRegistry(Guid key)
+        => _streamRegistry.TryRemove(key, out _);
+
+    private IDataReader GetReaderForFormat(string format)
+    {
+        return format.ToLower() switch
+        {
+            "csv" => _csvReader,
+            "json" => _jsonReader,
+            "jsonl" or "jsonlines" or "ndjson" => _jsonLinesReader,
+            _ => throw new NotSupportedException($"File format '{format}' is not supported")
+        };
+    }
+
     private string DetermineFormat(string blobName, string? configFormat)
     {
         if (!string.IsNullOrEmpty(configFormat))
@@ -164,7 +197,7 @@ public class AzureBlobDataReader : IDataReader
         var extension = Path.GetExtension(blobName).TrimStart('.').ToLower();
         return extension switch
         {
-            "csv" => "csv",
+            "csv"  => "csv",
             "json" => "json",
             "jsonl" or "ndjson" => "jsonl",
             _ => "jsonl"
@@ -173,7 +206,7 @@ public class AzureBlobDataReader : IDataReader
 
     private bool IsSupportedFormat(string format)
     {
-        return format switch
+        return format.ToLower() switch
         {
             "csv" or "json" or "jsonl" or "jsonlines" or "ndjson" => true,
             _ => false
@@ -182,16 +215,41 @@ public class AzureBlobDataReader : IDataReader
 
     private AzureBlobConfig ParseConfig(string configJson)
     {
-        return JsonSerializer.Deserialize<AzureBlobConfig>(configJson)
-            ?? throw new InvalidOperationException("Invalid Azure Blob configuration");
+        try
+        {
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+            var config = JsonSerializer.Deserialize<AzureBlobConfig>(configJson, options)
+                ?? throw new InvalidOperationException("Invalid Azure Blob configuration");
+
+            if (string.IsNullOrWhiteSpace(config.AzureAccountName))
+                throw new InvalidOperationException("AzureAccountName is required");
+            if (string.IsNullOrWhiteSpace(config.AzureAccountKey))
+                throw new InvalidOperationException("AzureAccountKey is required");
+            if (string.IsNullOrWhiteSpace(config.AzureContainer))
+                throw new InvalidOperationException("AzureContainer is required");
+            if (string.IsNullOrWhiteSpace(config.Path))
+                throw new InvalidOperationException("Path (BlobName) is required");
+
+            return config;
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException("Invalid JSON configuration for Azure Blob", ex);
+        }
     }
 
     private class AzureBlobConfig
     {
-        public string AccountName { get; set; } = string.Empty;
-        public string AccountKey { get; set; } = string.Empty;
-        public string ContainerName { get; set; } = string.Empty;
-        public string BlobName { get; set; } = string.Empty;
+        public string AzureAccountName { get; set; } = string.Empty;
+        public string AzureAccountKey { get; set; } = string.Empty;
+        public string AzureContainer { get; set; } = string.Empty;
+        public string Path { get; set; } = string.Empty;
         public string? Format { get; set; }
+
+        public string AccountName => AzureAccountName;
+        public string AccountKey => AzureAccountKey;
+        public string ContainerName => AzureContainer;
+        public string BlobName => Path;
     }
 }

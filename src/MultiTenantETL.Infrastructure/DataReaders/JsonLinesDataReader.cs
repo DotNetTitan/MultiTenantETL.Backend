@@ -30,9 +30,11 @@ public class JsonLinesDataReader : IDataReader
         Stream stream;
         bool ownsStream = false;
 
-        if (config.Stream != null)
+        // Check if a pre-opened stream was registered (e.g. from AzureBlobDataReader)
+        if (config.StreamRegistryKey.HasValue)
         {
-            stream = config.Stream;
+            stream = AzureBlobDataReader.GetStreamFromRegistry(config.StreamRegistryKey.Value)
+                ?? throw new InvalidOperationException($"Stream registry key {config.StreamRegistryKey.Value} not found");
         }
         else
         {
@@ -191,6 +193,7 @@ public class JsonLinesDataReader : IDataReader
     private class JsonLinesConfig
     {
         public string FilePath { get; set; } = string.Empty;
-        public Stream? Stream { get; set; }
+        /// <summary>Key into <see cref="AzureBlobDataReader._streamRegistry"/> for cloud-streamed blobs.</summary>
+        public Guid? StreamRegistryKey { get; set; }
     }
 }
