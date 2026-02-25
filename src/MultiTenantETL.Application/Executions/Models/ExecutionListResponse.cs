@@ -10,7 +10,7 @@ public class ExecutionListResponse
     public DateTimeOffset StartTime { get; set; }
     public DateTimeOffset? EndTime { get; set; }
     public TimeSpan? Duration { get; set; }
-    public double? DurationMs => Duration?.TotalMilliseconds;
+    public long? DurationMs => Duration.HasValue ? (long)Math.Round(Duration.Value.TotalMilliseconds) : null;
     
     public long RecordsProcessed { get; set; }
     public decimal ProgressPercent { get; set; }
