@@ -62,7 +62,15 @@ namespace MultiTenantETL.API.Controllers
             if (request.IsRefreshTokenGrantType())
                 return await HandleRefreshTokenFlow(request);
 
-            throw new NotImplementedException("The specified grant type is not implemented.");
+            return Forbid(
+                authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
+                properties: new AuthenticationProperties(new Dictionary<string, string?>
+                {
+                    [OpenIddictServerAspNetCoreConstants.Properties.Error] =
+                        OpenIddictConstants.Errors.UnsupportedGrantType,
+                    [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] =
+                        "The specified grant type is not supported by this authorization server."
+                }));
         }
 
         [HttpPost("revoke")]
