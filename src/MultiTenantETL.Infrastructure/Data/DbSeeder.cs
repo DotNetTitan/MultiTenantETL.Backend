@@ -367,11 +367,17 @@ public static class DbSeeder
                 {
                     fields = new[]
                     {
-                        new { id = "field-pg-1", name = "order_id", type = "int", order = 1, nullable = false, required = true, description = "Order ID", isPrimaryKey = true },
-                        new { id = "field-pg-2", name = "customer_id", type = "int", order = 2, nullable = false, required = true, description = "Customer ID", isPrimaryKey = false },
-                        new { id = "field-pg-3", name = "order_date", type = "date", order = 3, nullable = false, required = true, description = "Order Date", isPrimaryKey = false },
-                        new { id = "field-pg-4", name = "total_amount", type = "decimal", order = 4, nullable = false, required = true, description = "Total Amount", isPrimaryKey = false },
-                        new { id = "field-pg-5", name = "order_status", type = "varchar", order = 5, nullable = false, required = true, description = "Order Status", isPrimaryKey = false }
+                        // Sales Orders pipeline fields
+                        new { id = "field-pg-1", name = "order_id",      type = "int",     order = 1, nullable = false, required = true,  description = "Order ID",      isPrimaryKey = true  },
+                        new { id = "field-pg-2", name = "customer_id",   type = "int",     order = 2, nullable = false, required = true,  description = "Customer ID",   isPrimaryKey = false },
+                        new { id = "field-pg-3", name = "order_date",    type = "date",    order = 3, nullable = false, required = true,  description = "Order Date",    isPrimaryKey = false },
+                        new { id = "field-pg-4", name = "total_amount",  type = "decimal", order = 4, nullable = false, required = true,  description = "Total Amount",  isPrimaryKey = false },
+                        new { id = "field-pg-5", name = "order_status",  type = "varchar", order = 5, nullable = false, required = true,  description = "Order Status",  isPrimaryKey = false },
+                        // Product Catalog Extract pipeline fields
+                        new { id = "field-pg-6", name = "product_id",    type = "int",     order = 6, nullable = false, required = true,  description = "Product ID",    isPrimaryKey = false },
+                        new { id = "field-pg-7", name = "product_name",  type = "varchar", order = 7, nullable = false, required = true,  description = "Product Name",  isPrimaryKey = false },
+                        new { id = "field-pg-8", name = "category",      type = "varchar", order = 8, nullable = true,  required = false, description = "Category",      isPrimaryKey = false },
+                        new { id = "field-pg-9", name = "price",         type = "decimal", order = 9, nullable = false, required = true,  description = "Unit Price",    isPrimaryKey = false }
                     }
                 }),
                 CreatedAt = DateTime.UtcNow.AddDays(-30),
@@ -413,11 +419,28 @@ public static class DbSeeder
                 {
                     fields = new[]
                     {
-                        new { id = "field-mysql-1", name = "sales_id", type = "int", order = 1, nullable = false, required = true, description = "Sales ID", isPrimaryKey = true },
-                        new { id = "field-mysql-2", name = "customer_key", type = "int", order = 2, nullable = false, required = true, description = "Customer Key", isPrimaryKey = false },
-                        new { id = "field-mysql-3", name = "order_date", type = "date", order = 3, nullable = false, required = true, description = "Order Date", isPrimaryKey = false },
-                        new { id = "field-mysql-4", name = "sales_amount", type = "decimal", order = 4, nullable = false, required = true, description = "Sales Amount", isPrimaryKey = false },
-                        new { id = "field-mysql-5", name = "status_code", type = "varchar", order = 5, nullable = false, required = true, description = "Status Code", isPrimaryKey = false }
+                        // Sales Orders pipeline fields
+                        new { id = "field-mysql-1",  name = "sales_id",           type = "int",     order = 1,  nullable = false, required = true,  description = "Sales ID (PK)",           isPrimaryKey = true  },
+                        new { id = "field-mysql-2",  name = "customer_key",       type = "int",     order = 2,  nullable = false, required = true,  description = "Customer Key",             isPrimaryKey = false },
+                        new { id = "field-mysql-3",  name = "order_date",         type = "date",    order = 3,  nullable = false, required = true,  description = "Order Date",               isPrimaryKey = false },
+                        new { id = "field-mysql-4",  name = "sales_amount",       type = "decimal", order = 4,  nullable = false, required = true,  description = "Sales Amount",             isPrimaryKey = false },
+                        new { id = "field-mysql-5",  name = "status_code",        type = "varchar", order = 5,  nullable = false, required = true,  description = "Status Code",              isPrimaryKey = false },
+                        // CRM Customer Import pipeline fields
+                        new { id = "field-mysql-6",  name = "customer_name",      type = "varchar", order = 6,  nullable = false, required = true,  description = "Customer Name",            isPrimaryKey = false },
+                        new { id = "field-mysql-7",  name = "email_address",      type = "varchar", order = 7,  nullable = false, required = true,  description = "Email Address",            isPrimaryKey = false },
+                        new { id = "field-mysql-8",  name = "phone_number",       type = "varchar", order = 8,  nullable = true,  required = false, description = "Phone Number",             isPrimaryKey = false },
+                        new { id = "field-mysql-9",  name = "country_code",       type = "varchar", order = 9,  nullable = false, required = true,  description = "Country Code",             isPrimaryKey = false },
+                        // Salesforce Opportunities pipeline fields
+                        new { id = "field-mysql-10", name = "opportunity_id",     type = "varchar", order = 10, nullable = false, required = true,  description = "Opportunity ID",           isPrimaryKey = false },
+                        new { id = "field-mysql-11", name = "opportunity_name",   type = "varchar", order = 11, nullable = false, required = true,  description = "Opportunity Name",         isPrimaryKey = false },
+                        new { id = "field-mysql-12", name = "opportunity_value",  type = "decimal", order = 12, nullable = true,  required = false, description = "Opportunity Value",        isPrimaryKey = false },
+                        new { id = "field-mysql-13", name = "expected_close_date",type = "date",    order = 13, nullable = false, required = true,  description = "Expected Close Date",      isPrimaryKey = false },
+                        new { id = "field-mysql-14", name = "stage_code",         type = "varchar", order = 14, nullable = false, required = true,  description = "Stage Code",               isPrimaryKey = false },
+                        // Product Catalog pipeline fields
+                        new { id = "field-mysql-15", name = "product_key",        type = "int",     order = 15, nullable = false, required = true,  description = "Product Key",              isPrimaryKey = false },
+                        new { id = "field-mysql-16", name = "product_name",       type = "varchar", order = 16, nullable = false, required = true,  description = "Product Name",             isPrimaryKey = false },
+                        new { id = "field-mysql-17", name = "category_code",      type = "varchar", order = 17, nullable = false, required = true,  description = "Category Code",            isPrimaryKey = false },
+                        new { id = "field-mysql-18", name = "unit_price",         type = "decimal", order = 18, nullable = false, required = true,  description = "Unit Price",               isPrimaryKey = false }
                     }
                 }),
                 CreatedAt = DateTime.UtcNow.AddDays(-28),
