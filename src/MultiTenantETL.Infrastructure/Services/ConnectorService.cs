@@ -448,8 +448,8 @@ public class ConnectorService : IConnectorService
 
         var validProviders = type switch
         {
-            ConnectorTypes.Database => new[] { ConnectorProviders.SqlServer, ConnectorProviders.PostgreSQL, ConnectorProviders.MySQL, ConnectorProviders.Oracle, ConnectorProviders.Snowflake, ConnectorProviders.BigQuery, ConnectorProviders.Redshift, ConnectorProviders.MongoDb, ConnectorProviders.CosmosDb },
-            ConnectorTypes.File => new[] { ConnectorProviders.FTP, ConnectorProviders.SFTP, ConnectorProviders.S3, ConnectorProviders.AzureBlob, ConnectorProviders.GCS },
+            ConnectorTypes.Database => new[] { ConnectorProviders.SqlServer, ConnectorProviders.PostgreSQL, ConnectorProviders.MySQL, ConnectorProviders.Oracle, ConnectorProviders.MongoDb, ConnectorProviders.CosmosDb },
+            ConnectorTypes.File => new[] { ConnectorProviders.FTP, ConnectorProviders.SFTP, ConnectorProviders.AzureBlob },
             ConnectorTypes.Api => new[] { ConnectorProviders.REST },
             ConnectorTypes.Email => new[] { ConnectorProviders.Email },
             _ => Array.Empty<string>()

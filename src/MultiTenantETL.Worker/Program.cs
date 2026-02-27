@@ -121,40 +121,30 @@ builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.SqlServerDa
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.PostgreSqlDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.MySqlDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.OracleDataReader>();
-builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.SnowflakeDataReader>();
-builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.BigQueryDataReader>();
-builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.RedshiftDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.MongoDbDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.CosmosDbDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.CsvDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.JsonDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.JsonLinesDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.RestApiDataReader>();
-builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.S3DataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.AzureBlobDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.SftpDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.FtpDataReader>();
-builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.GcsDataReader>();
 
 // Data Writers
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.SqlServerDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.PostgreSqlDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.MySqlDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.OracleDataWriter>();
-builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.SnowflakeDataWriter>();
-builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.BigQueryDataWriter>();
-builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.RedshiftDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.MongoDbDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.CosmosDbDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.CsvDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.JsonDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.JsonLinesDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.RestApiDataWriter>();
-builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.S3DataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.AzureBlobDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.SftpDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.FtpDataWriter>();
-builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.GcsDataWriter>();
 
 // Supporting Services
 builder.Services.AddHttpClient(); // For API connectors

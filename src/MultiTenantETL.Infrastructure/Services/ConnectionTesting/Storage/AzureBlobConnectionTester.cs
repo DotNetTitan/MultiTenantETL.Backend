@@ -115,7 +115,7 @@ public class AzureBlobConnectionTester
                 Message = $"Storage account '{config.AzureAccountName}' or container '{config.AzureContainer}' not found."
             };
         }
-        catch (FormatException ex)
+        catch (FormatException)
         {
             return new ConnectionTestResult
             {

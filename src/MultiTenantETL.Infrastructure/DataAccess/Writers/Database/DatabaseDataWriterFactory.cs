@@ -15,9 +15,6 @@ public class DatabaseDataWriterFactory : IDatabaseDataWriterFactory
     private readonly PostgreSqlDataWriter _postgreSqlWriter;
     private readonly MySqlDataWriter _mySqlWriter;
     private readonly OracleDataWriter _oracleWriter;
-    private readonly SnowflakeDataWriter _snowflakeWriter;
-    private readonly BigQueryDataWriter _bigQueryWriter;
-    private readonly RedshiftDataWriter _redshiftWriter;
     private readonly MongoDbDataWriter _mongoDbWriter;
     private readonly CosmosDbDataWriter _cosmosDbWriter;
     private readonly ILogger<DatabaseDataWriterFactory> _logger;
@@ -27,9 +24,6 @@ public class DatabaseDataWriterFactory : IDatabaseDataWriterFactory
         PostgreSqlDataWriter postgreSqlWriter,
         MySqlDataWriter mySqlWriter,
         OracleDataWriter oracleWriter,
-        SnowflakeDataWriter snowflakeWriter,
-        BigQueryDataWriter bigQueryWriter,
-        RedshiftDataWriter redshiftWriter,
         MongoDbDataWriter mongoDbWriter,
         CosmosDbDataWriter cosmosDbWriter,
         ILogger<DatabaseDataWriterFactory> logger)
@@ -38,9 +32,6 @@ public class DatabaseDataWriterFactory : IDatabaseDataWriterFactory
         _postgreSqlWriter = postgreSqlWriter;
         _mySqlWriter = mySqlWriter;
         _oracleWriter = oracleWriter;
-        _snowflakeWriter = snowflakeWriter;
-        _bigQueryWriter = bigQueryWriter;
-        _redshiftWriter = redshiftWriter;
         _mongoDbWriter = mongoDbWriter;
         _cosmosDbWriter = cosmosDbWriter;
         _logger = logger;
@@ -56,9 +47,6 @@ public class DatabaseDataWriterFactory : IDatabaseDataWriterFactory
             ConnectorProviders.PostgreSQL => _postgreSqlWriter,
             ConnectorProviders.MySQL => _mySqlWriter,
             ConnectorProviders.Oracle => _oracleWriter,
-            ConnectorProviders.Snowflake => _snowflakeWriter,
-            ConnectorProviders.BigQuery => _bigQueryWriter,
-            ConnectorProviders.Redshift => _redshiftWriter,
             ConnectorProviders.MongoDb => _mongoDbWriter,
             ConnectorProviders.CosmosDb => _cosmosDbWriter,
             _ => throw new NotSupportedException($"Database provider '{connector.Provider}' is not supported")

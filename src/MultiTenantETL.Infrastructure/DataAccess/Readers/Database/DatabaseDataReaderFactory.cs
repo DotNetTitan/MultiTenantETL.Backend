@@ -15,9 +15,6 @@ public class DatabaseDataReaderFactory : IDatabaseDataReaderFactory
     private readonly PostgreSqlDataReader _postgreSqlReader;
     private readonly MySqlDataReader _mySqlReader;
     private readonly OracleDataReader _oracleReader;
-    private readonly SnowflakeDataReader _snowflakeReader;
-    private readonly BigQueryDataReader _bigQueryReader;
-    private readonly RedshiftDataReader _redshiftReader;
     private readonly MongoDbDataReader _mongoDbReader;
     private readonly CosmosDbDataReader _cosmosDbReader;
     private readonly ILogger<DatabaseDataReaderFactory> _logger;
@@ -27,9 +24,6 @@ public class DatabaseDataReaderFactory : IDatabaseDataReaderFactory
         PostgreSqlDataReader postgreSqlReader,
         MySqlDataReader mySqlReader,
         OracleDataReader oracleReader,
-        SnowflakeDataReader snowflakeReader,
-        BigQueryDataReader bigQueryReader,
-        RedshiftDataReader redshiftReader,
         MongoDbDataReader mongoDbReader,
         CosmosDbDataReader cosmosDbReader,
         ILogger<DatabaseDataReaderFactory> logger)
@@ -38,9 +32,6 @@ public class DatabaseDataReaderFactory : IDatabaseDataReaderFactory
         _postgreSqlReader = postgreSqlReader;
         _mySqlReader = mySqlReader;
         _oracleReader = oracleReader;
-        _snowflakeReader = snowflakeReader;
-        _bigQueryReader = bigQueryReader;
-        _redshiftReader = redshiftReader;
         _mongoDbReader = mongoDbReader;
         _cosmosDbReader = cosmosDbReader;
         _logger = logger;
@@ -56,9 +47,6 @@ public class DatabaseDataReaderFactory : IDatabaseDataReaderFactory
             ConnectorProviders.PostgreSQL => _postgreSqlReader,
             ConnectorProviders.MySQL => _mySqlReader,
             ConnectorProviders.Oracle => _oracleReader,
-            ConnectorProviders.Snowflake => _snowflakeReader,
-            ConnectorProviders.BigQuery => _bigQueryReader,
-            ConnectorProviders.Redshift => _redshiftReader,
             ConnectorProviders.MongoDb => _mongoDbReader,
             ConnectorProviders.CosmosDb => _cosmosDbReader,
             _ => throw new NotSupportedException($"Database provider '{connector.Provider}' is not supported")

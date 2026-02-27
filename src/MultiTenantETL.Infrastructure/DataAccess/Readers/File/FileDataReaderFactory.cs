@@ -14,32 +14,26 @@ public class FileDataReaderFactory : IFileDataReaderFactory
     private readonly CsvDataReader _csvReader;
     private readonly JsonDataReader _jsonReader;
     private readonly JsonLinesDataReader _jsonLinesReader;
-    private readonly S3DataReader _s3Reader;
     private readonly AzureBlobDataReader _azureBlobReader;
     private readonly SftpDataReader _sftpReader;
     private readonly FtpDataReader _ftpReader;
-    private readonly GcsDataReader _gcsReader;
     private readonly ILogger<FileDataReaderFactory> _logger;
 
     public FileDataReaderFactory(
         CsvDataReader csvReader,
         JsonDataReader jsonReader,
         JsonLinesDataReader jsonLinesReader,
-        S3DataReader s3Reader,
         AzureBlobDataReader azureBlobReader,
         SftpDataReader sftpReader,
         FtpDataReader ftpReader,
-        GcsDataReader gcsReader,
         ILogger<FileDataReaderFactory> logger)
     {
         _csvReader = csvReader;
         _jsonReader = jsonReader;
         _jsonLinesReader = jsonLinesReader;
-        _s3Reader = s3Reader;
         _azureBlobReader = azureBlobReader;
         _sftpReader = sftpReader;
         _ftpReader = ftpReader;
-        _gcsReader = gcsReader;
         _logger = logger;
     }
 
@@ -50,11 +44,9 @@ public class FileDataReaderFactory : IFileDataReaderFactory
         // Cloud storage and remote file providers handle their own format detection
         return connector.Provider switch
         {
-            ConnectorProviders.S3 => _s3Reader,
             ConnectorProviders.AzureBlob => _azureBlobReader,
             ConnectorProviders.SFTP => _sftpReader,
             ConnectorProviders.FTP => _ftpReader,
-            ConnectorProviders.GCS => _gcsReader,
             _ => throw new NotSupportedException($"File provider '{connector.Provider}' is not supported")
         };
     }

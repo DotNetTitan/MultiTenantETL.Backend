@@ -8,7 +8,7 @@ using MultiTenantETL.Infrastructure.Configuration;
 using Npgsql;
 using MySqlConnector;
 using Oracle.ManagedDataAccess.Client;
-using Snowflake.Data.Client;
+
 using MongoDB.Driver;
 using MongoDB.Bson;
 using Microsoft.Azure.Cosmos;
@@ -49,12 +49,10 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
             }
         }
         else if (provider != ConnectorProviders.CosmosDb && 
-                 provider != ConnectorProviders.MongoDb && 
-                 provider != ConnectorProviders.BigQuery &&
-                 provider != ConnectorProviders.Snowflake)
+                 provider != ConnectorProviders.MongoDb)
         {
             // Standard SQL database providers require host, database, username, password
-            // CosmosDB, MongoDB, BigQuery, and Snowflake have their own validation
+            // CosmosDB and MongoDB have their own validation
             if (string.IsNullOrEmpty(dbConfig.Host) || string.IsNullOrEmpty(dbConfig.Database) ||
                 string.IsNullOrEmpty(dbConfig.Username) || string.IsNullOrEmpty(dbConfig.Password))
             {
@@ -74,9 +72,6 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
                 ConnectorProviders.PostgreSQL => await TestPostgreSqlConnectionAsync(dbConfig),
                 ConnectorProviders.MySQL => await TestMySqlConnectionAsync(dbConfig),
                 ConnectorProviders.Oracle => await TestOracleConnectionAsync(dbConfig),
-                ConnectorProviders.Snowflake => await TestSnowflakeConnectionAsync(dbConfig),
-                ConnectorProviders.BigQuery => await TestBigQueryConnectionAsync(dbConfig),
-                ConnectorProviders.Redshift => await TestRedshiftConnectionAsync(dbConfig),
                 ConnectorProviders.MongoDb => await TestMongoDbConnectionAsync(dbConfig),
                 ConnectorProviders.CosmosDb => await TestCosmosDbConnectionAsync(dbConfig),
                 _ => new ConnectionTestResult
@@ -177,119 +172,7 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
         };
     }
 
-    private static async Task<ConnectionTestResult> TestSnowflakeConnectionAsync(DatabaseConfig config)
-    {
-        // Validate required fields for Snowflake
-        if (string.IsNullOrEmpty(config.Account) && string.IsNullOrEmpty(config.Host))
-        {
-            return new ConnectionTestResult 
-            { 
-                Success = false, 
-                Message = "Snowflake account or host is required" 
-            };
-        }
 
-        if (string.IsNullOrEmpty(config.Username))
-        {
-            return new ConnectionTestResult 
-            { 
-                Success = false, 
-                Message = "Username is required for Snowflake" 
-            };
-        }
-
-        if (string.IsNullOrEmpty(config.Password))
-        {
-            return new ConnectionTestResult 
-            { 
-                Success = false, 
-                Message = "Password is required for Snowflake" 
-            };
-        }
-
-        using var connection = new SnowflakeDbConnection(BuildSnowflakeConnectionString(config));
-        await connection.OpenAsync();
-
-        var details = new Dictionary<string, object>
-        {
-            ["ServerVersion"] = connection.ServerVersion,
-            ["Database"] = connection.Database ?? "Unknown",
-            ["State"] = connection.State.ToString()
-        };
-
-        if (!string.IsNullOrEmpty(config.Account))
-        {
-            details["Account"] = config.Account;
-        }
-        if (!string.IsNullOrEmpty(config.Warehouse))
-        {
-            details["Warehouse"] = config.Warehouse;
-        }
-
-        return new ConnectionTestResult
-        {
-            Success = true,
-            Message = "Successfully connected to Snowflake database",
-            Details = details
-        };
-    }
-
-    private static async Task<ConnectionTestResult> TestBigQueryConnectionAsync(DatabaseConfig config)
-    {
-        if (string.IsNullOrEmpty(config.ProjectId))
-        {
-            return new ConnectionTestResult { Success = false, Message = "Project ID is required" };
-        }
-
-        if (string.IsNullOrEmpty(config.DatasetId))
-        {
-            return new ConnectionTestResult { Success = false, Message = "Dataset ID is required" };
-        }
-
-        Google.Cloud.BigQuery.V2.BigQueryClient client;
-        if (!string.IsNullOrEmpty(config.JsonCredentials))
-        {
-            var credential = Google.Apis.Auth.OAuth2.GoogleCredential.FromJson(config.JsonCredentials);
-            client = Google.Cloud.BigQuery.V2.BigQueryClient.Create(config.ProjectId, credential);
-        }
-        else
-        {
-            client = Google.Cloud.BigQuery.V2.BigQueryClient.Create(config.ProjectId);
-        }
-
-        await client.GetDatasetAsync(config.DatasetId);
-
-        return new ConnectionTestResult
-        {
-            Success = true,
-            Message = "Successfully connected to Google BigQuery",
-            Details = new Dictionary<string, object>
-            {
-                ["ProjectId"] = config.ProjectId,
-                ["DatasetId"] = config.DatasetId
-            }
-        };
-    }
-
-    private static async Task<ConnectionTestResult> TestRedshiftConnectionAsync(DatabaseConfig config)
-    {
-        using var connection = new NpgsqlConnection(BuildRedshiftConnectionString(config));
-        await connection.OpenAsync();
-        
-        var details = new Dictionary<string, object>
-        {
-            ["ServerVersion"] = connection.ServerVersion,
-            ["Database"] = connection.Database,
-            ["State"] = connection.State.ToString()
-        };
-
-        return new ConnectionTestResult
-        {
-            Success = true,
-            Message = "Successfully connected to AWS Redshift",
-            Details = details
-        };
-    }
 
     private static async Task<ConnectionTestResult> TestMongoDbConnectionAsync(DatabaseConfig config)
     {
@@ -447,42 +330,5 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
         return builder.ConnectionString;
     }
 
-    private static string BuildSnowflakeConnectionString(DatabaseConfig config)
-    {
-        if (!string.IsNullOrEmpty(config.ConnectionString))
-        {
-            return config.ConnectionString;
-        }
 
-        var parts = new List<string>();
-        if (!string.IsNullOrEmpty(config.Account)) parts.Add($"account={config.Account}");
-        if (!string.IsNullOrEmpty(config.Username)) parts.Add($"user={config.Username}");
-        if (!string.IsNullOrEmpty(config.Password)) parts.Add($"password={config.Password}");
-        if (!string.IsNullOrEmpty(config.Database)) parts.Add($"db={config.Database}");
-        if (!string.IsNullOrEmpty(config.Schema)) parts.Add($"schema={config.Schema}");
-        if (!string.IsNullOrEmpty(config.Warehouse)) parts.Add($"warehouse={config.Warehouse}");
-        if (!string.IsNullOrEmpty(config.Role)) parts.Add($"role={config.Role}");
-        return string.Join(";", parts);
-    }
-
-    private static string BuildRedshiftConnectionString(DatabaseConfig config)
-    {
-        if (!string.IsNullOrEmpty(config.ConnectionString))
-        {
-            return config.ConnectionString;
-        }
-
-        var port = config.Port > 0 ? config.Port : 5439;
-        var builder = new NpgsqlConnectionStringBuilder
-        {
-            Host = config.Host!,
-            Port = port,
-            Database = config.Database!,
-            Username = config.Username!,
-            Password = config.Password!,
-            SslMode = SslMode.Require
-        };
-
-        return builder.ConnectionString;
-    }
 }

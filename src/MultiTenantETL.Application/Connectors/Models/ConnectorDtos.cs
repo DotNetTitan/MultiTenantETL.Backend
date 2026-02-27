@@ -160,16 +160,6 @@ public record DatabaseConfig
     public bool UseCustomConnectionString { get; init; }
     public string? ConnectionString { get; init; }
     public Dictionary<string, string>? AdditionalParameters { get; init; }
-    // Snowflake-specific fields
-    public string? Account { get; init; }
-    public string? Schema { get; init; }
-    public string? Warehouse { get; init; }
-    public string? Role { get; init; }
-    // BigQuery-specific fields
-    public string? ProjectId { get; init; }
-    public string? DatasetId { get; init; }
-    public string? Location { get; init; }
-    public string? JsonCredentials { get; init; }
     // Cosmos DB fields
     public string? CosmosEndpoint { get; init; }
     public string? CosmosKey { get; init; }
@@ -196,20 +186,10 @@ public record FileConfig
     public int? SftpPort { get; init; }
     public string? SftpUsername { get; init; }
     public string? SftpPassword { get; init; }
-    // S3
-    public string? S3Bucket { get; init; }
-    public string? S3Region { get; init; }
-    public string? S3AccessKey { get; init; }
-    public string? S3SecretKey { get; init; }
-    public string? S3Endpoint { get; init; } // Optional custom endpoint (for MinIO, etc.)
     // Azure Blob
     public string? AzureAccountName { get; init; }
     public string? AzureContainer { get; init; }
     public string? AzureAccountKey { get; init; }
-    // GCS
-    public string? GcsBucket { get; init; }
-    public string? GcsProjectId { get; init; }
-    public string? GcsJsonCredentials { get; init; }
     public Dictionary<string, string>? AdditionalParameters { get; init; }
 }
 

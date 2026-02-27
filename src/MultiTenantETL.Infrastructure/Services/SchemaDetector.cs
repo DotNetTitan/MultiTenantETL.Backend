@@ -9,7 +9,6 @@ using MultiTenantETL.Infrastructure.Configuration;
 using Npgsql;
 using MySqlConnector;
 using Oracle.ManagedDataAccess.Client;
-using Snowflake.Data.Client;
 using MongoDB.Driver;
 using Microsoft.Azure.Cosmos;
 using System.Text.Json.Nodes;
@@ -88,9 +87,6 @@ public class SchemaDetector : ISchemaDetector
                 ConnectorProviders.PostgreSQL => await DetectPostgreSqlSchemaAsync(dbConfig, tableName),
                 ConnectorProviders.MySQL => await DetectMySqlSchemaAsync(dbConfig, tableName),
                 ConnectorProviders.Oracle => await DetectOracleSchemaAsync(dbConfig, tableName),
-                ConnectorProviders.Snowflake => await DetectSnowflakeSchemaAsync(dbConfig, tableName),
-                ConnectorProviders.BigQuery => await DetectBigQuerySchemaAsync(dbConfig, tableName),
-                ConnectorProviders.Redshift => await DetectRedshiftSchemaAsync(dbConfig, tableName),
                 ConnectorProviders.MongoDb => await DetectMongoDbSchemaAsync(dbConfig, tableName),
                 ConnectorProviders.CosmosDb => await DetectCosmosDbSchemaAsync(dbConfig, tableName),
                 _ => throw new NotSupportedException($"Database provider {provider} is not supported")
@@ -742,14 +738,14 @@ public class SchemaDetector : ISchemaDetector
             "nvarchar(max)" => "ntext",
             "varchar(max)" => "text",
 
-            // BigQuery & MongoDB common types → Standard types
-            "string" => "varchar",  // BigQuery, MongoDB
-            "bytes" or "binary" => "varbinary",  // BigQuery, MongoDB
+            // MongoDB common types → Standard types
+            "string" => "varchar",  // MongoDB
+            "bytes" or "binary" => "varbinary",  // MongoDB
             "int32" => "int",  // MongoDB
-            "int64" => "bigint",  // BigQuery, MongoDB
-            "float" or "float64" or "double" => "decimal",  // BigQuery, MongoDB
-            "bool" => "boolean",  // BigQuery
-            "record" or "struct" or "document" or "array" => "json",  // BigQuery, MongoDB
+            "int64" => "bigint",  // MongoDB
+            "float" or "float64" or "double" => "decimal",  // MongoDB
+            "bool" => "boolean",
+            "record" or "struct" or "document" or "array" => "json",  // MongoDB
             "objectid" => "varchar",  // MongoDB
 
             // If the type is already in MetadataConstants.DataTypes, return as-is
@@ -838,151 +834,6 @@ public class SchemaDetector : ISchemaDetector
         };
 
         return builder.ConnectionString;
-    }
-
-    private async Task<List<SchemaField>> DetectSnowflakeSchemaAsync(DatabaseConfig config, string tableName)
-    {
-        using var connection = new SnowflakeDbConnection(BuildSnowflakeConnectionString(config));
-        await connection.OpenAsync();
-
-        var query = $@"
-            SELECT
-                COLUMN_NAME,
-                DATA_TYPE,
-                IS_NULLABLE,
-                CHARACTER_MAXIMUM_LENGTH,
-                NUMERIC_PRECISION,
-                NUMERIC_SCALE,
-                COLUMN_DEFAULT,
-                CASE WHEN COLUMN_NAME IN (
-                    SELECT COLUMN_NAME
-                    FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
-                    JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
-                        ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
-                    WHERE tc.CONSTRAINT_TYPE = 'PRIMARY KEY'
-                        AND tc.TABLE_NAME = '{tableName}'
-                ) THEN true ELSE false END AS IS_PRIMARY_KEY
-            FROM INFORMATION_SCHEMA.COLUMNS
-            WHERE TABLE_NAME = '{tableName}'
-            ORDER BY ORDINAL_POSITION";
-
-        using var command = new SnowflakeDbCommand(connection, query);
-
-        var fields = new List<SchemaField>();
-        using var reader = await command.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
-        {
-            fields.Add(new SchemaField
-            {
-                Name = reader.GetString(0),
-                DataType = NormalizeDataType(reader.GetString(1)),
-                IsNullable = reader.GetString(2) == "YES",
-                MaxLength = reader.IsDBNull(3) ? null : reader.GetInt32(3),
-                Precision = reader.IsDBNull(4) ? null : reader.GetInt32(4),
-                Scale = reader.IsDBNull(5) ? null : reader.GetInt32(5),
-                DefaultValue = reader.IsDBNull(6) ? null : reader.GetString(6),
-                IsPrimaryKey = reader.GetBoolean(7)
-            });
-        }
-
-        return fields;
-    }
-
-    private string BuildSnowflakeConnectionString(DatabaseConfig config)
-    {
-        if (!string.IsNullOrEmpty(config.ConnectionString))
-        {
-            return config.ConnectionString;
-        }
-
-        var parts = new List<string>();
-        if (!string.IsNullOrEmpty(config.Account)) parts.Add($"account={config.Account}");
-        if (!string.IsNullOrEmpty(config.Username)) parts.Add($"user={config.Username}");
-        if (!string.IsNullOrEmpty(config.Password)) parts.Add($"password={config.Password}");
-        if (!string.IsNullOrEmpty(config.Database)) parts.Add($"db={config.Database}");
-        if (!string.IsNullOrEmpty(config.Schema)) parts.Add($"schema={config.Schema}");
-        if (!string.IsNullOrEmpty(config.Warehouse)) parts.Add($"warehouse={config.Warehouse}");
-        if (!string.IsNullOrEmpty(config.Role)) parts.Add($"role={config.Role}");
-        return string.Join(";", parts);
-    }
-
-    private async Task<List<SchemaField>> DetectBigQuerySchemaAsync(DatabaseConfig config, string tableName)
-    {
-        Google.Cloud.BigQuery.V2.BigQueryClient client;
-        if (!string.IsNullOrEmpty(config.JsonCredentials))
-        {
-            var credential = Google.Apis.Auth.OAuth2.GoogleCredential.FromJson(config.JsonCredentials);
-            client = Google.Cloud.BigQuery.V2.BigQueryClient.Create(config.ProjectId, credential);
-        }
-        else
-        {
-            client = Google.Cloud.BigQuery.V2.BigQueryClient.Create(config.ProjectId);
-        }
-
-        var table = await client.GetTableAsync(config.DatasetId!, tableName);
-        return table.Schema.Fields.Select(f => new SchemaField
-        {
-            Name = f.Name,
-            DataType = NormalizeDataType(f.Type),
-            IsNullable = f.Mode != "REQUIRED",
-            IsPrimaryKey = false
-        }).ToList();
-    }
-
-    private async Task<List<SchemaField>> DetectRedshiftSchemaAsync(DatabaseConfig config, string tableName)
-    {
-        // Redshift is compatible with PostgreSQL for schema detection
-        var connectionString = config.ConnectionString;
-        if (string.IsNullOrEmpty(connectionString))
-        {
-            var builder = new NpgsqlConnectionStringBuilder
-            {
-                Host = config.Host,
-                Port = config.Port > 0 ? config.Port : 5439,
-                Database = config.Database,
-                Username = config.Username,
-                Password = config.Password,
-                SslMode = SslMode.Require
-            };
-            connectionString = builder.ConnectionString;
-        }
-
-        using var connection = new NpgsqlConnection(connectionString);
-        await connection.OpenAsync();
-
-        var query = @"
-            SELECT 
-                column_name as Name,
-                data_type as DataType,
-                is_nullable as IsNullable,
-                character_maximum_length as MaxLength,
-                false as IsPrimaryKey
-            FROM information_schema.columns
-            WHERE table_name = @TableName
-            ORDER BY ordinal_position";
-
-        using var command = connection.CreateCommand();
-        command.CommandText = query;
-        var param = command.CreateParameter();
-        param.ParameterName = "@TableName";
-        param.Value = tableName;
-        command.Parameters.Add(param);
-
-        var fields = new List<SchemaField>();
-        using var reader = await command.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
-        {
-            fields.Add(new SchemaField
-            {
-                Name = reader.GetString(0),
-                DataType = NormalizeDataType(reader.GetString(1)),
-                IsNullable = reader.GetString(2) == "YES",
-                IsPrimaryKey = reader.GetBoolean(4),
-                MaxLength = reader.IsDBNull(3) ? null : reader.GetInt32(3)
-            });
-        }
-
-        return fields;
     }
 
     private async Task<List<SchemaField>> DetectMongoDbSchemaAsync(DatabaseConfig config, string tableName)

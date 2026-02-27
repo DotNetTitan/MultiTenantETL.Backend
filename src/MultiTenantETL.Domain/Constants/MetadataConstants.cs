@@ -29,9 +29,6 @@ public static class MetadataConstants
                     Constants.ConnectorProviders.PostgreSQL, 
                     Constants.ConnectorProviders.MySQL,
                     Constants.ConnectorProviders.Oracle,
-                    Constants.ConnectorProviders.Snowflake,
-                    Constants.ConnectorProviders.BigQuery,
-                    Constants.ConnectorProviders.Redshift,
                     Constants.ConnectorProviders.MongoDb,
                     Constants.ConnectorProviders.CosmosDb
                 } 
@@ -49,9 +46,7 @@ public static class MetadataConstants
                 { 
                     Constants.ConnectorProviders.FTP, 
                     Constants.ConnectorProviders.SFTP, 
-                    Constants.ConnectorProviders.S3, 
-                    Constants.ConnectorProviders.AzureBlob,
-                    Constants.ConnectorProviders.GCS
+                    Constants.ConnectorProviders.AzureBlob
                 } 
             },
             { 
@@ -73,18 +68,13 @@ public static class MetadataConstants
             { Constants.ConnectorProviders.PostgreSQL, ("mdi-database", "blue-darken-2") },
             { Constants.ConnectorProviders.MySQL, ("mdi-database", "blue-darken-2") },
             { Constants.ConnectorProviders.Oracle, ("mdi-database", "blue-darken-2") },
-            { Constants.ConnectorProviders.Snowflake, ("mdi-snowflake", "blue-darken-2") },
-            { Constants.ConnectorProviders.BigQuery, ("mdi-google-cloud", "blue-darken-2") },
-            { Constants.ConnectorProviders.Redshift, ("mdi-aws", "orange-darken-2") },
             { Constants.ConnectorProviders.MongoDb, ("mdi-database", "green-darken-2") },
             { Constants.ConnectorProviders.CosmosDb, ("mdi-infinity", "blue-lighten-2") },
             
             // File providers
             { Constants.ConnectorProviders.FTP, ("mdi-server-network", "green-darken-1") },
             { Constants.ConnectorProviders.SFTP, ("mdi-server-security", "green-darken-2") },
-            { Constants.ConnectorProviders.S3, ("mdi-aws", "orange-darken-2") },
             { Constants.ConnectorProviders.AzureBlob, ("mdi-microsoft-azure", "blue-lighten-1") },
-            { Constants.ConnectorProviders.GCS, ("mdi-google-cloud", "blue-lighten-1") },
             
             // API providers
             { Constants.ConnectorProviders.REST, ("mdi-api", "purple-darken-1") },

@@ -42,7 +42,7 @@ public class WriteContext
     public bool IsTruncateMode { get; set; }
     
     /// <summary>
-    /// Destination type (File, S3, AzureBlob, Database, API)
+    /// Destination type (File, AzureBlob, Database, API)
     /// </summary>
     public string DestinationType { get; set; } = string.Empty;
     

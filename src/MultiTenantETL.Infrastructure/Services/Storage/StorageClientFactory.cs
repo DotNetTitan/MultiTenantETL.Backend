@@ -1,4 +1,3 @@
-using Amazon.S3;
 using Azure.Storage.Blobs;
 using FluentFTP;
 using Microsoft.Extensions.Logging;
@@ -10,9 +9,7 @@ public interface IStorageClientFactory
 {
     AsyncFtpClient CreateFtpClient(string host, int port, string username, string password);
     SftpClient CreateSftpClient(string host, int port, string username, string password);
-    IAmazonS3 CreateS3Client(string accessKey, string secretKey, string region, string? endpoint = null);
     BlobContainerClient CreateAzureBlobClient(string accountName, string accountKey, string containerName);
-    Google.Cloud.Storage.V1.StorageClient CreateGcsClient(string projectId, string jsonCredentials);
 }
 
 public class StorageClientFactory : IStorageClientFactory
@@ -34,27 +31,6 @@ public class StorageClientFactory : IStorageClientFactory
         return new SftpClient(host, port, username, password);
     }
 
-    public IAmazonS3 CreateS3Client(string accessKey, string secretKey, string region, string? endpoint = null)
-    {
-        var s3Config = new AmazonS3Config
-        {
-            MaxErrorRetry = 3,
-            Timeout = TimeSpan.FromSeconds(30),
-            ForcePathStyle = !string.IsNullOrEmpty(endpoint)
-        };
-
-        if (!string.IsNullOrEmpty(endpoint))
-        {
-            s3Config.ServiceURL = endpoint;
-        }
-        else
-        {
-            s3Config.RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(region);
-        }
-
-        return new AmazonS3Client(accessKey, secretKey, s3Config);
-    }
-
     public BlobContainerClient CreateAzureBlobClient(string accountName, string accountKey, string containerName)
     {
         var connectionString = $"DefaultEndpointsProtocol=https;AccountName={accountName};AccountKey={accountKey};EndpointSuffix=core.windows.net";
@@ -71,12 +47,5 @@ public class StorageClientFactory : IStorageClientFactory
 
         var blobServiceClient = new BlobServiceClient(connectionString, blobClientOptions);
         return blobServiceClient.GetBlobContainerClient(containerName);
-    }
-    
-    public Google.Cloud.Storage.V1.StorageClient CreateGcsClient(string projectId, string jsonCredentials)
-    {
-        return Google.Cloud.Storage.V1.StorageClient.Create(
-            Google.Apis.Auth.OAuth2.GoogleCredential.FromJson(jsonCredentials)
-        );
     }
 }

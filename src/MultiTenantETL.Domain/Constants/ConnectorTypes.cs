@@ -15,18 +15,13 @@ public static class ConnectorProviders
     public const string PostgreSQL = "PostgreSQL";
     public const string MySQL = "MySQL";
     public const string Oracle = "Oracle";
-    public const string Snowflake = "Snowflake";
-    public const string BigQuery = "BigQuery";
-    public const string Redshift = "Redshift";
     public const string MongoDb = "MongoDb";
     public const string CosmosDb = "CosmosDb";
     
     // File providers (storage locations)
     public const string FTP = "FTP";
     public const string SFTP = "SFTP";
-    public const string S3 = "S3";
     public const string AzureBlob = "AzureBlob";
-    public const string GCS = "GCS";
     
     // API providers
     public const string REST = "REST";
