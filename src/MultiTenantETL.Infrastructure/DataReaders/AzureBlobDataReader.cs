@@ -215,41 +215,29 @@ public class AzureBlobDataReader : IDataReader
 
     private AzureBlobConfig ParseConfig(string configJson)
     {
-        try
-        {
-            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
 
-            var config = JsonSerializer.Deserialize<AzureBlobConfig>(configJson, options)
-                ?? throw new InvalidOperationException("Invalid Azure Blob configuration");
+        var config = JsonSerializer.Deserialize<AzureBlobConfig>(configJson, options)
+            ?? throw new InvalidOperationException("Invalid Azure Blob configuration");
 
-            if (string.IsNullOrWhiteSpace(config.AzureAccountName))
-                throw new InvalidOperationException("AzureAccountName is required");
-            if (string.IsNullOrWhiteSpace(config.AzureAccountKey))
-                throw new InvalidOperationException("AzureAccountKey is required");
-            if (string.IsNullOrWhiteSpace(config.AzureContainer))
-                throw new InvalidOperationException("AzureContainer is required");
-            if (string.IsNullOrWhiteSpace(config.Path))
-                throw new InvalidOperationException("Path (BlobName) is required");
+        if (string.IsNullOrWhiteSpace(config.AccountName))
+            throw new InvalidOperationException("AccountName is required");
+        if (string.IsNullOrWhiteSpace(config.AccountKey))
+            throw new InvalidOperationException("AccountKey is required");
+        if (string.IsNullOrWhiteSpace(config.ContainerName))
+            throw new InvalidOperationException("Azure Blob configuration must include ContainerName");
+        if (string.IsNullOrWhiteSpace(config.BlobName))
+            throw new InvalidOperationException("Azure Blob configuration must include BlobName");
 
-            return config;
-        }
-        catch (JsonException ex)
-        {
-            throw new InvalidOperationException("Invalid JSON configuration for Azure Blob", ex);
-        }
+        return config;
     }
 
     private class AzureBlobConfig
     {
-        public string AzureAccountName { get; set; } = string.Empty;
-        public string AzureAccountKey { get; set; } = string.Empty;
-        public string AzureContainer { get; set; } = string.Empty;
-        public string Path { get; set; } = string.Empty;
+        public string AccountName { get; set; } = string.Empty;
+        public string AccountKey { get; set; } = string.Empty;
+        public string ContainerName { get; set; } = string.Empty;
+        public string BlobName { get; set; } = string.Empty;
         public string? Format { get; set; }
-
-        public string AccountName => AzureAccountName;
-        public string AccountKey => AzureAccountKey;
-        public string ContainerName => AzureContainer;
-        public string BlobName => Path;
     }
 }
