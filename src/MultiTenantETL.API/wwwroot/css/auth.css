@@ -107,20 +107,12 @@ body {
     padding: 48px 32px 0;
 }
 
-.avatar {
-    width: 64px;
-    height: 64px;
-    border-radius: 50%;
-    background: var(--primary);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 16px;
-}
-
-.avatar .mdi {
-    font-size: 40px;
-    color: white;
+.login-logo {
+    width: 128px;
+    height: 128px;
+    object-fit: contain;
+    display: block;
+    margin: 0 auto 16px;
 }
 
 .title {
