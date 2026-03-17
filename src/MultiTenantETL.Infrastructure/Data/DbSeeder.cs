@@ -194,7 +194,8 @@ public static class DbSeeder
         var applicationManager = services.GetRequiredService<IOpenIddictApplicationManager>();
         var configuration = services.GetRequiredService<IConfiguration>();
 
-        var oauthClientSecret = configuration["Seeding:OAuthClientSecret"] ?? "postman-secret-key-change-in-production";
+        var oauthClientSecret = configuration["Seeding:OAuthClientSecret"]
+            ?? throw new InvalidOperationException("Seeding:OAuthClientSecret is not configured. Set it in appsettings.json or environment variables.");
         var frontendUrl = configuration["AppSettings:FrontendUrl"]
             ?? throw new InvalidOperationException("AppSettings:FrontendUrl is not configured. Set it in appsettings.json or environment variables.");
 
