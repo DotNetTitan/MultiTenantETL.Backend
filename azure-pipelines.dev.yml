@@ -121,7 +121,7 @@ stages:
             --mode Incremental \
             --resource-group $(RESOURCE_GROUP) \
             --template-file infra/main.bicep \
-            --parameters @infra/parameters.$(ENV_NAME).bicepparam \
+            --parameters infra/parameters.$(ENV_NAME).bicepparam \
             --output table
           echo "✅ Infrastructure deployment complete."
 
