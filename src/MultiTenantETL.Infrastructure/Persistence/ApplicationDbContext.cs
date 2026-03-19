@@ -1,6 +1,7 @@
-﻿using System.Reflection;
+using System.Reflection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Domain.Entities;
@@ -17,7 +18,7 @@ namespace MultiTenantETL.Infrastructure.Persistence
         IdentityUserRole<Guid>,
         IdentityUserLogin<Guid>,
         IdentityRoleClaim<Guid>,
-        IdentityUserToken<Guid>>
+        IdentityUserToken<Guid>>, IDataProtectionKeyContext
     {
         private readonly ITenantProvider _tenantProvider;
         public Guid? CurrentTenantId => _tenantProvider.TenantId;
@@ -38,6 +39,8 @@ namespace MultiTenantETL.Infrastructure.Persistence
         public DbSet<OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreAuthorization> OpenIddictAuthorizations { get; set; }
         public DbSet<OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreScope> OpenIddictScopes { get; set; }
         public DbSet<OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreToken> OpenIddictTokens { get; set; }
+
+        public DbSet<DataProtectionKey> DataProtectionKeys { get; set; }
 
         public ApplicationDbContext(
             DbContextOptions<ApplicationDbContext> options,

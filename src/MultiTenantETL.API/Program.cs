@@ -4,6 +4,8 @@ using AspNetCoreRateLimit;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MultiTenantETL.API.Middleware;
@@ -65,7 +67,21 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 
 // Database
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+{
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"),
+        o => o.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName));
+});
+
+// Configure shared Data Protection for container scaling
+builder.Services.AddDataProtection()
+    .PersistKeysToDbContext<ApplicationDbContext>()
+    .SetApplicationName("MultiTenantETL");
+
+builder.Services.AddAntiforgery(options =>
+{
+    // Ensure cookies are always marked as Secure so they are sent over the Azure HTTPS proxy
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+});
 
 // Quartz.NET Scheduler - shared by OpenIddict and Pipeline Scheduling
 builder.Services.AddQuartz(q =>
