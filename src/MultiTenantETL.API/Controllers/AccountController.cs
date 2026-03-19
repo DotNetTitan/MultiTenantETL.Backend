@@ -324,23 +324,15 @@ namespace MultiTenantETL.API.Controllers
                     success: true);
             }
             
-            // Sign out and clear authentication cookie
+            // Sign out - this should properly clear the Identity cookie
             await _signInManager.SignOutAsync();
-            
-            // Explicitly clear the authentication cookie to prevent stale state
-            Response.Cookies.Delete(".AspNetCore.Identity.Application");
-            Response.Cookies.Delete(".AspNetCore.Antiforgery");
-            
-            // Add header to signal frontend to clear all stored tokens
-            Response.Headers["X-Logout-Success"] = "true";
-            Response.Headers["Clear-Site-Data"] = "\"cache\", \"cookies\", \"storage\"";
             
             _logger.LogInformation("User logged out");
             
             return Ok(new { 
                 success = true, 
                 message = "Logged out successfully. All refresh tokens have been revoked.",
-                clearTokens = true  // Signal to frontend to clear stored tokens
+                clearTokens = true
             });
         }
 

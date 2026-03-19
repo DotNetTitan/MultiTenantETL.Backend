@@ -47,27 +47,9 @@ public class LoginModel : PageModel
     public string FrontendUrl => _configuration["AppSettings:FrontendUrl"]
         ?? throw new InvalidOperationException("AppSettings:FrontendUrl is not configured.");
 
-    public async Task<IActionResult> OnGetAsync(string? returnUrl = null, bool clearAuth = false)
+    public async Task<IActionResult> OnGetAsync(string? returnUrl = null)
     {
         ReturnUrl = returnUrl;
-
-        // Clear authentication state in these cases:
-        // 1. Explicit clearAuth parameter (from logout redirect)
-        // 2. Direct navigation to login page (no returnUrl)
-        // 3. NOT in OAuth flow (returnUrl doesn't contain /connect/authorize)
-        var isOAuthFlow = !string.IsNullOrEmpty(returnUrl) && returnUrl.Contains("/connect/authorize");
-        var shouldClearAuth = clearAuth || string.IsNullOrEmpty(returnUrl) || !isOAuthFlow;
-        
-        if (shouldClearAuth)
-        {
-            // Clear any existing authentication state to prevent stale cookie issues
-            await HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
-            
-            // Explicitly delete authentication cookies to ensure clean state
-            Response.Cookies.Delete(".AspNetCore.Identity.Application");
-            Response.Cookies.Delete(".AspNetCore.Antiforgery");
-        }
-
         return Page();
     }
 

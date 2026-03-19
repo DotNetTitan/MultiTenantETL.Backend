@@ -125,21 +125,15 @@ builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
 // Configure Identity application cookie for proper logout behavior
 builder.Services.ConfigureApplicationCookie(options =>
 {
+    options.Cookie.Name = ".AspNetCore.Identity.Application";
     options.Cookie.HttpOnly = true;
     options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
     options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.Path = "/";
     options.ExpireTimeSpan = TimeSpan.FromHours(1);
     options.SlidingExpiration = true;
     options.LoginPath = "/auth/login";
     options.LogoutPath = "/api/account/logout";
-    
-    // Important: Clear cookie on logout to prevent stale authentication state
-    options.Events.OnSigningOut = async context =>
-    {
-        // Explicitly delete the authentication cookie
-        context.Response.Cookies.Delete(options.Cookie.Name ?? ".AspNetCore.Identity.Application");
-        await Task.CompletedTask;
-    };
 });
 
 // Configure token lifespan

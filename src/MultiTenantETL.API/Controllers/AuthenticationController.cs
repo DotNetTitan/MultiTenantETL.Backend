@@ -109,9 +109,13 @@ namespace MultiTenantETL.API.Controllers
             var request = HttpContext.GetOpenIddictServerRequest() ??
                 throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
 
+            // Check if prompt=login is requested (forces re-authentication)
+            var prompt = request.GetParameter("prompt")?.ToString();
+            var forceLogin = prompt == "login";
+
             // Standard OAuth flow: check if user is already authenticated via cookie
             var result = await HttpContext.AuthenticateAsync(IdentityConstants.ApplicationScheme);
-            if (result.Succeeded && result.Principal != null)
+            if (result.Succeeded && result.Principal != null && !forceLogin)
             {
                 var user = await _userManager.GetUserAsync(result.Principal);
                 if (user != null && await _signInManager.CanSignInAsync(user) && user.IsActive)
@@ -125,6 +129,12 @@ namespace MultiTenantETL.API.Controllers
                     // User exists in cookie but is no longer valid - clear the stale authentication
                     await HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
                 }
+            }
+
+            // If forceLogin is requested, sign out first
+            if (forceLogin && result.Succeeded)
+            {
+                await HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
             }
 
             // User is not authenticated - redirect to login page
