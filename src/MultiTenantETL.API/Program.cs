@@ -1,4 +1,5 @@
 using System.Security.Cryptography.X509Certificates;
+using Microsoft.AspNetCore.HttpOverrides;
 using AspNetCoreRateLimit;
 using FluentValidation;
 using FluentValidation.AspNetCore;
@@ -535,7 +536,19 @@ builder.Services.AddRazorPages();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Configure forwarded headers for Azure Container Apps proxy
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    // Azure Container Apps proxy configuration
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
 var app = builder.Build();
+
+// Configure forwarded headers first so all subsequent middleware sees the correct scheme (HTTPS)
+app.UseForwardedHeaders();
 
 // Global exception handler - should be first to catch all exceptions
 app.UseExceptionHandler();
@@ -560,7 +573,7 @@ app.UseStaticFiles();
 app.UseResponseCaching();
 
 // Rate limiting - before authentication
-app.UseForwardedHeaders();
+// app.UseForwardedHeaders(); // Moved to top of pipeline
 app.UseIpRateLimiting();
 
 // Only use HTTPS redirection in production
