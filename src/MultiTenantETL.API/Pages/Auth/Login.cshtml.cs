@@ -51,15 +51,19 @@ public class LoginModel : PageModel
     {
         ReturnUrl = returnUrl;
 
-        // If user is already authenticated, redirect back to the authorization endpoint
+        // Clear any existing authentication state to prevent conflicts
         if (User.Identity?.IsAuthenticated == true)
         {
+            // User is already authenticated, redirect appropriately
             if (!string.IsNullOrEmpty(returnUrl))
             {
                 return Redirect(returnUrl);
             }
             return Redirect(FrontendUrl);
         }
+        
+        // Ensure clean slate by signing out any residual authentication
+        await HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
 
         return Page();
     }

@@ -324,7 +324,13 @@ namespace MultiTenantETL.API.Controllers
                     success: true);
             }
             
+            // Sign out and clear authentication cookie
             await _signInManager.SignOutAsync();
+            
+            // Explicitly clear the authentication cookie to prevent stale state
+            Response.Cookies.Delete(".AspNetCore.Identity.Application");
+            Response.Cookies.Delete(".AspNetCore.Antiforgery");
+            
             _logger.LogInformation("User logged out");
             
             return Ok(new { success = true, message = "Logged out successfully. All refresh tokens have been revoked." });

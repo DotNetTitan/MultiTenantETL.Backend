@@ -111,7 +111,7 @@ namespace MultiTenantETL.API.Controllers
 
             // Standard OAuth flow: check if user is already authenticated via cookie
             var result = await HttpContext.AuthenticateAsync(IdentityConstants.ApplicationScheme);
-            if (result.Succeeded)
+            if (result.Succeeded && result.Principal != null)
             {
                 var user = await _userManager.GetUserAsync(result.Principal);
                 if (user != null && await _signInManager.CanSignInAsync(user) && user.IsActive)
@@ -119,6 +119,11 @@ namespace MultiTenantETL.API.Controllers
                     var principal = await CreateClaimsPrincipalAsync(user, request.GetScopes());
                     principal.SetScopes(request.GetScopes());
                     return SignIn(principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+                }
+                else
+                {
+                    // User exists in cookie but is no longer valid - clear the stale authentication
+                    await HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
                 }
             }
 
