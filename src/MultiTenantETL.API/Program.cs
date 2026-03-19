@@ -314,13 +314,41 @@ builder.Services.Configure<IpRateLimitOptions>(options =>
             Limit = 200  // Per IP: allows legitimate use, blocks abuse
         },
 
-        // Authentication endpoints - very strict
+        // OAuth/OpenIddict endpoints - need higher limits for authorization flow
+        new RateLimitRule
+        {
+            Endpoint = "*:/connect/authorize",
+            Period = "1m",
+            Limit = 20  // OAuth flow can make multiple requests
+        },
         new RateLimitRule
         {
             Endpoint = "POST:/connect/token",
             Period = "1m",
-            Limit = 5  // 5 login attempts per minute
+            Limit = 15  // Increased to handle token exchange + refresh attempts
         },
+        new RateLimitRule
+        {
+            Endpoint = "POST:/connect/revoke",
+            Period = "1m",
+            Limit = 10  // Token revocation
+        },
+        
+        // Login page - should not be rate limited (it's just HTML)
+        new RateLimitRule
+        {
+            Endpoint = "GET:/auth/login",
+            Period = "1m",
+            Limit = 50
+        },
+        new RateLimitRule
+        {
+            Endpoint = "POST:/auth/login",
+            Period = "1m",
+            Limit = 15  // Actual login form submissions
+        },
+        
+        // Account management endpoints
         new RateLimitRule
         {
             Endpoint = "POST:/api/account/register",
@@ -332,6 +360,12 @@ builder.Services.Configure<IpRateLimitOptions>(options =>
             Endpoint = "POST:/api/account/forgot-password",
             Period = "15m",
             Limit = 3  // 3 password reset requests per 15 min
+        },
+        new RateLimitRule
+        {
+            Endpoint = "POST:/api/account/logout",
+            Period = "1m",
+            Limit = 10  // Allow multiple logout attempts
         },
 
         // Write operations - moderate
@@ -609,8 +643,11 @@ app.UseStaticFiles();
 app.UseResponseCaching();
 
 // Rate limiting - before authentication
-// app.UseForwardedHeaders(); // Moved to top of pipeline
-app.UseIpRateLimiting();
+// More lenient in development for testing, strict in production
+if (!app.Environment.IsDevelopment())
+{
+    app.UseIpRateLimiting();
+}
 
 // Only use HTTPS redirection in production
 if (!app.Environment.IsDevelopment())

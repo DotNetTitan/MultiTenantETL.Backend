@@ -51,19 +51,13 @@ public class LoginModel : PageModel
     {
         ReturnUrl = returnUrl;
 
-        // Clear any existing authentication state to prevent conflicts
-        if (User.Identity?.IsAuthenticated == true)
-        {
-            // User is already authenticated, redirect appropriately
-            if (!string.IsNullOrEmpty(returnUrl))
-            {
-                return Redirect(returnUrl);
-            }
-            return Redirect(FrontendUrl);
-        }
-        
-        // Ensure clean slate by signing out any residual authentication
+        // Always clear any existing authentication state first to prevent stale cookie issues
+        // This ensures users can always see the login form after logout
         await HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
+        
+        // Explicitly delete authentication cookies to ensure clean state
+        Response.Cookies.Delete(".AspNetCore.Identity.Application");
+        Response.Cookies.Delete(".AspNetCore.Antiforgery");
 
         return Page();
     }
@@ -74,6 +68,10 @@ public class LoginModel : PageModel
         {
             return Page();
         }
+
+        // Clear any existing authentication state before attempting new login
+        // This prevents conflicts when switching between users
+        await HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
 
         // Find user by email
         var user = await _userManager.FindByEmailAsync(Email);
