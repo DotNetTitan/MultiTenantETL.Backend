@@ -416,7 +416,7 @@ builder.Services.AddCors(options =>
             .AllowAnyMethod()
             .AllowAnyHeader()
             .AllowCredentials()
-            .WithExposedHeaders("Cache-Control", "Expires", "Pragma", "Age");
+            .WithExposedHeaders("Cache-Control", "Expires", "Pragma", "Age", "X-Logout-Success", "Clear-Site-Data");
     });
 });
 
