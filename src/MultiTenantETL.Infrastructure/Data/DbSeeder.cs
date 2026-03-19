@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -199,10 +199,11 @@ public static class DbSeeder
         var frontendUrl = configuration["AppSettings:FrontendUrl"]
             ?? throw new InvalidOperationException("AppSettings:FrontendUrl is not configured. Set it in appsettings.json or environment variables.");
 
-        if (await applicationManager.FindByClientIdAsync("multitenant-etl-spa") == null)
-        {
-            var normalizedUrl = frontendUrl.TrimEnd('/');
+        var spaApp = await applicationManager.FindByClientIdAsync("multitenant-etl-spa");
+        var normalizedUrl = frontendUrl.TrimEnd('/');
 
+        if (spaApp == null)
+        {
             await applicationManager.CreateAsync(new OpenIddictApplicationDescriptor
             {
                 ClientId = "multitenant-etl-spa",
@@ -235,6 +236,21 @@ public static class DbSeeder
             });
 
             logger.LogInformation("Created OAuth client: multitenant-etl-spa");
+        }
+        else
+        {
+            // Update the existing application to use the current FrontendUrl
+            var descriptor = new OpenIddictApplicationDescriptor();
+            await applicationManager.PopulateAsync(descriptor, spaApp);
+            
+            descriptor.RedirectUris.Clear();
+            descriptor.RedirectUris.Add(new Uri($"{normalizedUrl}/auth/callback"));
+            
+            descriptor.PostLogoutRedirectUris.Clear();
+            descriptor.PostLogoutRedirectUris.Add(new Uri($"{normalizedUrl}/"));
+            
+            await applicationManager.UpdateAsync(spaApp, descriptor);
+            logger.LogInformation("Updated OAuth client: multitenant-etl-spa with frontend URL {Url}", normalizedUrl);
         }
 
         if (await applicationManager.FindByClientIdAsync("multitenant-etl-postman") == null)

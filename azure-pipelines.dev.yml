@@ -257,6 +257,7 @@ stages:
                     "AzureCommunicationServices__ApplicationName=MultiTenantETL" \
                     "AzureCommunicationServices__ApplicationUrl=$(AzureCommunication__ApplicationUrl)" \
                     "AzureCommunicationServices__FrontendUrl=$(AzureCommunication__FrontendUrl)" \
+                    "AppSettings__FrontendUrl=$(AzureCommunication__FrontendUrl)" \
                     "Cors__AllowedOrigins__0=$(Cors__AllowedOrigins__0)" \
                     "EmailService__UseStub=false" \
                     "Certificates__EtlEncryption__PfxBase64=secretref:etl-encryption-b64" \
