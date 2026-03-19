@@ -52,7 +52,7 @@ variables:
   - name: WORKER_APP_NAME
     value: mtetl-worker-dev
   - name: SB_NAMESPACE
-    value: mtetl-dev-sb
+    value: multi-tenant-etl-dev-sb-ns
 
 stages:
 # ════════════════════════════════════════════════════════════════════════════════
