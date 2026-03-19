@@ -47,17 +47,26 @@ public class LoginModel : PageModel
     public string FrontendUrl => _configuration["AppSettings:FrontendUrl"]
         ?? throw new InvalidOperationException("AppSettings:FrontendUrl is not configured.");
 
-    public async Task<IActionResult> OnGetAsync(string? returnUrl = null)
+    public async Task<IActionResult> OnGetAsync(string? returnUrl = null, bool clearAuth = false)
     {
         ReturnUrl = returnUrl;
 
-        // Always clear any existing authentication state first to prevent stale cookie issues
-        // This ensures users can always see the login form after logout
-        await HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
+        // Clear authentication state in these cases:
+        // 1. Explicit clearAuth parameter (from logout redirect)
+        // 2. Direct navigation to login page (no returnUrl)
+        // 3. NOT in OAuth flow (returnUrl doesn't contain /connect/authorize)
+        var isOAuthFlow = !string.IsNullOrEmpty(returnUrl) && returnUrl.Contains("/connect/authorize");
+        var shouldClearAuth = clearAuth || string.IsNullOrEmpty(returnUrl) || !isOAuthFlow;
         
-        // Explicitly delete authentication cookies to ensure clean state
-        Response.Cookies.Delete(".AspNetCore.Identity.Application");
-        Response.Cookies.Delete(".AspNetCore.Antiforgery");
+        if (shouldClearAuth)
+        {
+            // Clear any existing authentication state to prevent stale cookie issues
+            await HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
+            
+            // Explicitly delete authentication cookies to ensure clean state
+            Response.Cookies.Delete(".AspNetCore.Identity.Application");
+            Response.Cookies.Delete(".AspNetCore.Antiforgery");
+        }
 
         return Page();
     }
@@ -68,10 +77,6 @@ public class LoginModel : PageModel
         {
             return Page();
         }
-
-        // Clear any existing authentication state before attempting new login
-        // This prevents conflicts when switching between users
-        await HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
 
         // Find user by email
         var user = await _userManager.FindByEmailAsync(Email);
