@@ -45,10 +45,6 @@ var keyVaultSecretsUserRoleId = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
   '4633458b-17de-408a-b874-0445c86b69e6' // Key Vault Secrets User
 )
-var serviceBusDataOwnerRoleId = subscriptionResourceId(
-  'Microsoft.Authorization/roleDefinitions',
-  '090c5cfd-751d-6711-b5d4-d56f1a0a8ff6' // Azure Service Bus Data Owner
-)
 
 // ── Log Analytics Workspace ──────────────────────────────────────────────────
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
@@ -96,11 +92,10 @@ resource serviceBusNamespace 'Microsoft.ServiceBus/namespaces@2021-11-01' = {
   name: serviceBusName
   location: location
   sku: {
-    name: 'Standard'
-    tier: 'Standard'
+    name: 'Basic'
+    tier: 'Basic'
   }
   properties: {
-    minimumTlsVersion: '1.2'
     disableLocalAuth: false // connection string auth used by the application
   }
 }
@@ -129,16 +124,6 @@ resource sbCancelQueue 'Microsoft.ServiceBus/namespaces/queues@2021-11-01' = {
   }
 }
 
-// ── Role: Service Bus Data Owner → Managed Identity ─────────────────────────
-resource sbDataOwnerAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(serviceBusNamespace.id, managedIdentity.id, serviceBusDataOwnerRoleId)
-  scope: serviceBusNamespace
-  properties: {
-    roleDefinitionId: serviceBusDataOwnerRoleId
-    principalId: managedIdentity.properties.principalId
-    principalType: 'ServicePrincipal'
-  }
-}
 
 // ── Azure Key Vault (Standard, RBAC) ────────────────────────────────────────
 // Used by the app's ISecretStorageService to store connector credentials.
