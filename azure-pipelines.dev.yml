@@ -263,7 +263,7 @@ stages:
                     "Certificates__EtlEncryption__Password=secretref:etl-cert-password" \
                     "Certificates__EtlSigning__PfxBase64=secretref:etl-signing-b64" \
                     "Certificates__EtlSigning__Password=secretref:etl-cert-password" \
-                    "ASPNETCORE_ENVIRONMENT=Production"
+                    "ASPNETCORE_ENVIRONMENT=Development"
 
                 echo "✅ API updated to api:$(Build.BuildId)"
 
@@ -319,6 +319,6 @@ stages:
                     "AzureCommunicationServices__ConnectionString=secretref:acs-connection" \
                     "AzureCommunicationServices__SenderEmailAddress=$(AzureCommunication__SenderEmailAddress)" \
                     "EmailService__UseStub=false" \
-                    "DOTNET_ENVIRONMENT=Production"
+                    "DOTNET_ENVIRONMENT=Development"
 
                 echo "✅ Worker updated to worker:$(Build.BuildId)"
