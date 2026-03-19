@@ -31,7 +31,7 @@ RUN dotnet publish src/MultiTenantETL.Worker/MultiTenantETL.Worker.csproj \
     /p:UseAppHost=false
 
 # --- Runtime Stage ---
-FROM mcr.microsoft.com/dotnet/runtime:8.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
 
 # Security: run as non-root

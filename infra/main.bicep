@@ -253,7 +253,7 @@ resource workerContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
         {
           name: 'worker'
           // Placeholder image – replaced by the pipeline on first deploy.
-          image: 'mcr.microsoft.com/dotnet/runtime:8.0'
+          image: 'mcr.microsoft.com/dotnet/aspnet:8.0'
           resources: {
             cpu: json('0.5')
             memory: '1Gi'
