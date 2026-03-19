@@ -163,6 +163,19 @@ builder.Services.AddScoped<MultiTenantETL.Application.Orchestration.IFieldMappin
 var messagingSettings = new MessagingSettings();
 builder.Configuration.GetSection(MessagingSettings.SectionName).Bind(messagingSettings);
 
+// IMessagePublisher is required by ExecutionService and PipelineScheduleJob at runtime.
+// Must be registered before AddHostedService so the DI container can resolve it.
+if (messagingSettings.UseServiceBus)
+{
+    builder.Services.AddSingleton<MultiTenantETL.Application.Messaging.IMessagePublisher,
+        MultiTenantETL.Infrastructure.Messaging.ServiceBusPublisher>();
+}
+else
+{
+    builder.Services.AddSingleton<MultiTenantETL.Application.Messaging.IMessagePublisher,
+        MultiTenantETL.Infrastructure.Messaging.RabbitMqPublisher>();
+}
+
 if (messagingSettings.UseServiceBus)
 {
     builder.Services.AddHostedService<ServiceBusWorker>();
