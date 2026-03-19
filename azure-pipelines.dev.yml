@@ -208,6 +208,8 @@ stages:
               GUEST_PASS: $(Seeding__GuestPassword)
               OAUTH_SECRET: $(Seeding__OAuthClientSecret)
               ACS_CONN: $(AzureCommunication__ConnectionString)
+              ETLENCRYPTION_B64: $(Certificates__EtlEncryption__PfxBase64)
+              ETLSIGNING_B64: $(Certificates__EtlSigning__PfxBase64)
             inputs:
               azureSubscription: $(AZURE_SERVICE_CONNECTION)
               scriptType: bash
@@ -230,7 +232,10 @@ stages:
                     "admin-password=${ADMIN_PASS}" \
                     "guest-password=${GUEST_PASS}" \
                     "oauth-client-secret=${OAUTH_SECRET}" \
-                    "acs-connection=${ACS_CONN}"
+                    "acs-connection=${ACS_CONN}" \
+                    "etl-encryption-b64=${ETLENCRYPTION_B64}" \
+                    "etl-signing-b64=${ETLSIGNING_B64}" \
+                    "etl-cert-password=password"
 
                 az containerapp update \
                   --name $(API_APP_NAME) \
@@ -254,6 +259,10 @@ stages:
                     "AzureCommunicationServices__FrontendUrl=$(AzureCommunication__FrontendUrl)" \
                     "Cors__AllowedOrigins__0=$(Cors__AllowedOrigins__0)" \
                     "EmailService__UseStub=false" \
+                    "Certificates__EtlEncryption__PfxBase64=secretref:etl-encryption-b64" \
+                    "Certificates__EtlEncryption__Password=secretref:etl-cert-password" \
+                    "Certificates__EtlSigning__PfxBase64=secretref:etl-signing-b64" \
+                    "Certificates__EtlSigning__Password=secretref:etl-cert-password" \
                     "ASPNETCORE_ENVIRONMENT=Production"
 
                 echo "✅ API updated to api:$(Build.BuildId)"
