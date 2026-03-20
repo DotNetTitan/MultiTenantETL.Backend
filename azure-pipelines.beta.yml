@@ -141,17 +141,12 @@ stages:
       vmImage: ubuntu-latest
     steps:
     - task: Docker@2
-      displayName: 'Login to GitHub Container Registry'
-      inputs:
-        command: login
-        containerRegistry: 'github-container-registry'  # Service connection name in Azure DevOps
-
-    - task: Docker@2
       displayName: 'Build and push API image'
       inputs:
         command: buildAndPush
         repository: '$(GITHUB_REPO)/api'
         dockerfile: 'src/MultiTenantETL.API/Dockerfile'
+        buildContext: '.'
         containerRegistry: 'github-container-registry'
         tags: |
           $(Build.BuildId)
@@ -163,17 +158,12 @@ stages:
       vmImage: ubuntu-latest
     steps:
     - task: Docker@2
-      displayName: 'Login to GitHub Container Registry'
-      inputs:
-        command: login
-        containerRegistry: 'github-container-registry'
-
-    - task: Docker@2
       displayName: 'Build and push Worker image'
       inputs:
         command: buildAndPush
         repository: '$(GITHUB_REPO)/worker'
         dockerfile: 'src/MultiTenantETL.Worker/Dockerfile'
+        buildContext: '.'
         containerRegistry: 'github-container-registry'
         tags: |
           $(Build.BuildId)
