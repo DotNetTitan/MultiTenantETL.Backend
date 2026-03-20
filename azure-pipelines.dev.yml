@@ -45,14 +45,17 @@ variables:
     value: dev
   - name: RESOURCE_GROUP
     value: multi-tenant-etl-dev-rg
-  - name: ACR_NAME
-    value: multitenantetldevcr
   - name: API_APP_NAME
     value: mtetl-api-dev
   - name: WORKER_APP_NAME
     value: mtetl-worker-dev
   - name: SB_NAMESPACE
     value: multi-tenant-etl-dev-sb-ns
+  - name: GHCR_REGISTRY
+    value: ghcr.io
+  # Set GITHUB_REPO to your GitHub username/repo (e.g., myusername/multi-tenant-etl)
+  - name: GITHUB_REPO
+    value: $(GITHUB_REPOSITORY)
 
 stages:
 # ════════════════════════════════════════════════════════════════════════════════
@@ -126,53 +129,55 @@ stages:
           echo "✅ Infrastructure deployment complete."
 
 # ════════════════════════════════════════════════════════════════════════════════
-# Stage 3 – Build container images in ACR (parallel)
+# Stage 3 – Build & Push container images to GHCR (parallel)
 # ════════════════════════════════════════════════════════════════════════════════
 - stage: BuildImages
-  displayName: '③ Build Images'
+  displayName: '③ Build & Push Images to GHCR'
   dependsOn: Infrastructure
   jobs:
   - job: BuildAPIImage
-    displayName: 'ACR Build: api:$(Build.BuildId)'
+    displayName: 'Build & Push: api:$(Build.BuildId)'
     pool:
       vmImage: ubuntu-latest
     steps:
-    - task: AzureCLI@2
-      displayName: 'az acr build → api'
+    - task: Docker@2
+      displayName: 'Login to GitHub Container Registry'
       inputs:
-        azureSubscription: $(AZURE_SERVICE_CONNECTION)
-        scriptType: bash
-        scriptLocation: inlineScript
-        workingDirectory: $(Build.SourcesDirectory)
-        inlineScript: |
-          az acr build \
-            --registry $(ACR_NAME) \
-            --image api:$(Build.BuildId) \
-            --image api:latest \
-            --file src/MultiTenantETL.API/Dockerfile \
-            .
-          echo "✅ API image pushed: $(ACR_NAME).azurecr.io/api:$(Build.BuildId)"
+        command: login
+        containerRegistry: 'github-container-registry'  # Service connection name in Azure DevOps
+
+    - task: Docker@2
+      displayName: 'Build and push API image'
+      inputs:
+        command: buildAndPush
+        repository: '$(GITHUB_REPO)/api'
+        dockerfile: 'src/MultiTenantETL.API/Dockerfile'
+        containerRegistry: 'github-container-registry'
+        tags: |
+          $(Build.BuildId)
+          latest
 
   - job: BuildWorkerImage
-    displayName: 'ACR Build: worker:$(Build.BuildId)'
+    displayName: 'Build & Push: worker:$(Build.BuildId)'
     pool:
       vmImage: ubuntu-latest
     steps:
-    - task: AzureCLI@2
-      displayName: 'az acr build → worker'
+    - task: Docker@2
+      displayName: 'Login to GitHub Container Registry'
       inputs:
-        azureSubscription: $(AZURE_SERVICE_CONNECTION)
-        scriptType: bash
-        scriptLocation: inlineScript
-        workingDirectory: $(Build.SourcesDirectory)
-        inlineScript: |
-          az acr build \
-            --registry $(ACR_NAME) \
-            --image worker:$(Build.BuildId) \
-            --image worker:latest \
-            --file src/MultiTenantETL.Worker/Dockerfile \
-            .
-          echo "✅ Worker image pushed: $(ACR_NAME).azurecr.io/worker:$(Build.BuildId)"
+        command: login
+        containerRegistry: 'github-container-registry'
+
+    - task: Docker@2
+      displayName: 'Build and push Worker image'
+      inputs:
+        command: buildAndPush
+        repository: '$(GITHUB_REPO)/worker'
+        dockerfile: 'src/MultiTenantETL.Worker/Dockerfile'
+        containerRegistry: 'github-container-registry'
+        tags: |
+          $(Build.BuildId)
+          latest
 
 # ════════════════════════════════════════════════════════════════════════════════
 # Stage 4 – Deploy Container Apps (approval-gated, parallel)
@@ -240,7 +245,7 @@ stages:
                 az containerapp update \
                   --name $(API_APP_NAME) \
                   --resource-group $(RESOURCE_GROUP) \
-                  --image $(ACR_NAME).azurecr.io/api:$(Build.BuildId) \
+                  --image $(GHCR_REGISTRY)/$(GITHUB_REPO)/api:$(Build.BuildId) \
                   --set-env-vars \
                     "ConnectionStrings__DefaultConnection=secretref:db-connection" \
                     "Messaging__Provider=ServiceBus" \
@@ -308,7 +313,7 @@ stages:
                 az containerapp update \
                   --name $(WORKER_APP_NAME) \
                   --resource-group $(RESOURCE_GROUP) \
-                  --image $(ACR_NAME).azurecr.io/worker:$(Build.BuildId) \
+                  --image $(GHCR_REGISTRY)/$(GITHUB_REPO)/worker:$(Build.BuildId) \
                   --set-env-vars \
                     "ConnectionStrings__DefaultConnection=secretref:db-connection" \
                     "Messaging__Provider=ServiceBus" \

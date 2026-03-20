@@ -24,8 +24,6 @@ param staticWebAppLocation string = 'eastus2'
 
 // ── Computed resource names ──────────────────────────────────────────────────
 var prefix = 'mtetl'
-// ACR names: alphanumeric only, max 50 chars
-var acrName = 'multitenantetl${environmentName}cr'
 var logAnalyticsName = '${prefix}-${environmentName}-law'
 var managedIdentityName = '${prefix}-${environmentName}-mi'
 var serviceBusName = 'multi-tenant-etl-${environmentName}-sb-ns'
@@ -37,10 +35,6 @@ var staticWebAppName = '${prefix}-web-${environmentName}'
 
 // ── Built-in role definition IDs ────────────────────────────────────────────
 // Verify with: az role definition list --name "<Role Name>" --query "[].name" -o tsv
-var acrPullRoleId = subscriptionResourceId(
-  'Microsoft.Authorization/roleDefinitions',
-  '7f951dda-4ed3-4680-a7ca-43fe172d538d' // AcrPull
-)
 var keyVaultSecretsUserRoleId = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
   '4633458b-17de-408a-b874-0445c86b69e6' // Key Vault Secrets User
@@ -56,19 +50,8 @@ resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
   }
 }
 
-// ── Azure Container Registry ─────────────────────────────────────────────────
-resource acr 'Microsoft.ContainerRegistry/registries@2022-12-01' = {
-  name: acrName
-  location: location
-  sku: { name: 'Standard' }
-  properties: {
-    adminUserEnabled: false // ACR pull is via managed identity – no admin credentials
-  }
-}
-
 // ── User-Assigned Managed Identity ──────────────────────────────────────────
 // Shared by API and Worker Container Apps for:
-//   • Pulling images from ACR (AcrPull)
 //   • Reading secrets from Key Vault (Key Vault Secrets User)
 //   • Publishing/consuming Service Bus messages (Azure Service Bus Data Owner)
 resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
@@ -76,18 +59,7 @@ resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-
   location: location
 }
 
-// ── Role: AcrPull on ACR ─────────────────────────────────────────────────────
-resource acrPullAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(acr.id, managedIdentity.id, acrPullRoleId)
-  scope: acr
-  properties: {
-    roleDefinitionId: acrPullRoleId
-    principalId: managedIdentity.properties.principalId
-    principalType: 'ServicePrincipal'
-  }
-}
-
-// ── Azure Service Bus (Standard) ─────────────────────────────────────────────
+// ── Azure Service Bus (Basic) ─────────────────────────────────────────────
 resource serviceBusNamespace 'Microsoft.ServiceBus/namespaces@2021-11-01' = {
   name: serviceBusName
   location: location
@@ -172,8 +144,8 @@ resource containerAppsEnv 'Microsoft.App/managedEnvironments@2023-05-01' = {
 
 // ── API Container App ────────────────────────────────────────────────────────
 // External HTTP ingress on port 8080 (matches Dockerfile ASPNETCORE_URLS).
-// Initial image is an MCR placeholder – the pipeline replaces it on first deploy.
-resource apiContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
+// Initial image is an MCR placeholder – the pipeline replaces it with GHCR image on first deploy.
+resource apiContainerApp 'Microsoft/App/containerApps@2023-05-01' = {
   name: apiAppName
   location: location
   identity: {
@@ -185,12 +157,6 @@ resource apiContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
   properties: {
     environmentId: containerAppsEnv.id
     configuration: {
-      registries: [
-        {
-          server: acr.properties.loginServer
-          identity: managedIdentity.id
-        }
-      ]
       ingress: {
         external: true
         targetPort: 8080
@@ -202,8 +168,8 @@ resource apiContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
       containers: [
         {
           name: 'api'
-          // Placeholder image from public registry – does not require ACR credentials.
-          // The deployment pipeline replaces this with the real image on every run.
+          // Placeholder image from public registry – does not require credentials.
+          // The deployment pipeline replaces this with the GHCR image on every run.
           image: 'mcr.microsoft.com/dotnet/aspnet:8.0'
           resources: {
             cpu: json('0.5')
@@ -223,7 +189,6 @@ resource apiContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
       }
     }
   }
-  dependsOn: [acrPullAssignment]
 }
 
 // ── Worker Container App ──────────────────────────────────────────────────────
@@ -240,19 +205,12 @@ resource workerContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
   }
   properties: {
     environmentId: containerAppsEnv.id
-    configuration: {
-      registries: [
-        {
-          server: acr.properties.loginServer
-          identity: managedIdentity.id
-        }
-      ]
-    }
+    configuration: {}
     template: {
       containers: [
         {
           name: 'worker'
-          // Placeholder image – replaced by the pipeline on first deploy.
+          // Placeholder image – replaced by the pipeline with GHCR image on first deploy.
           image: 'mcr.microsoft.com/dotnet/aspnet:8.0'
           resources: {
             cpu: json('0.5')
@@ -273,7 +231,6 @@ resource workerContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
       }
     }
   }
-  dependsOn: [acrPullAssignment]
 }
 
 // ── Azure Static Web App (Free tier) ────────────────────────────────────────
@@ -295,9 +252,6 @@ resource staticWebApp 'Microsoft.Web/staticSites@2022-09-01' = {
 
 // ── Outputs ──────────────────────────────────────────────────────────────────
 // Use these values to populate your Azure DevOps variable groups after first deploy.
-
-@description('Container Registry login server (e.g., multitenantetldevcr.azurecr.io)')
-output acrLoginServer string = acr.properties.loginServer
 
 @description('API Container App public URL – set as VITE_API_BASE_URL in the frontend variable group and as AzureCommunicationServices__ApplicationUrl in the backend variable group')
 output apiUrl string = 'https://${apiContainerApp.properties.configuration.ingress.fqdn}'
