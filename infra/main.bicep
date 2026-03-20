@@ -145,7 +145,7 @@ resource containerAppsEnv 'Microsoft.App/managedEnvironments@2023-05-01' = {
 // ── API Container App ────────────────────────────────────────────────────────
 // External HTTP ingress on port 8080 (matches Dockerfile ASPNETCORE_URLS).
 // Initial image is an MCR placeholder – the pipeline replaces it with GHCR image on first deploy.
-resource apiContainerApp 'Microsoft/App/containerApps@2023-05-01' = {
+resource apiContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
   name: apiAppName
   location: location
   identity: {
