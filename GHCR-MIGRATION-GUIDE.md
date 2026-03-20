@@ -35,10 +35,19 @@ This guide explains how to complete the migration from Azure Container Registry 
 4. Choose "Others" as registry type
 5. Fill in:
    - **Docker Registry**: `https://ghcr.io`
-   - **Docker ID**: Your GitHub username
+   - **Docker ID**: Your GitHub username (e.g., `dotnettitan`)
    - **Docker Password**: Paste the GitHub PAT from step 1
-   - **Service connection name**: `github-container-registry`
-6. Click "Save"
+   - **Service connection name**: `github-container-registry` (must match exactly)
+6. **IMPORTANT**: Grant access permission to all pipelines
+7. Click "Save"
+
+**Troubleshooting the service connection:**
+- Verify your GitHub username is correct (not email)
+- Ensure the PAT has `write:packages` and `read:packages` scopes
+- Test the credentials manually:
+  ```bash
+  echo YOUR_PAT | docker login ghcr.io -u YOUR_USERNAME --password-stdin
+  ```
 
 ### 3. Update Pipeline Variables
 
