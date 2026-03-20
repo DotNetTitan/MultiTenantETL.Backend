@@ -53,10 +53,10 @@ variables:
     value: multi-tenant-etl-dev-sb-ns
   - name: GHCR_REGISTRY
     value: ghcr.io
-  # GITHUB_REPO must be lowercase for container registry
-  # Set GITHUB_REPOSITORY in variable group (e.g., dotnettitan/multitenantetl.backend)
+  # GITHUB_REPO must be lowercase - set GITHUB_REPOSITORY in variable group
+  # Example: dotnettitan/multitenantetl.backend (all lowercase)
   - name: GITHUB_REPO
-    value: ${{ lower(variables['GITHUB_REPOSITORY']) }}
+    value: $(GITHUB_REPOSITORY)
 
 stages:
 # ════════════════════════════════════════════════════════════════════════════════
