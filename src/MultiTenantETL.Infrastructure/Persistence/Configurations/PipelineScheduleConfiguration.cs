@@ -58,5 +58,8 @@ public class PipelineScheduleConfiguration : IEntityTypeConfiguration<PipelineSc
 
         builder.Property(s => s.ConsecutiveFailures)
             .HasDefaultValue(0);
+
+        builder.Property(s => s.IsPausedByPipeline)
+            .HasDefaultValue(false);
     }
 }

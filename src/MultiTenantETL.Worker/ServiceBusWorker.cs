@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
 using Azure.Messaging.ServiceBus;
@@ -17,7 +18,7 @@ public class ServiceBusWorker : BackgroundService
     private ServiceBusClient? _client;
     private ServiceBusProcessor? _executionProcessor;
     private ServiceBusProcessor? _cancellationProcessor;
-    private readonly Dictionary<Guid, CancellationTokenSource> _runningExecutions = new();
+    private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _runningExecutions = new();
 
     public ServiceBusWorker(
         ILogger<ServiceBusWorker> logger,
@@ -127,7 +128,7 @@ public class ServiceBusWorker : BackgroundService
 
             // Create cancellation token source for this execution
             var cts = CancellationTokenSource.CreateLinkedTokenSource(args.CancellationToken);
-            _runningExecutions[task.ExecutionId] = cts;
+            RegisterExecution(task.ExecutionId, cts);
 
             // Execute pipeline in a new scope with tenant context
             var scope = _serviceProvider.CreateAsyncScope();
@@ -157,7 +158,7 @@ public class ServiceBusWorker : BackgroundService
             }
 
             // Remove from running executions
-            _runningExecutions.Remove(task.ExecutionId);
+            CompleteExecution(task.ExecutionId);
 
             // Complete the message
             await args.CompleteMessageAsync(args.Message);
@@ -170,7 +171,7 @@ public class ServiceBusWorker : BackgroundService
 
             if (task != null)
             {
-                _runningExecutions.Remove(task.ExecutionId);
+                CompleteExecution(task.ExecutionId);
             }
 
             // Don't retry - just fail and move to dead letter queue
@@ -201,11 +202,9 @@ public class ServiceBusWorker : BackgroundService
 
             if (request != null)
             {
-                if (_runningExecutions.TryGetValue(request.ExecutionId, out var cts))
+                if (CancelExecution(request.ExecutionId))
                 {
                     _logger.LogInformation("Cancelling execution: ExecutionId={ExecutionId}", request.ExecutionId);
-                    cts.Cancel();
-                    _runningExecutions.Remove(request.ExecutionId);
                 }
                 else
                 {
@@ -237,9 +236,13 @@ public class ServiceBusWorker : BackgroundService
         _logger.LogInformation("Pipeline Worker stopping...");
 
         // Cancel all running executions
-        foreach (var cts in _runningExecutions.Values)
+        foreach (var execution in _runningExecutions.ToArray())
         {
-            cts.Cancel();
+            if (_runningExecutions.TryRemove(execution.Key, out var cts))
+            {
+                cts.Cancel();
+                cts.Dispose();
+            }
         }
 
         // Stop processors first
@@ -278,12 +281,46 @@ public class ServiceBusWorker : BackgroundService
     public override void Dispose()
     {
         // Dispose synchronous resources
-        foreach (var cts in _runningExecutions.Values)
+        foreach (var execution in _runningExecutions.ToArray())
         {
-            cts.Dispose();
+            if (_runningExecutions.TryRemove(execution.Key, out var cts))
+            {
+                cts.Dispose();
+            }
         }
         _runningExecutions.Clear();
 
         base.Dispose();
+    }
+
+    private void RegisterExecution(Guid executionId, CancellationTokenSource cts)
+    {
+        if (_runningExecutions.TryGetValue(executionId, out var existing))
+        {
+            existing.Cancel();
+            existing.Dispose();
+        }
+
+        _runningExecutions[executionId] = cts;
+    }
+
+    private void CompleteExecution(Guid executionId)
+    {
+        if (_runningExecutions.TryRemove(executionId, out var cts))
+        {
+            cts.Dispose();
+        }
+    }
+
+    private bool CancelExecution(Guid executionId)
+    {
+        if (_runningExecutions.TryRemove(executionId, out var cts))
+        {
+            cts.Cancel();
+            cts.Dispose();
+            return true;
+        }
+
+        return false;
     }
 }

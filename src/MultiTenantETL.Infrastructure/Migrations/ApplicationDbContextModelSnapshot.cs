@@ -570,6 +570,11 @@ namespace MultiTenantETL.Infrastructure.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsPausedByPipeline")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<int>("MaxConsecutiveFailures")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
