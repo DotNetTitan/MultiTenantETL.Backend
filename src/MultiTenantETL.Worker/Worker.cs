@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
@@ -17,7 +18,7 @@ public class Worker : BackgroundService
     private readonly RabbitMqSettings _settings;
     private IConnection? _connection;
     private IModel? _channel;
-    private readonly Dictionary<Guid, CancellationTokenSource> _runningExecutions = new();
+    private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _runningExecutions = new();
 
     public Worker(
         ILogger<Worker> logger,
@@ -150,7 +151,7 @@ public class Worker : BackgroundService
 
             // Create cancellation token source for this execution
             var cts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
-            _runningExecutions[task.ExecutionId] = cts;
+            RegisterExecution(task.ExecutionId, cts);
 
             // Execute pipeline in a new scope with tenant context
             var scope = _serviceProvider.CreateAsyncScope();
@@ -180,7 +181,7 @@ public class Worker : BackgroundService
             }
 
             // Remove from running executions
-            _runningExecutions.Remove(task.ExecutionId);
+            CompleteExecution(task.ExecutionId);
 
             // Acknowledge message
             _channel?.BasicAck(ea.DeliveryTag, false);
@@ -193,7 +194,7 @@ public class Worker : BackgroundService
             
             if (task != null)
             {
-                _runningExecutions.Remove(task.ExecutionId);
+                CompleteExecution(task.ExecutionId);
             }
 
             // Don't retry - just fail and move on
@@ -212,22 +213,18 @@ public class Worker : BackgroundService
         
         try
         {
-            var message = JsonSerializer.Deserialize<Dictionary<string, object>>(json);
+            var message = JsonSerializer.Deserialize<CancellationRequest>(json);
             
-            if (message != null && message.TryGetValue("ExecutionId", out var executionIdObj))
+            if (message != null)
             {
-                var executionId = Guid.Parse(executionIdObj.ToString()!);
-                
-                if (_runningExecutions.TryGetValue(executionId, out var cts))
+                if (CancelExecution(message.ExecutionId))
                 {
-                    _logger.LogInformation("Cancelling execution: ExecutionId={ExecutionId}", executionId);
-                    cts.Cancel();
-                    _runningExecutions.Remove(executionId);
+                    _logger.LogInformation("Cancelling execution: ExecutionId={ExecutionId}", message.ExecutionId);
                 }
                 else
                 {
                     _logger.LogWarning("Cancellation requested for non-running execution: ExecutionId={ExecutionId}", 
-                        executionId);
+                        message.ExecutionId);
                 }
             }
         }
@@ -253,9 +250,13 @@ public class Worker : BackgroundService
         _logger.LogInformation("Pipeline Worker stopping...");
 
         // Cancel all running executions
-        foreach (var cts in _runningExecutions.Values)
+        foreach (var execution in _runningExecutions.ToArray())
         {
-            cts.Cancel();
+            if (_runningExecutions.TryRemove(execution.Key, out var cts))
+            {
+                cts.Cancel();
+                cts.Dispose();
+            }
         }
 
         _channel?.Close();
@@ -269,11 +270,45 @@ public class Worker : BackgroundService
         _channel?.Dispose();
         _connection?.Dispose();
         
-        foreach (var cts in _runningExecutions.Values)
+        foreach (var execution in _runningExecutions.ToArray())
         {
-            cts.Dispose();
+            if (_runningExecutions.TryRemove(execution.Key, out var cts))
+            {
+                cts.Dispose();
+            }
         }
         
         base.Dispose();
+    }
+
+    private void RegisterExecution(Guid executionId, CancellationTokenSource cts)
+    {
+        if (_runningExecutions.TryGetValue(executionId, out var existing))
+        {
+            existing.Cancel();
+            existing.Dispose();
+        }
+
+        _runningExecutions[executionId] = cts;
+    }
+
+    private void CompleteExecution(Guid executionId)
+    {
+        if (_runningExecutions.TryRemove(executionId, out var cts))
+        {
+            cts.Dispose();
+        }
+    }
+
+    private bool CancelExecution(Guid executionId)
+    {
+        if (_runningExecutions.TryRemove(executionId, out var cts))
+        {
+            cts.Cancel();
+            cts.Dispose();
+            return true;
+        }
+
+        return false;
     }
 }

@@ -70,7 +70,18 @@ public class PipelineOrchestrator : IPipelineOrchestrator
             
             if (!result.WasCancelled)
             {
-                await CompleteExecutionAsync(execution, result, cancellationToken);
+                if (result.HasBatchFailures)
+                {
+                    var errorMessage = result.Errors.Count == 1
+                        ? result.Errors[0]
+                        : $"Execution encountered {result.Errors.Count} failed batches: {string.Join(" | ", result.Errors)}";
+
+                    await FailExecutionAsync(execution, errorMessage, cancellationToken, result);
+                }
+                else
+                {
+                    await CompleteExecutionAsync(execution, result, cancellationToken);
+                }
             }
         }
         catch (Exception ex)
@@ -140,18 +151,31 @@ public class PipelineOrchestrator : IPipelineOrchestrator
         await SendExecutionNotificationAsync(execution, cancellationToken);
     }
 
-    private async Task FailExecutionAsync(PipelineExecution execution, string errorMessage, CancellationToken cancellationToken)
+    private async Task FailExecutionAsync(
+        PipelineExecution execution,
+        string errorMessage,
+        CancellationToken cancellationToken,
+        BatchProcessingResult? result = null)
     {
         execution.Status = ExecutionStatus.Failed;
         execution.EndTime = DateTimeOffset.UtcNow;
         execution.Duration = execution.EndTime.Value - execution.StartTime;
         execution.ErrorMessage = errorMessage;
 
+        if (result != null)
+        {
+            execution.RecordsProcessed = result.TotalProcessed;
+            execution.RecordsSucceeded = result.TotalSucceeded;
+            execution.RecordsFailed = result.TotalFailed;
+            execution.BatchCount = result.BatchIndex;
+        }
+
         // Update pipeline's last run tracking fields
         if (execution.Pipeline != null)
         {
             execution.Pipeline.LastRunAt = DateTime.UtcNow;
             execution.Pipeline.LastRunStatus = "Failed";
+            execution.Pipeline.LastRunRecordsProcessed = (int?)result?.TotalProcessed;
         }
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -291,9 +315,18 @@ public class PipelineOrchestrator : IPipelineOrchestrator
             _logger.LogError(ex, "Error processing batch {BatchIndex} for execution {ExecutionId}", result.BatchIndex, execution.Id);
 
             executionBatch.Status = BatchStatus.Failed;
+            executionBatch.RowsSucceeded = 0;
             executionBatch.RowsFailed = batch.RowCount;
             executionBatch.EndedAt = DateTimeOffset.UtcNow;
+            result.TotalProcessed += batch.RowCount;
             result.TotalFailed += batch.RowCount;
+            result.HasBatchFailures = true;
+            result.Errors.Add($"Batch {result.BatchIndex} failed: {ex.Message}");
+
+            execution.RecordsProcessed = result.TotalProcessed;
+            execution.RecordsSucceeded = result.TotalSucceeded;
+            execution.RecordsFailed = result.TotalFailed;
+            execution.BatchCount = result.BatchIndex;
 
             await _context.SaveChangesAsync(cancellationToken);
             await AddLogEntryAsync(execution, "Error", "Batch", $"Batch {result.BatchIndex} failed: {ex.Message}", cancellationToken);
@@ -434,5 +467,7 @@ public class PipelineOrchestrator : IPipelineOrchestrator
         public long TotalSucceeded { get; set; }
         public long TotalFailed { get; set; }
         public bool WasCancelled { get; set; }
+        public bool HasBatchFailures { get; set; }
+        public List<string> Errors { get; } = new();
     }
 }

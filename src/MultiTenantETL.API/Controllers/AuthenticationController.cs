@@ -88,16 +88,25 @@ namespace MultiTenantETL.API.Controllers
                 });
             }
 
-            // Find the token in the database
-            var token = await _tokenManager.FindByIdAsync(request.Token);
-            if (token == null)
+            var revoked = false;
+
+            var referenceToken = await _tokenManager.FindByReferenceIdAsync(request.Token);
+            if (referenceToken != null)
             {
-                // Token not found - this is not an error per RFC 7009
-                return Ok();
+                revoked = true;
+                await _tokenManager.TryRevokeAsync(referenceToken);
             }
 
-            // Revoke the token and any associated tokens (e.g., refresh tokens)
-            await _tokenManager.TryRevokeAsync(token);
+            if (!revoked)
+            {
+                // Fallback to token id lookup for compatibility with non-reference tokens.
+                var token = await _tokenManager.FindByIdAsync(request.Token);
+                if (token != null)
+                {
+                    revoked = true;
+                    await _tokenManager.TryRevokeAsync(token);
+                }
+            }
 
             return Ok();
         }
@@ -277,7 +286,7 @@ namespace MultiTenantETL.API.Controllers
             var info = await HttpContext.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
             var user = info.Principal != null ? await _userManager.GetUserAsync(info.Principal) : null;
 
-            if (user == null || !await _signInManager.CanSignInAsync(user))
+            if (user == null || !await _signInManager.CanSignInAsync(user) || !user.IsActive)
             {
                 return Forbid(
                     authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,

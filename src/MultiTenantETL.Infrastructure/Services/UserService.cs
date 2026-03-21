@@ -5,6 +5,7 @@ using MultiTenantETL.Domain.Enums;
 using MultiTenantETL.Infrastructure.Identity;
 using MultiTenantETL.Infrastructure.Interfaces;
 using MultiTenantETL.Infrastructure.Persistence;
+using OpenIddict.Abstractions;
 
 namespace MultiTenantETL.Infrastructure.Services;
 
@@ -12,13 +13,16 @@ public class UserService : IUserService
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ApplicationDbContext _context;
+    private readonly IOpenIddictTokenManager _tokenManager;
 
     public UserService(
         UserManager<ApplicationUser> userManager,
-        ApplicationDbContext context)
+        ApplicationDbContext context,
+        IOpenIddictTokenManager tokenManager)
     {
         _userManager = userManager;
         _context = context;
+        _tokenManager = tokenManager;
     }
 
     public async Task<ApplicationUser?> GetUserByIdAsync(Guid userId)
@@ -146,6 +150,11 @@ public class UserService : IUserService
                 string.Join(", ", result.Errors.Select(e => e.Description)));
         }
 
+        if (!isActive)
+        {
+            await RevokeUserTokensAsync(userId);
+        }
+
         return ServiceResult<ApplicationUser>.SuccessResult(user);
     }
 
@@ -169,6 +178,8 @@ public class UserService : IUserService
                 AuthErrorCode.ValidationError,
                 string.Join(", ", result.Errors.Select(e => e.Description)));
         }
+
+        await RevokeUserTokensAsync(userId);
 
         return ServiceResult.SuccessResult();
     }
@@ -239,11 +250,8 @@ public class UserService : IUserService
                 "User not found");
         }
 
-        // Remove existing password
-        await _userManager.RemovePasswordAsync(user);
-
-        // Add new password
-        var result = await _userManager.AddPasswordAsync(user, newPassword);
+        var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
+        var result = await _userManager.ResetPasswordAsync(user, resetToken, newPassword);
 
         if (!result.Succeeded)
         {
@@ -251,6 +259,8 @@ public class UserService : IUserService
                 AuthErrorCode.ValidationError,
                 string.Join(", ", result.Errors.Select(e => e.Description)));
         }
+
+        await RevokeUserTokensAsync(userId);
 
         return ServiceResult.SuccessResult();
     }
@@ -262,5 +272,13 @@ public class UserService : IUserService
             .Where(ut => ut.UserId == userId && ut.IsActive)
             .OrderBy(ut => ut.Tenant!.Name)
             .ToListAsync();
+    }
+
+    private async Task RevokeUserTokensAsync(Guid userId)
+    {
+        await foreach (var token in _tokenManager.FindBySubjectAsync(userId.ToString()))
+        {
+            await _tokenManager.TryRevokeAsync(token);
+        }
     }
 }

@@ -98,6 +98,7 @@ public class ScheduleService : IScheduleService
             Timezone = request.Timezone,
             Description = request.Description,
             IsActive = request.IsActive,
+            IsPausedByPipeline = false,
             NextRunAt = nextFireTime,
             ConsecutiveFailures = 0,
             MaxConsecutiveFailures = 5,
@@ -260,7 +261,9 @@ public class ScheduleService : IScheduleService
             {
                 throw new InvalidOperationException($"Cannot activate schedule because pipeline '{schedule.Pipeline.Name}' is deactivated");
             }
+
             schedule.IsActive = request.IsActive.Value;
+            schedule.IsPausedByPipeline = false;
         }
 
         schedule.UpdatedAt = DateTime.UtcNow;
@@ -365,6 +368,7 @@ public class ScheduleService : IScheduleService
         }
 
         schedule.IsActive = true;
+        schedule.IsPausedByPipeline = false;
         schedule.ConsecutiveFailures = 0; // Reset on enable
         schedule.UpdatedAt = DateTime.UtcNow;
         schedule.UpdatedBy = userId;
@@ -405,12 +409,13 @@ public class ScheduleService : IScheduleService
             throw new KeyNotFoundException($"Schedule with ID {id} not found");
         }
 
-        if (!schedule.IsActive)
+        if (!schedule.IsActive && !schedule.IsPausedByPipeline)
         {
             return await MapToResponseAsync(schedule, schedule.Pipeline, cancellationToken);
         }
 
         schedule.IsActive = false;
+        schedule.IsPausedByPipeline = false;
         schedule.UpdatedAt = DateTime.UtcNow;
         schedule.UpdatedBy = userId;
 
@@ -554,8 +559,10 @@ public class ScheduleService : IScheduleService
             // Unregister from Quartz
             await UnregisterQuartzJobAsync(schedule, cancellationToken);
             
-            // Set schedule to inactive so it appears correctly in the UI
+            // Mark the schedule as pipeline-paused so we only restore schedules
+            // that were active before the pipeline was deactivated.
             schedule.IsActive = false;
+            schedule.IsPausedByPipeline = true;
             schedule.UpdatedAt = DateTime.UtcNow;
         }
 
@@ -579,15 +586,18 @@ public class ScheduleService : IScheduleService
         _logger.LogInformation("Resuming schedules for pipeline {PipelineId} in tenant {TenantId}", 
             pipelineId, tenantId);
 
-        // Find all schedules for this pipeline (including inactive ones that were paused)
+        // Only resume schedules that were auto-paused due to pipeline deactivation.
         var schedules = await _context.PipelineSchedules
             .Include(s => s.Pipeline)
-            .Where(s => s.PipelineId == pipelineId && s.TenantId == tenantId)
+            .Where(s => s.PipelineId == pipelineId &&
+                        s.TenantId == tenantId &&
+                        s.IsPausedByPipeline &&
+                        !s.IsActive)
             .ToListAsync(cancellationToken);
 
         if (schedules.Count == 0)
         {
-            _logger.LogInformation("No schedules found for pipeline {PipelineId} to resume", pipelineId);
+            _logger.LogInformation("No pipeline-paused schedules found for pipeline {PipelineId} to resume", pipelineId);
             return;
         }
 
@@ -602,6 +612,7 @@ public class ScheduleService : IScheduleService
             
             // Set schedule to active
             schedule.IsActive = true;
+            schedule.IsPausedByPipeline = false;
             schedule.UpdatedAt = DateTime.UtcNow;
             
             // Pipeline should not be null after Include, but check for safety
