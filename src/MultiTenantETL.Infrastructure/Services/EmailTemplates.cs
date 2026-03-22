@@ -356,9 +356,9 @@ namespace MultiTenantETL.Infrastructure.Services
             
             var statusIcon = executionStatus.ToLower() switch
             {
-                "completed" => "✓",
-                "failed" => "✗",
-                "cancelled" => "⊘",
+                "completed" => "•",
+                "failed" => "•",
+                "cancelled" => "•",
                 _ => "•"
             };
             
