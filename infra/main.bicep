@@ -283,7 +283,8 @@ resource workerContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
               type: 'azure-queue'
               metadata: {
                 queueName: 'pipeline-executions'
-                queueLength: '1' // wake on first message
+                queueLength: '1' // wake on first message,
+                accountName: storageAccountName
               }
               auth: [
                 {
