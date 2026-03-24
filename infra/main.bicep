@@ -55,7 +55,7 @@ var keyVaultSecretsUserRoleId = subscriptionResourceId(
 )
 var storageQueueDataContributorRoleId = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
-  '974c5e8b-45b9-4653-8a3f-d0564206b078' // Storage Queue Data Contributor
+  '974c5e8b-45b9-4653-ba55-5f855dd0fb88' // Storage Queue Data Contributor
 )
 
 // ── Log Analytics Workspace ──────────────────────────────────────────────────
@@ -254,16 +254,16 @@ resource workerContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
   properties: {
     environmentId: containerAppsEnv.id
     configuration: {
-      secrets: [
-        {
+    //  secrets: [
+    //   {
           // Connection string for KEDA azure-queue scaler.
           // Pulled from Key Vault using the managed identity.
           // Must be populated manually after first deploy (see top of file).
-          name: 'storage-queue-conn'
-          keyVaultUrl: '${kvUri}secrets/StorageQueueConnection'
-          identity: managedIdentity.id
-        }
-      ]
+          // name: 'storage-queue-conn'
+          // keyVaultUrl: '${kvUri}secrets/StorageQueueConnection'
+          // identity: managedIdentity.id
+    //    }
+    //  ]
     }
     template: {
       containers: [
@@ -299,11 +299,11 @@ resource workerContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
                 queueName: 'pipeline-executions'
                 queueLength: '1' // wake on first message
               }
-              auth: [
-                {
-                  secretRef: 'storage-queue-conn'
-                  triggerParameter: 'connection'
-                }
+              // auth: [
+              //  {
+              //    secretRef: 'storage-queue-conn'
+              //    triggerParameter: 'connection'
+              //  }
               ]
             }
           }
