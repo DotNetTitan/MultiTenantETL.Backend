@@ -43,6 +43,18 @@ builder.Services.Configure<ServiceBusSettings>(options =>
         options.ConnectionString = connectionString;
     }
 });
+
+// Configuration - bind Azure Storage Queue settings and inject connection string if available from Aspire
+builder.Services.Configure<StorageQueueSettings>(options =>
+{
+    builder.Configuration.GetSection("StorageQueue").Bind(options);
+    // Check for Aspire-provided connection string
+    var connectionString = builder.Configuration.GetConnectionString("StorageQueue");
+    if (!string.IsNullOrEmpty(connectionString))
+    {
+        options.ConnectionString = connectionString;
+    }
+});
 builder.Services.Configure<EtlSettings>(builder.Configuration.GetSection(EtlSettings.SectionName));
 
 // Configuration - bind Azure Communication Services settings
@@ -170,6 +182,11 @@ if (messagingSettings.UseServiceBus)
     builder.Services.AddSingleton<MultiTenantETL.Application.Messaging.IMessagePublisher,
         MultiTenantETL.Infrastructure.Messaging.ServiceBusPublisher>();
 }
+else if (messagingSettings.UseStorageQueue)
+{
+    builder.Services.AddSingleton<MultiTenantETL.Application.Messaging.IMessagePublisher,
+        MultiTenantETL.Infrastructure.Messaging.StorageQueuePublisher>();
+}
 else
 {
     builder.Services.AddSingleton<MultiTenantETL.Application.Messaging.IMessagePublisher,
@@ -179,6 +196,10 @@ else
 if (messagingSettings.UseServiceBus)
 {
     builder.Services.AddHostedService<ServiceBusWorker>();
+}
+else if (messagingSettings.UseStorageQueue)
+{
+    builder.Services.AddHostedService<StorageQueueWorker>();
 }
 else
 {

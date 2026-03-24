@@ -1,6 +1,6 @@
 // ============================================================================
 // MultiTenant ETL – Azure Infrastructure
-// Deploys: ACR, Container Apps (API + Worker), Service Bus, Key Vault, SWA
+// Deploys: ACR, Container Apps (API + Worker), Storage Queue, Key Vault, SWA
 //
 // Usage:
 //   az deployment group create \
@@ -8,8 +8,8 @@
 //     --template-file infra/main.bicep \
 //     --parameters @infra/parameters.dev.bicepparam
 //
-// To verify Service Bus Data Owner role ID:
-//   az role definition list --name "Azure Service Bus Data Owner" --query "[].name" -o tsv
+// To verify Storage Queue Data Contributor role ID:
+//   az role definition list --name "Storage Queue Data Contributor" --query "[].name" -o tsv
 // ============================================================================
 
 @description('Environment name (dev or beta)')
@@ -26,7 +26,7 @@ param staticWebAppLocation string = 'eastus2'
 var prefix = 'mtetl'
 var logAnalyticsName = '${prefix}-${environmentName}-law'
 var managedIdentityName = '${prefix}-${environmentName}-mi'
-var serviceBusName = 'multi-tenant-etl-${environmentName}-sb-ns'
+var storageAccountName = '${replace(prefix, '-', '')}${replace(environmentName, '-', '')}stor'
 var keyVaultName = '${prefix}-${environmentName}-kv'
 var containerAppsEnvName = '${prefix}-${environmentName}-cae'
 var apiAppName = '${prefix}-api-${environmentName}'
@@ -38,6 +38,10 @@ var staticWebAppName = '${prefix}-web-${environmentName}'
 var keyVaultSecretsUserRoleId = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
   '4633458b-17de-408a-b874-0445c86b69e6' // Key Vault Secrets User
+)
+var storageQueueDataContributorRoleId = subscriptionResourceId(
+  'Microsoft.Authorization/roleDefinitions',
+  '974c5e8b-45b9-4653-8a3f-d0564206b078' // Storage Queue Data Contributor
 )
 
 // ── Log Analytics Workspace ──────────────────────────────────────────────────
@@ -53,49 +57,51 @@ resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
 // ── User-Assigned Managed Identity ──────────────────────────────────────────
 // Shared by API and Worker Container Apps for:
 //   • Reading secrets from Key Vault (Key Vault Secrets User)
-//   • Publishing/consuming Service Bus messages (Azure Service Bus Data Owner)
+//   • Publishing/consuming Storage Queue messages (Storage Queue Data Contributor)
 resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: managedIdentityName
   location: location
 }
 
-// ── Azure Service Bus (Basic) ─────────────────────────────────────────────
-resource serviceBusNamespace 'Microsoft.ServiceBus/namespaces@2021-11-01' = {
-  name: serviceBusName
+// ── Azure Storage Account (Standard, Hot, LRS) ──────────────────────────────
+// Used for message queues (pipeline-executions, pipeline-cancellations)
+// Cost: ~$0.015/GB/month at-rest + per-operation charges (minimal for light usage)
+resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
+  name: storageAccountName
   location: location
+  kind: 'StorageV2'
   sku: {
-    name: 'Basic'
-    tier: 'Basic'
+    name: 'Standard_LRS' // Locally redundant, cheapest option
   }
   properties: {
-    disableLocalAuth: false // connection string auth used by the application
+    accessTier: 'Hot'
+    allowBlobPublicAccess: false
+    minimumTlsVersion: 'TLS1_2'
+    publicNetworkAccess: 'Enabled'
+    networkAcls: {
+      defaultAction: 'Allow'
+      bypass: 'AzureServices'
+    }
   }
 }
 
-// pipeline-executions queue – matches ServiceBusSettings.ExecutionQueueName
-resource sbExecQueue 'Microsoft.ServiceBus/namespaces/queues@2021-11-01' = {
-  parent: serviceBusNamespace
+// ── Storage Queue Service + Queues (parent-chained) ─────────────────────────
+resource queueService 'Microsoft.Storage/storageAccounts/queueServices@2023-01-01' = {
+  parent: storageAccount
+  name: 'default'
+}
+
+// pipeline-executions queue – matches StorageQueueSettings.ExecutionQueueName
+resource execQueue 'Microsoft.Storage/storageAccounts/queueServices/queues@2023-01-01' = {
+  parent: queueService
   name: 'pipeline-executions'
-  properties: {
-    lockDuration: 'PT5M'           // 5 min – matches lock renewal in ServiceBusWorker
-    maxDeliveryCount: 5            // matches ServiceBusSettings.MaxRetryAttempts
-    deadLetteringOnMessageExpiration: true
-    enablePartitioning: false
-  }
 }
 
-// pipeline-cancellations queue – matches ServiceBusSettings.CancellationQueueName
-resource sbCancelQueue 'Microsoft.ServiceBus/namespaces/queues@2021-11-01' = {
-  parent: serviceBusNamespace
+// pipeline-cancellations queue – matches StorageQueueSettings.CancellationQueueName
+resource cancelQueue 'Microsoft.Storage/storageAccounts/queueServices/queues@2023-01-01' = {
+  parent: queueService
   name: 'pipeline-cancellations'
-  properties: {
-    lockDuration: 'PT1M'
-    maxDeliveryCount: 3
-    deadLetteringOnMessageExpiration: true
-    enablePartitioning: false
-  }
 }
-
 
 // ── Azure Key Vault (Standard, RBAC) ────────────────────────────────────────
 // Used by the app's ISecretStorageService to store connector credentials.
@@ -127,6 +133,17 @@ resource kvSecretsUserAssignment 'Microsoft.Authorization/roleAssignments@2022-0
   }
 }
 
+// ── Role: Storage Queue Data Contributor → Managed Identity ─────────────────
+resource storageQueueDataAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount.id, managedIdentity.id, storageQueueDataContributorRoleId)
+  scope: storageAccount
+  properties: {
+    roleDefinitionId: storageQueueDataContributorRoleId
+    principalId: managedIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 // ── Container Apps Environment ───────────────────────────────────────────────
 resource containerAppsEnv 'Microsoft.App/managedEnvironments@2023-05-01' = {
   name: containerAppsEnvName
@@ -144,6 +161,7 @@ resource containerAppsEnv 'Microsoft.App/managedEnvironments@2023-05-01' = {
 
 // ── API Container App ────────────────────────────────────────────────────────
 // External HTTP ingress on port 8080 (matches Dockerfile ASPNETCORE_URLS).
+// Scales to zero when idle; HTTP scaler wakes it on incoming requests.
 // Initial image is an MCR placeholder – the pipeline replaces it with GHCR image on first deploy.
 resource apiContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
   name: apiAppName
@@ -172,28 +190,41 @@ resource apiContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
           // The deployment pipeline replaces this with the GHCR image on every run.
           image: 'mcr.microsoft.com/dotnet/aspnet:8.0'
           resources: {
-            cpu: json('0.5')
-            memory: '1Gi'
+            cpu: json('0.25')
+            memory: '0.5Gi'
           }
           env: [
             { name: 'ASPNETCORE_ENVIRONMENT', value: 'Production' }
             { name: 'AzureKeyVault__VaultUri', value: 'https://${keyVaultName}.vault.azure.net/' }
             { name: 'AzureKeyVault__UseKeyVault', value: 'true' }
-            { name: 'Messaging__Provider', value: 'ServiceBus' }
+            { name: 'Messaging__Provider', value: 'StorageQueue' }
+            { name: 'Messaging__StorageAccountName', value: storageAccountName }
           ]
         }
       ]
       scale: {
-        minReplicas: 1
-        maxReplicas: 3
+        minReplicas: 0
+        maxReplicas: 1
+        rules: [
+          {
+            // Wake the API on incoming HTTP requests
+            name: 'http-scaling'
+            http: {
+              metadata: {
+                concurrentRequests: '10'
+              }
+            }
+          }
+        ]
       }
     }
   }
 }
 
-// ── Worker Container App ──────────────────────────────────────────────────────
-// No HTTP ingress – background Service Bus consumer only.
+// ── Worker Container App ─────────────────────────────────────────────────────
+// No HTTP ingress – background Storage Queue consumer only.
 // Worker runs EF Core database migrations on startup.
+// Scales to zero when queue is empty; KEDA wakes it when messages arrive.
 resource workerContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
   name: workerAppName
   location: location
@@ -213,21 +244,38 @@ resource workerContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
           // Placeholder image – replaced by the pipeline with GHCR image on first deploy.
           image: 'mcr.microsoft.com/dotnet/aspnet:8.0'
           resources: {
-            cpu: json('0.5')
-            memory: '1Gi'
+            cpu: json('0.25')
+            memory: '0.5Gi'
           }
           env: [
             { name: 'DOTNET_ENVIRONMENT', value: 'Production' }
             { name: 'AzureKeyVault__VaultUri', value: 'https://${keyVaultName}.vault.azure.net/' }
             { name: 'AzureKeyVault__UseKeyVault', value: 'true' }
-            { name: 'Messaging__Provider', value: 'ServiceBus' }
+            { name: 'Messaging__Provider', value: 'StorageQueue' }
+            { name: 'Messaging__StorageAccountName', value: storageAccountName }
             { name: 'EmailService__UseStub', value: 'false' }
           ]
         }
       ]
       scale: {
-        minReplicas: 1
+        minReplicas: 0
         maxReplicas: 1 // Worker processes one batch at a time; scale-out requires coordination
+        rules: [
+          {
+            // Wake the worker when messages appear in the executions queue.
+            // Uses managed identity – no connection string required.
+            name: 'storage-queue-scaler'
+            custom: {
+              type: 'azure-queue'
+              metadata: {
+                queueName: 'pipeline-executions'
+                queueLength: '1'           // wake on first message
+                accountName: storageAccountName
+              }
+              identity: managedIdentity.id
+            }
+          }
+        ]
       }
     }
   }
@@ -262,8 +310,11 @@ output staticWebAppUrl string = 'https://${staticWebApp.properties.defaultHostna
 @description('Key Vault URI (auto-injected into Container Apps via Bicep; shown here for reference)')
 output keyVaultUri string = keyVault.properties.vaultUri
 
-@description('Service Bus namespace name – pipeline uses this to retrieve the connection string automatically')
-output serviceBusNamespaceName string = serviceBusNamespace.name
+@description('Storage Account name – used by apps for queue access via managed identity')
+output storageAccountName string = storageAccount.name
+
+@description('Storage Queue endpoint – useful for verifying app config')
+output storageQueueEndpoint string = storageAccount.properties.primaryEndpoints.queue
 
 @description('Managed Identity resource ID')
 output managedIdentityId string = managedIdentity.id

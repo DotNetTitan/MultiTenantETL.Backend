@@ -288,6 +288,18 @@ builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.ServiceBu
     }
 });
 
+// Configure Azure Storage Queue settings with Aspire connection string support
+builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.StorageQueueSettings>(options =>
+{
+    builder.Configuration.GetSection("StorageQueue").Bind(options);
+    // Check for Aspire-provided connection string
+    var connectionString = builder.Configuration.GetConnectionString("StorageQueue");
+    if (!string.IsNullOrEmpty(connectionString))
+    {
+        options.ConnectionString = connectionString;
+    }
+});
+
 // Rate Limiting
 builder.Services.AddMemoryCache();
 builder.Services.Configure<IpRateLimitOptions>(options =>
@@ -494,6 +506,11 @@ if (messagingSettings.UseServiceBus)
 {
     builder.Services.AddSingleton<MultiTenantETL.Application.Messaging.IMessagePublisher,
         MultiTenantETL.Infrastructure.Messaging.ServiceBusPublisher>();
+}
+else if (messagingSettings.UseStorageQueue)
+{
+    builder.Services.AddSingleton<MultiTenantETL.Application.Messaging.IMessagePublisher,
+        MultiTenantETL.Infrastructure.Messaging.StorageQueuePublisher>();
 }
 else
 {

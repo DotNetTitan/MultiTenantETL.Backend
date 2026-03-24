@@ -7,7 +7,7 @@ This document provides context and guidelines for GitHub Copilot when working wi
 MultiTenant ETL is an enterprise-grade ETL (Extract, Transform, Load) platform built with:
 - **ASP.NET Core 8.0** Web API with Clean Architecture
 - **PostgreSQL** with Entity Framework Core 8.0
-- **RabbitMQ** for asynchronous pipeline execution
+- **Asynchronous Pipeline Execution** via message queue (RabbitMQ for local development, Azure Service Bus or Azure Storage Queue for cloud deployment)
 - **OpenIddict 7.2.0** for OAuth 2.0/OpenID Connect authentication
 
 ## Architecture Principles
@@ -25,7 +25,7 @@ MultiTenant ETL is an enterprise-grade ETL (Extract, Transform, Load) platform b
 - **Repository Pattern**: Abstracted through EF Core DbContext
 - **Factory Pattern**: `DataReaderFactory`, `DataWriterFactory` for creating connectors
 - **Strategy Pattern**: Different processors for different transformation types
-- **Message Queue Pattern**: RabbitMQ for async pipeline execution
+- **Message Queue Pattern**: RabbitMQ for local development, Azure Service Bus or Azure Storage Queue for cloud deployment (configuration-driven via `Messaging.Provider` setting)
 
 ## Coding Conventions
 
@@ -117,18 +117,51 @@ Controllers should:
 
 ## Message Broker
 
-### RabbitMQ Queues
+### Supported Providers
 
-- `pipeline-executions` - Main execution queue
-- `pipeline-cancellations` - Cancellation requests
-- `pipeline-dlx` - Dead letter exchange for failed messages
+The application supports three messaging providers, selectable via configuration:
+
+1. **RabbitMQ** - Default for local development
+   - Queue names: `pipeline-executions`, `pipeline-cancellations`
+   - Dead letter exchange: `pipeline-dlx`
+   - Configuration: `Messaging.Provider = "RabbitMQ"`
+
+2. **Azure Service Bus** - Recommended for production on Azure
+   - Queue names: `pipeline-executions`, `pipeline-cancellations`
+   - Configuration: `Messaging.Provider = "ServiceBus"`
+
+3. **Azure Storage Queue** - Cost-optimized option for Azure
+   - Queue names: `pipeline-executions`, `pipeline-cancellations`
+   - Poison queue handling: Messages exceeding MaxDequeueCount are automatically moved to poison queue
+   - Configuration: `Messaging.Provider = "StorageQueue"`
+
+### Provider Selection
+
+Set the `Messaging.Provider` setting in `appsettings.json` to select which messaging provider to use:
+
+```json
+{
+  "Messaging": {
+    "Provider": "RabbitMQ"  // or "ServiceBus" or "StorageQueue"
+  }
+}
+```
 
 ### Publishing Messages
 
-Use `IMessagePublisher` interface:
+Use `IMessagePublisher` interface (provider-agnostic):
 ```csharp
 await _messagePublisher.PublishExecutionTaskAsync(new ExecutionTask { ... });
+await _messagePublisher.PublishCancellationRequestAsync(executionId);
 ```
+
+### Message Infrastructure
+
+- **IMessagePublisher**: Implemented by RabbitMqPublisher, ServiceBusPublisher, or StorageQueuePublisher
+- **Worker Services**: Worker (RabbitMQ), ServiceBusWorker, or StorageQueueWorker
+- **Message Contracts**: ExecutionTask and CancellationRequest
+
+### RabbitMQ Queues (for reference)
 
 ## Testing
 
@@ -181,11 +214,20 @@ dotnet ef database update --project src/MultiTenantETL.Infrastructure --startup-
   "ConnectionStrings": {
     "DefaultConnection": "PostgreSQL connection string"
   },
+  "Messaging": {
+    "Provider": "RabbitMQ"  // RabbitMQ, ServiceBus, or StorageQueue
+  },
   "RabbitMq": {
     "HostName": "localhost",
     "Port": 5672,
     "UserName": "guest",
     "Password": "guest"
+  },
+  "ServiceBus": {
+    "ConnectionString": "Endpoint=sb://namespace.servicebus.windows.net/;..."  // Set via user secrets or environment variable
+  },
+  "StorageQueue": {
+    "ConnectionString": "DefaultEndpointsProtocol=https;AccountName=...;AccountKey=..."  // Set via user secrets or environment variable
   },
   "AzureCommunication": {
     "ConnectionString": "Azure Communication Services connection",
