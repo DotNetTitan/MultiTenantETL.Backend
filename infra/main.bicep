@@ -8,15 +8,24 @@
 //     --template-file infra/main.bicep \
 //     --parameters @infra/parameters.dev.bicepparam
 //
-// First-time setup (once per environment, before second deploy):
-//   1. az storage account show-connection-string \
-//        --name <storageAccountName> \
-//        --resource-group <rg> \
-//        --query connectionString -o tsv
-//   2. az keyvault secret set \
-//        --vault-name <keyVaultName> \
-//        --name StorageQueueConnection \
-//        --value "<connection-string>"
+// ── Two-pass deployment ──────────────────────────────────────────────────────
+// Pass 1 (this file as-is):
+//   Deploy with the worker KV secret ref and KEDA auth commented out.
+//   The storage account and Key Vault are created in this pass.
+//
+// After Pass 1, run these commands to store the connection string in Key Vault:
+//   az storage account show-connection-string \
+//     --name mtetldevstor \
+//     --resource-group multi-tenant-etl-dev-rg \
+//     --query connectionString -o tsv
+//   az keyvault secret set \
+//     --vault-name mtetl-dev-kv \
+//     --name StorageQueueConnection \
+//     --value "<connection-string-from-above>"
+//
+// Pass 2:
+//   Uncomment the two blocks marked with TODO below, then redeploy.
+//   All future deploys after Pass 2 need no manual steps.
 //
 // To verify role definition IDs:
 //   az role definition list --name "Key Vault Secrets User" --query "[].name" -o tsv
@@ -239,9 +248,6 @@ resource apiContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
 // No HTTP ingress – background Storage Queue consumer only.
 // Worker runs EF Core database migrations on startup.
 // Scales to zero when queue is empty; KEDA wakes it when messages arrive.
-//
-// IMPORTANT: The StorageQueueConnection secret must exist in Key Vault before
-// this deploys successfully. See first-time setup instructions at top of file.
 resource workerContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
   name: workerAppName
   location: location
@@ -253,18 +259,19 @@ resource workerContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
   }
   properties: {
     environmentId: containerAppsEnv.id
+
+    // TODO (Pass 2): After storing StorageQueueConnection in Key Vault,
+    // uncomment this secrets block and redeploy.
     configuration: {
-    //  secrets: [
-    //   {
-          // Connection string for KEDA azure-queue scaler.
-          // Pulled from Key Vault using the managed identity.
-          // Must be populated manually after first deploy (see top of file).
-          // name: 'storage-queue-conn'
-          // keyVaultUrl: '${kvUri}secrets/StorageQueueConnection'
-          // identity: managedIdentity.id
-    //    }
-    //  ]
+      // secrets: [
+      //   {
+      //     name: 'storage-queue-conn'
+      //     keyVaultUrl: '${kvUri}secrets/StorageQueueConnection'
+      //     identity: managedIdentity.id
+      //   }
+      // ]
     }
+
     template: {
       containers: [
         {
@@ -291,7 +298,6 @@ resource workerContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
         rules: [
           {
             // Wake the worker when messages appear in the executions queue.
-            // Authenticates via the storage-queue-conn secret sourced from Key Vault.
             name: 'storage-queue-scaler'
             custom: {
               type: 'azure-queue'
@@ -299,12 +305,14 @@ resource workerContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
                 queueName: 'pipeline-executions'
                 queueLength: '1' // wake on first message
               }
+              // TODO (Pass 2): After storing StorageQueueConnection in Key Vault,
+              // uncomment this auth block and redeploy.
               // auth: [
-              //  {
-              //    secretRef: 'storage-queue-conn'
-              //    triggerParameter: 'connection'
-              //  }
-              ]
+              //   {
+              //     secretRef: 'storage-queue-conn'
+              //     triggerParameter: 'connection'
+              //   }
+              // ]
             }
           }
         ]
