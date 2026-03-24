@@ -1,6 +1,6 @@
 // ============================================================================
 // MultiTenant ETL – Azure Infrastructure
-// Deploys: ACR, Container Apps (API + Worker), Storage Queue, Key Vault, SWA
+// Deploys: Container Apps (API + Worker), Storage Queue, Key Vault, SWA
 //
 // Usage:
 //   az deployment group create \
@@ -8,7 +8,18 @@
 //     --template-file infra/main.bicep \
 //     --parameters @infra/parameters.dev.bicepparam
 //
-// To verify Storage Queue Data Contributor role ID:
+// First-time setup (once per environment, before second deploy):
+//   1. az storage account show-connection-string \
+//        --name <storageAccountName> \
+//        --resource-group <rg> \
+//        --query connectionString -o tsv
+//   2. az keyvault secret set \
+//        --vault-name <keyVaultName> \
+//        --name StorageQueueConnection \
+//        --value "<connection-string>"
+//
+// To verify role definition IDs:
+//   az role definition list --name "Key Vault Secrets User" --query "[].name" -o tsv
 //   az role definition list --name "Storage Queue Data Contributor" --query "[].name" -o tsv
 // ============================================================================
 
@@ -33,8 +44,11 @@ var apiAppName = '${prefix}-api-${environmentName}'
 var workerAppName = '${prefix}-worker-${environmentName}'
 var staticWebAppName = '${prefix}-web-${environmentName}'
 
+// ── Key Vault DNS suffix (avoids hardcoded vault.azure.net) ─────────────────
+var kvDnsSuffix = environment().suffixes.keyvaultDns  // .vault.azure.net in AzureCloud
+var kvUri = 'https://${keyVaultName}${kvDnsSuffix}/'
+
 // ── Built-in role definition IDs ────────────────────────────────────────────
-// Verify with: az role definition list --name "<Role Name>" --query "[].name" -o tsv
 var keyVaultSecretsUserRoleId = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
   '4633458b-17de-408a-b874-0445c86b69e6' // Key Vault Secrets User
@@ -64,14 +78,14 @@ resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-
 }
 
 // ── Azure Storage Account (Standard, Hot, LRS) ──────────────────────────────
-// Used for message queues (pipeline-executions, pipeline-cancellations)
+// Used for message queues (pipeline-executions, pipeline-cancellations).
 // Cost: ~$0.015/GB/month at-rest + per-operation charges (minimal for light usage)
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   name: storageAccountName
   location: location
   kind: 'StorageV2'
   sku: {
-    name: 'Standard_LRS' // Locally redundant, cheapest option
+    name: 'Standard_LRS'
   }
   properties: {
     accessTier: 'Hot'
@@ -85,7 +99,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   }
 }
 
-// ── Storage Queue Service + Queues (parent-chained) ─────────────────────────
+// ── Storage Queue Service + Queues ──────────────────────────────────────────
 resource queueService 'Microsoft.Storage/storageAccounts/queueServices@2023-01-01' = {
   parent: storageAccount
   name: 'default'
@@ -105,13 +119,14 @@ resource cancelQueue 'Microsoft.Storage/storageAccounts/queueServices/queues@202
 
 // ── Azure Key Vault (Standard, RBAC) ────────────────────────────────────────
 // Used by the app's ISecretStorageService to store connector credentials.
+// Also holds the StorageQueueConnection secret used by the KEDA scaler.
 resource keyVault 'Microsoft.KeyVault/vaults@2023-02-01' = {
   name: keyVaultName
   location: location
   properties: {
     sku: { family: 'A', name: 'standard' }
     tenantId: tenant().tenantId
-    enableRbacAuthorization: true  // RBAC-based access (no legacy access policies)
+    enableRbacAuthorization: true
     enableSoftDelete: true
     softDeleteRetentionInDays: 7
     publicNetworkAccess: 'Enabled'
@@ -186,8 +201,7 @@ resource apiContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
       containers: [
         {
           name: 'api'
-          // Placeholder image from public registry – does not require credentials.
-          // The deployment pipeline replaces this with the GHCR image on every run.
+          // Placeholder image – replaced by the pipeline with GHCR image on every run.
           image: 'mcr.microsoft.com/dotnet/aspnet:8.0'
           resources: {
             cpu: json('0.25')
@@ -195,7 +209,7 @@ resource apiContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
           }
           env: [
             { name: 'ASPNETCORE_ENVIRONMENT', value: 'Production' }
-            { name: 'AzureKeyVault__VaultUri', value: 'https://${keyVaultName}.vault.azure.net/' }
+            { name: 'AzureKeyVault__VaultUri', value: kvUri }
             { name: 'AzureKeyVault__UseKeyVault', value: 'true' }
             { name: 'Messaging__Provider', value: 'StorageQueue' }
             { name: 'Messaging__StorageAccountName', value: storageAccountName }
@@ -225,6 +239,9 @@ resource apiContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
 // No HTTP ingress – background Storage Queue consumer only.
 // Worker runs EF Core database migrations on startup.
 // Scales to zero when queue is empty; KEDA wakes it when messages arrive.
+//
+// IMPORTANT: The StorageQueueConnection secret must exist in Key Vault before
+// this deploys successfully. See first-time setup instructions at top of file.
 resource workerContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
   name: workerAppName
   location: location
@@ -236,12 +253,23 @@ resource workerContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
   }
   properties: {
     environmentId: containerAppsEnv.id
-    configuration: {}
+    configuration: {
+      secrets: [
+        {
+          // Connection string for KEDA azure-queue scaler.
+          // Pulled from Key Vault using the managed identity.
+          // Must be populated manually after first deploy (see top of file).
+          name: 'storage-queue-conn'
+          keyVaultUrl: '${kvUri}secrets/StorageQueueConnection'
+          identity: managedIdentity.id
+        }
+      ]
+    }
     template: {
       containers: [
         {
           name: 'worker'
-          // Placeholder image – replaced by the pipeline with GHCR image on first deploy.
+          // Placeholder image – replaced by the pipeline with GHCR image on every run.
           image: 'mcr.microsoft.com/dotnet/aspnet:8.0'
           resources: {
             cpu: json('0.25')
@@ -249,7 +277,7 @@ resource workerContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
           }
           env: [
             { name: 'DOTNET_ENVIRONMENT', value: 'Production' }
-            { name: 'AzureKeyVault__VaultUri', value: 'https://${keyVaultName}.vault.azure.net/' }
+            { name: 'AzureKeyVault__VaultUri', value: kvUri }
             { name: 'AzureKeyVault__UseKeyVault', value: 'true' }
             { name: 'Messaging__Provider', value: 'StorageQueue' }
             { name: 'Messaging__StorageAccountName', value: storageAccountName }
@@ -263,16 +291,20 @@ resource workerContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
         rules: [
           {
             // Wake the worker when messages appear in the executions queue.
-            // Uses managed identity – no connection string required.
+            // Authenticates via the storage-queue-conn secret sourced from Key Vault.
             name: 'storage-queue-scaler'
             custom: {
               type: 'azure-queue'
               metadata: {
                 queueName: 'pipeline-executions'
-                queueLength: '1'           // wake on first message
-                accountName: storageAccountName
+                queueLength: '1' // wake on first message
               }
-              identity: managedIdentity.id
+              auth: [
+                {
+                  secretRef: 'storage-queue-conn'
+                  triggerParameter: 'connection'
+                }
+              ]
             }
           }
         ]
@@ -310,7 +342,7 @@ output staticWebAppUrl string = 'https://${staticWebApp.properties.defaultHostna
 @description('Key Vault URI (auto-injected into Container Apps via Bicep; shown here for reference)')
 output keyVaultUri string = keyVault.properties.vaultUri
 
-@description('Storage Account name – used by apps for queue access via managed identity')
+@description('Storage Account name – use this to retrieve the connection string for the one-time Key Vault setup')
 output storageAccountName string = storageAccount.name
 
 @description('Storage Queue endpoint – useful for verifying app config')
