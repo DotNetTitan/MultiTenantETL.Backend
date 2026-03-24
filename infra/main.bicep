@@ -8,25 +8,6 @@
 //     --template-file infra/main.bicep \
 //     --parameters @infra/parameters.dev.bicepparam
 //
-// ── Two-pass deployment ──────────────────────────────────────────────────────
-// Pass 1 (this file as-is):
-//   Deploy with the worker KV secret ref and KEDA auth commented out.
-//   The storage account and Key Vault are created in this pass.
-//
-// After Pass 1, run these commands to store the connection string in Key Vault:
-//   az storage account show-connection-string \
-//     --name mtetldevstor \
-//     --resource-group multi-tenant-etl-dev-rg \
-//     --query connectionString -o tsv
-//   az keyvault secret set \
-//     --vault-name mtetl-dev-kv \
-//     --name StorageQueueConnection \
-//     --value "<connection-string-from-above>"
-//
-// Pass 2:
-//   Uncomment the two blocks marked with TODO below, then redeploy.
-//   All future deploys after Pass 2 need no manual steps.
-//
 // To verify role definition IDs:
 //   az role definition list --name "Key Vault Secrets User" --query "[].name" -o tsv
 //   az role definition list --name "Storage Queue Data Contributor" --query "[].name" -o tsv
@@ -259,19 +240,17 @@ resource workerContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
   }
   properties: {
     environmentId: containerAppsEnv.id
-
-    // TODO (Pass 2): After storing StorageQueueConnection in Key Vault,
-    // uncomment this secrets block and redeploy.
     configuration: {
-      // secrets: [
-      //   {
-      //     name: 'storage-queue-conn'
-      //     keyVaultUrl: '${kvUri}secrets/StorageQueueConnection'
-      //     identity: managedIdentity.id
-      //   }
-      // ]
+      secrets: [
+        {
+          // Connection string for KEDA azure-queue scaler.
+          // Pulled from Key Vault using the managed identity.
+          name: 'storage-queue-conn'
+          keyVaultUrl: '${kvUri}secrets/StorageQueueConnection'
+          identity: managedIdentity.id
+        }
+      ]
     }
-
     template: {
       containers: [
         {
@@ -298,6 +277,7 @@ resource workerContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
         rules: [
           {
             // Wake the worker when messages appear in the executions queue.
+            // Authenticates via the storage-queue-conn secret sourced from Key Vault.
             name: 'storage-queue-scaler'
             custom: {
               type: 'azure-queue'
@@ -305,14 +285,12 @@ resource workerContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
                 queueName: 'pipeline-executions'
                 queueLength: '1' // wake on first message
               }
-              // TODO (Pass 2): After storing StorageQueueConnection in Key Vault,
-              // uncomment this auth block and redeploy.
-              // auth: [
-              //   {
-              //     secretRef: 'storage-queue-conn'
-              //     triggerParameter: 'connection'
-              //   }
-              // ]
+              auth: [
+                {
+                  secretRef: 'storage-queue-conn'
+                  triggerParameter: 'connection'
+                }
+              ]
             }
           }
         ]
