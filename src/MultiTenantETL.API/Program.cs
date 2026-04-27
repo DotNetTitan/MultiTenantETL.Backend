@@ -28,6 +28,9 @@ var builder = WebApplication.CreateBuilder(args);
 // Add Aspire service defaults (includes OpenTelemetry, health checks, service discovery)
 builder.AddServiceDefaults();
 
+// Add Sentry
+builder.WebHost.UseSentry();
+
 // Configure logging to suppress watch debug logs
 builder.Logging.AddFilter("Microsoft.AspNetCore.Watch", LogLevel.None);
 
