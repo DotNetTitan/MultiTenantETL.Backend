@@ -416,7 +416,7 @@ public class PipelineOrchestrator : IPipelineOrchestrator
                 return;
             }
 
-            var executionDetailsUrl = $"{_frontendUrl}/executions/{execution.Id}";
+            var executionDetailsUrl = $"{_frontendUrl}/executions";
             
             foreach (var email in notificationEmails)
             {
