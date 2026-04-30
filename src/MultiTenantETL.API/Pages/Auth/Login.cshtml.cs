@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
@@ -5,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Infrastructure.Identity;
+using MultiTenantETL.Infrastructure.Interfaces;
 
 namespace MultiTenantETL.API.Pages.Auth;
 
@@ -13,17 +15,20 @@ public class LoginModel : PageModel
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IAuditService _auditService;
+    private readonly IClaimsService _claimsService;
     private readonly IConfiguration _configuration;
 
     public LoginModel(
         SignInManager<ApplicationUser> signInManager,
         UserManager<ApplicationUser> userManager,
         IAuditService auditService,
+        IClaimsService claimsService,
         IConfiguration configuration)
     {
         _signInManager = signInManager;
         _userManager = userManager;
         _auditService = auditService;
+        _claimsService = claimsService;
         _configuration = configuration;
     }
 
@@ -62,7 +67,7 @@ public class LoginModel : PageModel
 
         // Find user by email
         var user = await _userManager.FindByEmailAsync(Email);
-        
+
         if (user == null)
         {
             await _auditService.LogAuthenticationAsync(
@@ -88,15 +93,26 @@ public class LoginModel : PageModel
             return Page();
         }
 
-        // Attempt to sign in
-        var result = await _signInManager.PasswordSignInAsync(
+        // Validate credentials while honoring lockout policy
+        var result = await _signInManager.CheckPasswordSignInAsync(
             user,
             Password,
-            RememberMe,
             lockoutOnFailure: true);
 
         if (result.Succeeded)
         {
+            // Build enriched claims principal (roles, tenant, permissions)
+            // so cookie-authenticated API requests pass authorization policies.
+            var principal = await _claimsService.BuildClaimsPrincipalAsync(user, ImmutableArray<string>.Empty);
+
+            var authProperties = new AuthenticationProperties
+            {
+                IsPersistent = RememberMe,
+                AllowRefresh = true
+            };
+
+            await HttpContext.SignInAsync(IdentityConstants.ApplicationScheme, principal, authProperties);
+
             await _auditService.LogAuthenticationAsync(
                 Domain.Constants.AuditActions.Authentication.Login,
                 Email,

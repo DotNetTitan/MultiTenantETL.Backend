@@ -296,11 +296,11 @@ namespace MultiTenantETL.API.Controllers
                 Domain.Constants.AuditActions.Authentication.PasswordChanged,
                 user.Email,
                 success: true);
-            
+
             // Revoke all tokens for security - user must re-authenticate
             await RevokeUserTokensAsync(user.Id);
             _logger.LogInformation("Revoked all tokens for user {Email} after password change", user.Email);
-            
+
             await _emailService.SendPasswordChangedNotificationAsync(user.Email!, user.FirstName);
 
             return Ok(new { message = "Password changed successfully. Please log in again with your new password." });
@@ -316,21 +316,21 @@ namespace MultiTenantETL.API.Controllers
                 // Revoke all refresh tokens for this user
                 await RevokeUserTokensAsync(user.Id);
                 _logger.LogInformation("Revoked all tokens for user {Email}", user.Email);
-                
+
                 // Audit log
                 await _auditService.LogAuthenticationAsync(
                     Domain.Constants.AuditActions.Authentication.Logout,
                     user.Email,
                     success: true);
             }
-            
+
             // Sign out - this should properly clear the Identity cookie
             await _signInManager.SignOutAsync();
-            
+
             _logger.LogInformation("User logged out");
-            
-            return Ok(new { 
-                success = true, 
+
+            return Ok(new {
+                success = true,
                 message = "Logged out successfully. All refresh tokens have been revoked.",
                 clearTokens = true
             });
@@ -346,7 +346,7 @@ namespace MultiTenantETL.API.Controllers
 
             // Use tenant service to switch tenant
             var result = await _tenantService.SwitchUserTenantAsync(user.Id, request.TenantId);
-            
+
             if (!result.Success)
             {
                 return BadRequest(new ErrorResponse(result.ErrorCode!.Value, result.ErrorMessage!));
@@ -361,13 +361,20 @@ namespace MultiTenantETL.API.Controllers
                 request.TenantId.ToString(),
                 $"User switched to tenant: {result.UserTenant!.TenantName}");
 
-            // Return success - client should use refresh token to get new access token with updated tenant claims
+            // Re-issue Identity cookie with updated tenant claims for BFF/session-based auth.
+            var updatedUser = await _userManager.FindByIdAsync(user.Id.ToString());
+            if (updatedUser != null)
+            {
+                var principal = await _claimsService.BuildClaimsPrincipalAsync(updatedUser, ImmutableArray<string>.Empty);
+                await HttpContext.SignInAsync(IdentityConstants.ApplicationScheme, principal);
+            }
+
             return Ok(new
             {
                 currentTenantId = request.TenantId,
                 tenantName = result.UserTenant!.TenantName,
-                message = "Tenant switched successfully. Please refresh your token to get updated claims.",
-                requiresTokenRefresh = true
+                message = "Tenant switched successfully.",
+                requiresTokenRefresh = false
             });
         }
 

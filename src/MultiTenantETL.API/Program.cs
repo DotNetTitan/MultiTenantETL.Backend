@@ -42,26 +42,26 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 {
     // Limit request body size to 30MB (adjust based on your file upload needs)
     serverOptions.Limits.MaxRequestBodySize = 30 * 1024 * 1024;
-    
+
     // Limit maximum concurrent connections
     serverOptions.Limits.MaxConcurrentConnections = 100;
     serverOptions.Limits.MaxConcurrentUpgradedConnections = 100;
-    
+
     // Request line and header limits
     serverOptions.Limits.MaxRequestLineSize = 8 * 1024; // 8KB
     serverOptions.Limits.MaxRequestHeadersTotalSize = 32 * 1024; // 32KB
     serverOptions.Limits.MaxRequestHeaderCount = 100;
-    
+
     // Timeout configurations
     serverOptions.Limits.KeepAliveTimeout = TimeSpan.FromMinutes(2);
     serverOptions.Limits.RequestHeadersTimeout = TimeSpan.FromSeconds(30);
-    
+
     // Minimum data rate to prevent slow-read attacks (Slowloris)
     serverOptions.Limits.MinRequestBodyDataRate = new Microsoft.AspNetCore.Server.Kestrel.Core.MinDataRate(
         bytesPerSecond: 240, // 240 bytes/sec minimum
         gracePeriod: TimeSpan.FromSeconds(10)
     );
-    
+
     serverOptions.Limits.MinResponseDataRate = new Microsoft.AspNetCore.Server.Kestrel.Core.MinDataRate(
         bytesPerSecond: 240,
         gracePeriod: TimeSpan.FromSeconds(10)
@@ -92,7 +92,7 @@ builder.Services.AddQuartz(q =>
     q.UseSimpleTypeLoader();
     q.UseInMemoryStore();
     q.UseDefaultThreadPool(tp => tp.MaxConcurrency = 10);
-    
+
     // Register the pipeline schedule job
     q.AddJob<PipelineScheduleJob>(opts => opts
         .WithIdentity("PipelineScheduleJobTemplate")
@@ -130,13 +130,40 @@ builder.Services.ConfigureApplicationCookie(options =>
 {
     options.Cookie.Name = ".AspNetCore.Identity.Application";
     options.Cookie.HttpOnly = true;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+        ? CookieSecurePolicy.SameAsRequest
+        : CookieSecurePolicy.Always;
     options.Cookie.SameSite = SameSiteMode.Lax;
     options.Cookie.Path = "/";
     options.ExpireTimeSpan = TimeSpan.FromHours(1);
     options.SlidingExpiration = true;
     options.LoginPath = "/auth/login";
     options.LogoutPath = "/api/account/logout";
+    options.Events.OnRedirectToLogin = context =>
+    {
+        // APIs should return 401 instead of redirecting to HTML login page.
+        if (context.Request.Path.StartsWithSegments("/api") ||
+            context.Request.Headers.Accept.Any(h => h.Contains("application/json", StringComparison.OrdinalIgnoreCase)))
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return Task.CompletedTask;
+        }
+
+        context.Response.Redirect(context.RedirectUri);
+        return Task.CompletedTask;
+    };
+    options.Events.OnRedirectToAccessDenied = context =>
+    {
+        if (context.Request.Path.StartsWithSegments("/api") ||
+            context.Request.Headers.Accept.Any(h => h.Contains("application/json", StringComparison.OrdinalIgnoreCase)))
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return Task.CompletedTask;
+        }
+
+        context.Response.Redirect(context.RedirectUri);
+        return Task.CompletedTask;
+    };
 });
 
 // Configure token lifespan
@@ -175,7 +202,7 @@ builder.Services.AddOpenIddict()
             OpenIddictConstants.Scopes.OfflineAccess,  // Required for refresh tokens
             "api"
         );
-        
+
         // Allow offline_access scope to be granted without explicit consent
         // options.AllowRefreshTokenFlow(); // Already allowed above
 
@@ -216,9 +243,26 @@ builder.Services.AddOpenIddict()
 // Authentication & Authorization
 builder.Services.AddAuthentication(options =>
 {
-    options.DefaultScheme = OpenIddict.Validation.AspNetCore.OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme;
-    options.DefaultAuthenticateScheme = OpenIddict.Validation.AspNetCore.OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = OpenIddict.Validation.AspNetCore.OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme;
+    options.DefaultScheme = "DynamicAuth";
+    options.DefaultAuthenticateScheme = "DynamicAuth";
+    options.DefaultChallengeScheme = "DynamicAuth";
+})
+.AddPolicyScheme("DynamicAuth", "Bearer or Cookie", options =>
+{
+    options.ForwardDefaultSelector = context =>
+    {
+        var authorization = context.Request.Headers.Authorization.ToString();
+
+        // If bearer token is explicitly provided, validate as JWT/OIDC token.
+        if (!string.IsNullOrWhiteSpace(authorization) &&
+            authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            return OpenIddict.Validation.AspNetCore.OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme;
+        }
+
+        // Otherwise, use Identity application cookie (BFF/session mode).
+        return IdentityConstants.ApplicationScheme;
+    };
 });
 
 // Configure Identity options to map role claims correctly
@@ -342,7 +386,7 @@ builder.Services.Configure<IpRateLimitOptions>(options =>
             Period = "1m",
             Limit = 10  // Token revocation
         },
-        
+
         // Login page - should not be rate limited (it's just HTML)
         new RateLimitRule
         {
@@ -356,7 +400,7 @@ builder.Services.Configure<IpRateLimitOptions>(options =>
             Period = "1m",
             Limit = 15  // Actual login form submissions
         },
-        
+
         // Account management endpoints
         new RateLimitRule
         {
@@ -692,14 +736,14 @@ if (app.Environment.IsDevelopment())
         var services = scope.ServiceProvider;
         var logger = services.GetRequiredService<ILogger<Program>>();
         var dbContext = services.GetRequiredService<MultiTenantETL.Infrastructure.Persistence.ApplicationDbContext>();
-        
+
         try
         {
             // Apply pending migrations (creates database if it doesn't exist)
             logger.LogInformation("Applying database migrations...");
             await dbContext.Database.MigrateAsync();
             logger.LogInformation("Database migrations applied successfully");
-            
+
             // Seed the database
             await MultiTenantETL.Infrastructure.Data.DbSeeder.SeedAsync(services);
             logger.LogInformation("Database seeding completed successfully");
@@ -744,16 +788,16 @@ static X509Certificate2 LoadCertificate(string configKey, string subjectName, IC
     // Fallback to certificate store (for backward compatibility)
     using var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
     store.Open(OpenFlags.ReadOnly);
-    
+
     var certificates = store.Certificates.Find(
         X509FindType.FindBySubjectDistinguishedName,
         subjectName,
         validOnly: false);
-    
+
     if (certificates.Count == 0)
     {
         throw new InvalidOperationException($"Certificate '{subjectName}' not found in certificate store, file, or configuration.");
     }
-    
+
     return certificates[0];
 }
