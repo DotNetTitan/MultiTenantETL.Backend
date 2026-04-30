@@ -82,8 +82,13 @@ builder.Services.AddDataProtection()
 
 builder.Services.AddAntiforgery(options =>
 {
-    // Ensure cookies are always marked as Secure so they are sent over the Azure HTTPS proxy
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.HeaderName = "X-CSRF-TOKEN";
+    options.Cookie.Name = "XSRF-TOKEN";
+    options.Cookie.HttpOnly = false; // SPA must read the CSRF cookie and mirror it in header.
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+        ? CookieSecurePolicy.SameAsRequest
+        : CookieSecurePolicy.Always;
 });
 
 // Quartz.NET Scheduler - shared by OpenIddict and Pipeline Scheduling
@@ -714,6 +719,9 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseAuthentication();
+
+// Validate CSRF tokens for unsafe API/BFF requests.
+app.UseApiAntiforgery();
 
 // Populate tenant context from JWT claims (must be after authentication)
 app.UseTenantContext();
