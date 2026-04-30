@@ -339,9 +339,6 @@ namespace MultiTenantETL.Infrastructure.Services
                 <table role='presentation' cellpadding='0' cellspacing='0' border='0' width='100%'>
                     <tr>
                         <td style='padding-bottom:18px;border-left:4px solid #38BDF8;padding-left:14px;'>
-                            <div style='color:#9AA4B2;font-family:Roboto,-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;line-height:16px;'>
-                                Pipeline execution status
-                            </div>
                             <table role='presentation' cellpadding='0' cellspacing='0' border='0' width='100%'>
                                 <tr>
                                     <td style='padding-top:6px;color:#E6EDF6;font-family:Roboto,-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif;font-size:22px;line-height:28px;font-weight:700;'>
