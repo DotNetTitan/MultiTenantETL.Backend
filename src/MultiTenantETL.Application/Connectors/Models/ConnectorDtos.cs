@@ -224,7 +224,7 @@ public record ApiConfig
 
 public record ApiEndpoint
 {
-    public required string Method { get; init; } // GET, POST, PUT, PATCH, DELETE
+    public required string Method { get; init; } // GET, POST, PUT, DELETE
     public required string Path { get; init; } // e.g., /api/users
     public string? Name { get; init; } // Friendly name
     public string? ResponseDataPath { get; init; } // JSON path to extract data (e.g., data.results)

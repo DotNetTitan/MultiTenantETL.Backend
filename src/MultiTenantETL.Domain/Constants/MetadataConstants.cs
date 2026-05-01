@@ -159,7 +159,6 @@ public static class MetadataConstants
             ("GET", "common.httpGet", "success"),
             ("POST", "common.httpPost", "primary"),
             ("PUT", "common.httpPut", "warning"),
-            ("PATCH", "common.httpPatch", "info"),
             ("DELETE", "common.httpDelete", "error")
         };
     }

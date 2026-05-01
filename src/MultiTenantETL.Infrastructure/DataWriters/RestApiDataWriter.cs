@@ -148,9 +148,9 @@ public class RestApiDataWriter : IDataWriter
         
         if (config.Endpoints?.Count > 0)
         {
-            // Use first POST/PUT/PATCH endpoint for destination connectors
+            // Use first POST/PUT endpoint for destination connectors
             var endpoint = config.Endpoints.FirstOrDefault(e => 
-                new[] { "POST", "PUT", "PATCH" }.Contains(e.Method?.ToUpperInvariant()))
+                new[] { "POST", "PUT" }.Contains(e.Method?.ToUpperInvariant()))
                           ?? config.Endpoints[0];
             endpointPath = endpoint.Path;
         }
