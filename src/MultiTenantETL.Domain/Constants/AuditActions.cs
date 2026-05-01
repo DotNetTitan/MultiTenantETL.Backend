@@ -16,7 +16,7 @@ public static class AuditActions
         public const string EmailConfirmed = "Auth.EmailConfirmed";
         public const string TenantSwitched = "Auth.TenantSwitched";
     }
-    
+
     public static class Users
     {
         public const string Created = "User.Created";
@@ -30,7 +30,7 @@ public static class AuditActions
         public const string RemovedFromTenant = "User.RemovedFromTenant";
         public const string TenantRoleUpdated = "User.TenantRoleUpdated";
     }
-    
+
     public static class Tenants
     {
         public const string Created = "Tenant.Created";
@@ -40,7 +40,7 @@ public static class AuditActions
         public const string UserRemoved = "Tenant.UserRemoved";
         public const string UserRoleUpdated = "Tenant.UserRoleUpdated";
     }
-    
+
     public static class Pipelines
     {
         public const string Created = "Pipeline.Created";
@@ -51,7 +51,7 @@ public static class AuditActions
         public const string Activated = "Pipeline.Activated";
         public const string Deactivated = "Pipeline.Deactivated";
     }
-    
+
     public static class Connectors
     {
         public const string Created = "Connector.Created";
@@ -60,17 +60,15 @@ public static class AuditActions
         public const string Tested = "Connector.Tested";
         public const string TestFailed = "Connector.TestFailed";
         public const string SchemaDetected = "Connector.SchemaDetected";
-        public const string Viewed = "Connector.Viewed";
     }
-    
+
     // Backward compatibility constants
     public const string ConnectorCreated = "Connector.Created";
     public const string ConnectorUpdated = "Connector.Updated";
     public const string ConnectorDeleted = "Connector.Deleted";
     public const string ConnectorTested = "Connector.Tested";
     public const string ConnectorSchemaDetected = "Connector.SchemaDetected";
-    public const string ConnectorViewed = "Connector.Viewed";
-    
+
     // Backward compatibility constants for transformations (deprecated - transformations are now embedded in field mappings)
     [Obsolete("Transformation entity has been removed. Transformations are now embedded in Pipeline.FieldMappingsJson.")]
     public const string TransformationCreated = "Transformation.Created";
@@ -78,7 +76,7 @@ public static class AuditActions
     public const string TransformationUpdated = "Transformation.Updated";
     [Obsolete("Transformation entity has been removed. Transformations are now embedded in Pipeline.FieldMappingsJson.")]
     public const string TransformationDeleted = "Transformation.Deleted";
-    
+
     public static class Schedules
     {
         public const string Created = "Schedule.Created";

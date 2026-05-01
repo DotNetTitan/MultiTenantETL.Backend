@@ -16,20 +16,17 @@ public class ConnectorsController : ControllerBase
 {
     private readonly IConnectorService _connectorService;
     private readonly ICurrentUserService _currentUserService;
-    private readonly IAuditService _auditService;
     private readonly IAuthorizationService _authorizationService;
     private readonly ILogger<ConnectorsController> _logger;
 
     public ConnectorsController(
         IConnectorService connectorService,
         ICurrentUserService currentUserService,
-        IAuditService auditService,
         IAuthorizationService authorizationService,
         ILogger<ConnectorsController> logger)
     {
         _connectorService = connectorService;
         _currentUserService = currentUserService;
-        _auditService = auditService;
         _authorizationService = authorizationService;
         _logger = logger;
     }
@@ -44,10 +41,10 @@ public class ConnectorsController : ControllerBase
     {
         // Check permission
         var authResult = await _authorizationService.AuthorizeAsync(
-            User, 
-            null, 
+            User,
+            null,
             new PermissionRequirement(Permissions.Connectors.Read));
-        
+
         if (!authResult.Succeeded)
         {
             return Forbid();
@@ -68,10 +65,10 @@ public class ConnectorsController : ControllerBase
     {
         // Check permission
         var authResult = await _authorizationService.AuthorizeAsync(
-            User, 
-            null, 
+            User,
+            null,
             new PermissionRequirement(Permissions.Connectors.Read));
-        
+
         if (!authResult.Succeeded)
         {
             _logger.LogWarning("Authorization failed for connectors.read");
@@ -80,7 +77,7 @@ public class ConnectorsController : ControllerBase
 
         var tenantId = _currentUserService.GetTenantId();
         var result = await _connectorService.SearchAsync(request, tenantId);
-        
+
         return Ok(result);
     }
 
@@ -95,10 +92,10 @@ public class ConnectorsController : ControllerBase
     {
         // Check permission
         var authResult = await _authorizationService.AuthorizeAsync(
-            User, 
-            null, 
+            User,
+            null,
             new PermissionRequirement(Permissions.Connectors.Read));
-        
+
         if (!authResult.Succeeded)
         {
             return Forbid();
@@ -106,15 +103,7 @@ public class ConnectorsController : ControllerBase
 
         var tenantId = _currentUserService.GetTenantId();
         var connector = await _connectorService.GetByIdAsync(id, tenantId);
-        
-        // Audit log for viewing sensitive connector details
-        await _auditService.LogAsync(
-            action: AuditActions.ConnectorViewed,
-            resourceType: "Connector",
-            resourceId: id.ToString(),
-            description: $"Viewed connector '{connector.Name}'"
-        );
-        
+
         return Ok(connector);
     }
 
@@ -129,10 +118,10 @@ public class ConnectorsController : ControllerBase
     {
         // Check permission
         var authResult = await _authorizationService.AuthorizeAsync(
-            User, 
-            null, 
+            User,
+            null,
             new PermissionRequirement(Permissions.Connectors.Create));
-        
+
         if (!authResult.Succeeded)
         {
             return Forbid();
@@ -156,10 +145,10 @@ public class ConnectorsController : ControllerBase
     {
         // Check permission
         var authResult = await _authorizationService.AuthorizeAsync(
-            User, 
-            null, 
+            User,
+            null,
             new PermissionRequirement(Permissions.Connectors.Update));
-        
+
         if (!authResult.Succeeded)
         {
             return Forbid();
@@ -183,10 +172,10 @@ public class ConnectorsController : ControllerBase
     {
         // Check permission
         var authResult = await _authorizationService.AuthorizeAsync(
-            User, 
-            null, 
+            User,
+            null,
             new PermissionRequirement(Permissions.Connectors.Delete));
-        
+
         if (!authResult.Succeeded)
         {
             return Forbid();
@@ -207,10 +196,10 @@ public class ConnectorsController : ControllerBase
     {
         // Check permission
         var authResult = await _authorizationService.AuthorizeAsync(
-            User, 
-            null, 
+            User,
+            null,
             new PermissionRequirement(Permissions.Connectors.Test));
-        
+
         if (!authResult.Succeeded)
         {
             return Forbid();
@@ -232,10 +221,10 @@ public class ConnectorsController : ControllerBase
     {
         // Check permission
         var authResult = await _authorizationService.AuthorizeAsync(
-            User, 
-            null, 
+            User,
+            null,
             new PermissionRequirement(Permissions.Connectors.Test));
-        
+
         if (!authResult.Succeeded)
         {
             return Forbid();
@@ -257,10 +246,10 @@ public class ConnectorsController : ControllerBase
     {
         // Check permission - requires update permission to modify schema
         var authResult = await _authorizationService.AuthorizeAsync(
-            User, 
-            null, 
+            User,
+            null,
             new PermissionRequirement(Permissions.Connectors.Update));
-        
+
         if (!authResult.Succeeded)
         {
             return Forbid();
@@ -293,10 +282,10 @@ public class ConnectorsController : ControllerBase
     {
         // Check permission
         var authResult = await _authorizationService.AuthorizeAsync(
-            User, 
-            null, 
+            User,
+            null,
             new PermissionRequirement(Permissions.Connectors.Create));
-        
+
         if (!authResult.Succeeded)
         {
             return Forbid();
