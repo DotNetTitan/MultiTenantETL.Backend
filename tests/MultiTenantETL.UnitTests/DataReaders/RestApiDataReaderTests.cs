@@ -1,5 +1,6 @@
 using System.Net;
 using System.Reflection;
+using System.Text;
 using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
@@ -32,6 +33,11 @@ public class RestApiDataReaderTests
     {
         var handler = new MockHttpMessageHandler(response);
         return new HttpClient(handler);
+    }
+
+    private static StringContent CreateJsonContent(string content)
+    {
+        return new StringContent(content, Encoding.UTF8, "application/json");
     }
 
     private class MockHttpMessageHandler : HttpMessageHandler
@@ -85,7 +91,7 @@ public class RestApiDataReaderTests
         ]";
         var response = new HttpResponseMessage(HttpStatusCode.OK)
         {
-            Content = new StringContent(jsonResponse)
+            Content = CreateJsonContent(jsonResponse)
         };
         var mockHttpClient = CreateMockHttpClient(response);
         _httpClientFactory.CreateClient().Returns(mockHttpClient);
@@ -116,7 +122,7 @@ public class RestApiDataReaderTests
         var jsonResponse = @"{""name"":""John"",""age"":30}";
         var response = new HttpResponseMessage(HttpStatusCode.OK)
         {
-            Content = new StringContent(jsonResponse)
+            Content = CreateJsonContent(jsonResponse)
         };
         var mockHttpClient = CreateMockHttpClient(response);
         _httpClientFactory.CreateClient().Returns(mockHttpClient);
@@ -152,7 +158,7 @@ public class RestApiDataReaderTests
         }";
         var response = new HttpResponseMessage(HttpStatusCode.OK)
         {
-            Content = new StringContent(jsonResponse)
+            Content = CreateJsonContent(jsonResponse)
         };
         var mockHttpClient = CreateMockHttpClient(response);
         _httpClientFactory.CreateClient().Returns(mockHttpClient);
@@ -183,7 +189,7 @@ public class RestApiDataReaderTests
         ]";
         var response = new HttpResponseMessage(HttpStatusCode.OK)
         {
-            Content = new StringContent(jsonResponse)
+            Content = CreateJsonContent(jsonResponse)
         };
         var mockHttpClient = CreateMockHttpClient(response);
         _httpClientFactory.CreateClient().Returns(mockHttpClient);
@@ -213,7 +219,7 @@ public class RestApiDataReaderTests
         ]";
         var response = new HttpResponseMessage(HttpStatusCode.OK)
         {
-            Content = new StringContent(jsonResponse)
+            Content = CreateJsonContent(jsonResponse)
         };
         var mockHttpClient = CreateMockHttpClient(response);
         _httpClientFactory.CreateClient().Returns(mockHttpClient);
@@ -264,7 +270,7 @@ public class RestApiDataReaderTests
         var invalidJson = @"{invalid json}";
         var response = new HttpResponseMessage(HttpStatusCode.OK)
         {
-            Content = new StringContent(invalidJson)
+            Content = CreateJsonContent(invalidJson)
         };
         var mockHttpClient = CreateMockHttpClient(response);
         _httpClientFactory.CreateClient().Returns(mockHttpClient);
@@ -293,7 +299,7 @@ public class RestApiDataReaderTests
         ]";
         var response = new HttpResponseMessage(HttpStatusCode.OK)
         {
-            Content = new StringContent(jsonResponse)
+            Content = CreateJsonContent(jsonResponse)
         };
         var mockHttpClient = CreateMockHttpClient(response);
         _httpClientFactory.CreateClient().Returns(mockHttpClient);
@@ -322,7 +328,7 @@ public class RestApiDataReaderTests
         }";
         var response = new HttpResponseMessage(HttpStatusCode.OK)
         {
-            Content = new StringContent(jsonResponse)
+            Content = CreateJsonContent(jsonResponse)
         };
         var mockHttpClient = CreateMockHttpClient(response);
         _httpClientFactory.CreateClient().Returns(mockHttpClient);
@@ -418,7 +424,7 @@ public class RestApiDataReaderTests
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             _sut.TestConnectionAsync(connector, CancellationToken.None));
     }
-    
+
     [Fact]
     public async Task DetectSchemaAsync_WithInvalidUrl_ShouldThrowInvalidOperationException()
     {
@@ -427,7 +433,7 @@ public class RestApiDataReaderTests
 
         // Act & Assert
         var result = await _sut.DetectSchemaAsync(connector, CancellationToken.None);
-        
+
         result.Success.Should().BeFalse();
     }
 
@@ -438,7 +444,7 @@ public class RestApiDataReaderTests
         var jsonResponse = @"[{""id"":1,""name"":""Test""}]";
         var response = new HttpResponseMessage(HttpStatusCode.OK)
         {
-            Content = new StringContent(jsonResponse)
+            Content = CreateJsonContent(jsonResponse)
         };
         var mockHttpClient = CreateMockHttpClient(response);
         _httpClientFactory.CreateClient().Returns(mockHttpClient);

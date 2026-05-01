@@ -1,8 +1,58 @@
 using FluentValidation;
 using MultiTenantETL.Application.Connectors.Models;
 using MultiTenantETL.Domain.Constants;
+using System.Text.Json;
 
 namespace MultiTenantETL.Application.Connectors.Validators;
+
+/// <summary>
+/// Shared validation helpers for connector validators
+/// </summary>
+internal static class ConnectorValidationHelpers
+{
+    private static readonly string[] SupportedApiResponseFormats = MetadataConstants.ApiResponseFormats.Formats
+        .Where(format => format.IsSupported)
+        .Select(format => format.Value)
+        .ToArray();
+
+    public static readonly string ApiResponseFormatValidationMessage =
+        $"API connector must have a valid responseFormat. Supported values: {string.Join(", ", SupportedApiResponseFormats)}";
+
+    /// <summary>
+    /// Validates API connector configuration, specifically the responseFormat field
+    /// </summary>
+    public static bool ValidateApiConfig(string type, string provider, JsonElement config)
+    {
+        // Only validate API connectors with REST provider
+        if (type != ConnectorTypes.Api || provider != ConnectorProviders.REST)
+        {
+            return true;
+        }
+
+        try
+        {
+            // Check if responseFormat property exists and has a valid value
+            if (config.TryGetProperty("responseFormat", out var responseFormatElement))
+            {
+                var responseFormat = responseFormatElement.GetString();
+                if (string.IsNullOrWhiteSpace(responseFormat))
+                {
+                    return false;
+                }
+
+                // Validate against currently supported formats
+                return SupportedApiResponseFormats.Contains(responseFormat, StringComparer.OrdinalIgnoreCase);
+            }
+
+            // responseFormat is missing
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+}
 
 public class CreateConnectorRequestValidator : AbstractValidator<CreateConnectorRequest>
 {
@@ -34,7 +84,9 @@ public class CreateConnectorRequestValidator : AbstractValidator<CreateConnector
             .Must(BeValidDirection).WithMessage("Invalid direction. Valid values are: source, destination, both");
 
         RuleFor(x => x.Config)
-            .NotEmpty().WithMessage("Configuration is required");
+            .NotEmpty().WithMessage("Configuration is required")
+            .Must((request, config) => ConnectorValidationHelpers.ValidateApiConfig(request.Type, request.Provider, config))
+            .WithMessage(ConnectorValidationHelpers.ApiResponseFormatValidationMessage);
     }
 
     private static bool BeValidType(string type)
@@ -77,13 +129,23 @@ public class UpdateConnectorRequestValidator : AbstractValidator<UpdateConnector
             .MaximumLength(500).WithMessage("Description must not exceed 500 characters")
             .When(x => !string.IsNullOrEmpty(x.Description));
 
+        RuleFor(x => x.Type)
+            .NotEmpty().WithMessage("Type is required")
+            .MaximumLength(50).WithMessage("Type must not exceed 50 characters");
+
+        RuleFor(x => x.Provider)
+            .NotEmpty().WithMessage("Provider is required")
+            .MaximumLength(100).WithMessage("Provider must not exceed 100 characters");
+
         RuleFor(x => x.Direction)
             .NotEmpty().WithMessage("Direction is required")
             .MaximumLength(20).WithMessage("Direction must not exceed 20 characters")
             .Must(BeValidDirection).WithMessage("Invalid direction. Valid values are: source, destination, both");
 
         RuleFor(x => x.Config)
-            .NotEmpty().WithMessage("Configuration is required");
+            .NotEmpty().WithMessage("Configuration is required")
+            .Must((request, config) => ConnectorValidationHelpers.ValidateApiConfig(request.Type, request.Provider, config))
+            .WithMessage(ConnectorValidationHelpers.ApiResponseFormatValidationMessage);
     }
 
     private static bool BeValidDirection(string direction)
@@ -106,7 +168,9 @@ public class TestConnectionRequestValidator : AbstractValidator<TestConnectionRe
             .MaximumLength(100).WithMessage("Provider must not exceed 100 characters");
 
         RuleFor(x => x.Config)
-            .NotEmpty().WithMessage("Configuration is required");
+            .NotEmpty().WithMessage("Configuration is required")
+            .Must((request, config) => ConnectorValidationHelpers.ValidateApiConfig(request.Type, request.Provider, config))
+            .WithMessage(ConnectorValidationHelpers.ApiResponseFormatValidationMessage);
     }
 }
 
@@ -136,7 +200,9 @@ public class DetectSchemaPreviewRequestValidator : AbstractValidator<DetectSchem
             .MaximumLength(100).WithMessage("Provider must not exceed 100 characters");
 
         RuleFor(x => x.Config)
-            .NotEmpty().WithMessage("Configuration is required");
+            .NotEmpty().WithMessage("Configuration is required")
+            .Must((request, config) => ConnectorValidationHelpers.ValidateApiConfig(request.Type, request.Provider, config))
+            .WithMessage(ConnectorValidationHelpers.ApiResponseFormatValidationMessage);
 
         RuleFor(x => x.TableOrResourceName)
             .MaximumLength(200).WithMessage("TableOrResourceName must not exceed 200 characters")

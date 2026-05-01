@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
+using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
 using IDataReader = MultiTenantETL.Application.Connectors.DataReaders.IDataReader;
 
@@ -31,6 +32,9 @@ public class RestApiDataReader : IDataReader
 
         var response = await httpClient.GetAsync(config.FullUrl, cancellationToken);
         response.EnsureSuccessStatusCode();
+
+        EnsureJsonResponseFormat(config);
+        EnsureJsonContentType(response);
 
         var content = await response.Content.ReadAsStringAsync(cancellationToken);
         var jsonDoc = JsonDocument.Parse(content);
@@ -96,7 +100,7 @@ public class RestApiDataReader : IDataReader
     public async Task<bool> TestConnectionAsync(Connector connector, CancellationToken cancellationToken)
     {
         var config = ParseConfig(connector.ConfigJson);
-        
+
         try
         {
             var httpClient = _httpClientFactory.CreateClient();
@@ -124,6 +128,9 @@ public class RestApiDataReader : IDataReader
 
             var response = await httpClient.GetAsync(config.FullUrl, cancellationToken);
             response.EnsureSuccessStatusCode();
+
+            EnsureJsonResponseFormat(config);
+            EnsureJsonContentType(response);
 
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
             var jsonDoc = JsonDocument.Parse(content);
@@ -180,6 +187,37 @@ public class RestApiDataReader : IDataReader
         }
     }
 
+    private static void EnsureJsonResponseFormat(RestApiConfig config)
+    {
+        var responseFormat = config.ResponseFormat?.ToUpperInvariant() ?? ApiResponseFormats.Json;
+        if (responseFormat != ApiResponseFormats.Json)
+        {
+            throw new NotSupportedException($"Response format '{config.ResponseFormat}' is not supported. Supported formats: {ApiResponseFormats.Json}");
+        }
+    }
+
+    private static void EnsureJsonContentType(HttpResponseMessage response)
+    {
+        var mediaType = response.Content.Headers.ContentType?.MediaType;
+
+        if (string.IsNullOrWhiteSpace(mediaType))
+        {
+            throw new InvalidOperationException("API response did not include a Content-Type header. Expected a JSON media type (application/json or */*+json).");
+        }
+
+        if (!IsJsonMediaType(mediaType))
+        {
+            throw new InvalidOperationException($"API response Content-Type '{mediaType}' is not JSON. Expected application/json or a +json media type.");
+        }
+    }
+
+    private static bool IsJsonMediaType(string mediaType)
+    {
+        return mediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase)
+            || mediaType.Equals("text/json", StringComparison.OrdinalIgnoreCase)
+            || mediaType.EndsWith("+json", StringComparison.OrdinalIgnoreCase);
+    }
+
     private void ConfigureHttpClient(HttpClient httpClient, RestApiConfig config)
     {
         httpClient.Timeout = TimeSpan.FromSeconds(config.TimeoutSeconds);
@@ -187,7 +225,7 @@ public class RestApiDataReader : IDataReader
         if (!string.IsNullOrEmpty(config.AuthType))
         {
             var authType = config.AuthType.Replace(" ", "").ToLower();
-            
+
             switch (authType)
             {
                 case "bearer":
@@ -249,14 +287,14 @@ public class RestApiDataReader : IDataReader
         {
             PropertyNameCaseInsensitive = true
         };
-        
+
         var config = JsonSerializer.Deserialize<RestApiConfig>(configJson, options)
             ?? throw new InvalidOperationException("Invalid REST API configuration");
 
         // Support both old and new frontend formats
         var baseUrl = !string.IsNullOrWhiteSpace(config.BaseUrl) ? config.BaseUrl : config.Url;
-        
-        _logger.LogInformation("Parsing REST API config - BaseUrl: {BaseUrl}, Url: {Url}, EndpointPath: {EndpointPath}, Endpoints Count: {EndpointsCount}", 
+
+        _logger.LogInformation("Parsing REST API config - BaseUrl: {BaseUrl}, Url: {Url}, EndpointPath: {EndpointPath}, Endpoints Count: {EndpointsCount}",
             config.BaseUrl, config.Url, config.EndpointPath, config.Endpoints?.Count ?? 0);
 
         // Validate base URL
@@ -274,14 +312,14 @@ public class RestApiDataReader : IDataReader
 
         // Determine endpoint path - support both old single EndpointPath and new endpoints array
         string? endpointPath = null;
-        
+
         if (config.Endpoints?.Count > 0)
         {
             // Use first GET endpoint for source connectors
             var endpoint = config.Endpoints.FirstOrDefault(e => e.Method?.Equals("GET", StringComparison.OrdinalIgnoreCase) == true)
                           ?? config.Endpoints[0];
             endpointPath = endpoint.Path;
-            
+
             // Use responseDataPath if available
             if (!string.IsNullOrWhiteSpace(endpoint.ResponseDataPath))
             {
@@ -299,9 +337,9 @@ public class RestApiDataReader : IDataReader
             endpointPath = endpointPath.TrimStart('/');
             var baseUrlTrimmed = baseUrl.TrimEnd('/');
             config.FullUrl = $"{baseUrlTrimmed}/{endpointPath}";
-            
+
             _logger.LogInformation("Combined URL: {FullUrl}", config.FullUrl);
-            
+
             // Validate the combined URL
             if (!Uri.TryCreate(config.FullUrl, UriKind.Absolute, out _))
             {
@@ -319,7 +357,7 @@ public class RestApiDataReader : IDataReader
         {
             config.Token = config.AuthToken;
         }
-        
+
         // Support both old and new API key field names
         if (string.IsNullOrWhiteSpace(config.ApiKey) && !string.IsNullOrWhiteSpace(config.ApiKeyValue))
         {
@@ -337,6 +375,7 @@ public class RestApiDataReader : IDataReader
         public List<ApiEndpoint>? Endpoints { get; set; }
         public string FullUrl { get; set; } = string.Empty;
         public string? DataPath { get; set; }
+        public string? ResponseFormat { get; set; } = ApiResponseFormats.Json;
         public string? AuthType { get; set; }
         public string? Token { get; set; }
         public string? AuthToken { get; set; }

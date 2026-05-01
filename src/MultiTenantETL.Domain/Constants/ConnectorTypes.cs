@@ -42,3 +42,9 @@ public static class TestResults
     public const string Success = "Success";
     public const string Failed = "Failed";
 }
+
+public static class ApiResponseFormats
+{
+    public const string Json = "JSON";
+    public const string Xml = "XML";
+}

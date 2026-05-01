@@ -67,6 +67,10 @@ public class MetadataService : IMetadataService
             
             HttpMethods = MetadataConstants.HttpMethods.Methods
                 .Select(h => new HttpMethodDto { Value = h.Value, LabelKey = h.LabelKey, Color = h.Color })
+                .ToList(),
+            
+            ApiResponseFormats = MetadataConstants.ApiResponseFormats.Formats
+                .Select(f => new ApiResponseFormatDto { Value = f.Value, LabelKey = f.LabelKey, IsSupported = f.IsSupported })
                 .ToList()
         };
     }

@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
+using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
 
 namespace MultiTenantETL.Infrastructure.DataWriters;
@@ -205,6 +206,7 @@ public class RestApiDataWriter : IDataWriter
         public List<ApiEndpoint>? Endpoints { get; set; }
         public string FullUrl { get; set; } = string.Empty;
         public bool BatchEndpoint { get; set; } = false;
+        public string? ResponseFormat { get; set; } = ApiResponseFormats.Json;
         public string? AuthType { get; set; }
         public string? Token { get; set; }
         public string? AuthToken { get; set; }

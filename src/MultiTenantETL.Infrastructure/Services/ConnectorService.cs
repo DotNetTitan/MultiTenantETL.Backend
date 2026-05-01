@@ -176,6 +176,17 @@ public class ConnectorService : IConnectorService
 
         _logger.LogInformation("Updating connector {ConnectorId}", id);
 
+        // Validate that Type and Provider haven't changed (they are immutable)
+        if (connector.Type != request.Type)
+        {
+            throw new InvalidOperationException($"Cannot change connector type from '{connector.Type}' to '{request.Type}'. Type is immutable after creation.");
+        }
+
+        if (connector.Provider != request.Provider)
+        {
+            throw new InvalidOperationException($"Cannot change connector provider from '{connector.Provider}' to '{request.Provider}'. Provider is immutable after creation.");
+        }
+
         var oldName = connector.Name;
         var oldIsActive = connector.IsActive;
 

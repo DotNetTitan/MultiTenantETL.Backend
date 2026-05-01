@@ -164,6 +164,15 @@ public static class MetadataConstants
         };
     }
 
+    public static class ApiResponseFormats
+    {
+        public static readonly (string Value, string LabelKey, bool IsSupported)[] Formats = new[]
+        {
+            (Constants.ApiResponseFormats.Json, "common.json", true),
+            (Constants.ApiResponseFormats.Xml, "common.xml", false)
+        };
+    }
+
     public static class TransformationTypes
     {
         public static readonly (string Value, string LabelKey, string Icon, string CategoryKey, string DescriptionKey)[] Types = new[]

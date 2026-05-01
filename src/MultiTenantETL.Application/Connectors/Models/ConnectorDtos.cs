@@ -26,6 +26,10 @@ public record UpdateConnectorRequest
 
     public string? Description { get; init; }
 
+    public required string Type { get; init; } // Read-only, used for validation only
+
+    public required string Provider { get; init; } // Read-only, used for validation only
+
     public required string Direction { get; init; }
 
     public required JsonElement Config { get; init; }

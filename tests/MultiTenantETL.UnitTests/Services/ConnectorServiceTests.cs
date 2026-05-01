@@ -99,19 +99,19 @@ public class ConnectorServiceTests : IDisposable
         connector.Should().NotBeNull();
         connector!.TenantId.Should().Be(tenantId);
         connector.CreatedBy.Should().Be(userId);
-        
+
         // Verify secrets were stored in Key Vault (Password field should be stored)
         await _secretStorageService.Received().StoreSecretAsync(
-            Arg.Is<string>(name => name.Contains("password")), 
-            Arg.Any<string>(), 
+            Arg.Is<string>(name => name.Contains("password")),
+            Arg.Any<string>(),
             Arg.Any<CancellationToken>());
-        
+
         // Verify audit log
         await _auditService.Received(1).LogAsync(
-            Arg.Any<string>(), 
-            "Connector", 
-            result.Id.ToString(), 
-            Arg.Any<string>(), 
+            Arg.Any<string>(),
+            "Connector",
+            result.Id.ToString(),
+            Arg.Any<string>(),
             Arg.Any<object>());
     }
 
@@ -123,7 +123,7 @@ public class ConnectorServiceTests : IDisposable
         var connectorId = Guid.NewGuid();
         var encryptedConfigJson = "{\"Host\":\"localhost\",\"Password\":\"encrypted_secret\"}";
         _tenantProvider.TenantId.Returns(tenantId);
-        
+
         var connector = new Connector
         {
             Id = connectorId,
@@ -151,7 +151,7 @@ public class ConnectorServiceTests : IDisposable
         result.Should().NotBeNull();
         result.Id.Should().Be(connectorId);
         result.Name.Should().Be("Test Connector");
-        
+
         // Note: GetByIdAsync does NOT resolve secrets - it returns config with Key Vault references intact
         // Secrets are only resolved when actually used (connections, pipelines, etc.)
         // Therefore, we should NOT expect ResolveSecretsAsync to be called
@@ -179,7 +179,7 @@ public class ConnectorServiceTests : IDisposable
         var otherTenantId = Guid.NewGuid();
         var connectorId = Guid.NewGuid();
         _tenantProvider.TenantId.Returns(otherTenantId);
-        
+
         var connector = new Connector
         {
             Id = connectorId,
@@ -199,7 +199,7 @@ public class ConnectorServiceTests : IDisposable
 
         _context.Connectors.Add(connector);
         await _context.SaveChangesAsync();
-        
+
         // Switch tenant context for the query
         _tenantProvider.TenantId.Returns(tenantId);
 
@@ -218,7 +218,7 @@ public class ConnectorServiceTests : IDisposable
         var userId = Guid.NewGuid();
         var connectorId = Guid.NewGuid();
         _tenantProvider.TenantId.Returns(tenantId);
-        
+
         var connector = new Connector
         {
             Id = connectorId,
@@ -243,6 +243,8 @@ public class ConnectorServiceTests : IDisposable
         {
             Name = "New Name",
             Description = "Updated Description",
+            Type = "Database",
+            Provider = "PostgreSQL",
             Direction = "Destination",
             IsActive = true,
             Config = JsonDocument.Parse("{\"Host\":\"newhost\",\"Password\":\"newpass\"}").RootElement
@@ -263,11 +265,11 @@ public class ConnectorServiceTests : IDisposable
         updatedConnector!.Name.Should().Be("New Name");
         updatedConnector.UpdatedBy.Should().Be(userId);
         updatedConnector.UpdatedAt.Should().NotBeNull();
-        
+
         // Verify secrets were stored in Key Vault
         await _secretStorageService.Received().StoreSecretAsync(
-            Arg.Is<string>(name => name.Contains("password")), 
-            Arg.Any<string>(), 
+            Arg.Is<string>(name => name.Contains("password")),
+            Arg.Any<string>(),
             Arg.Any<CancellationToken>());
     }
 
@@ -278,7 +280,7 @@ public class ConnectorServiceTests : IDisposable
         var tenantId = Guid.NewGuid();
         var connectorId = Guid.NewGuid();
         _tenantProvider.TenantId.Returns(tenantId);
-        
+
         var connector = new Connector
         {
             Id = connectorId,
@@ -305,13 +307,13 @@ public class ConnectorServiceTests : IDisposable
         // Assert
         var deletedConnector = await _context.Connectors.FindAsync(connectorId);
         deletedConnector.Should().BeNull();
-        
+
         // Verify audit log
         await _auditService.Received(1).LogAsync(
-            Arg.Is<string>(s => s == "Connector.Deleted"), 
-            "Connector", 
-            connectorId.ToString(), 
-            Arg.Any<string>(), 
+            Arg.Is<string>(s => s == "Connector.Deleted"),
+            "Connector",
+            connectorId.ToString(),
+            Arg.Any<string>(),
             Arg.Any<object>());
     }
 
@@ -322,7 +324,7 @@ public class ConnectorServiceTests : IDisposable
         var tenantId = Guid.NewGuid();
         var otherTenantId = Guid.NewGuid();
         _tenantProvider.TenantId.Returns(tenantId);
-        
+
         var connector1 = new Connector
         {
             Id = Guid.NewGuid(),
