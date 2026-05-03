@@ -45,5 +45,51 @@ namespace MultiTenantETL.Infrastructure.Services
             _logger.LogInformation("   Name: {FirstName}", firstName);
             return Task.CompletedTask;
         }
+        
+        public Task SendPipelineExecutionReportAsync(
+            string recipientEmail,
+            string pipelineName,
+            string executionId,
+            string executionStatus,
+            DateTimeOffset startTime,
+            DateTimeOffset? endTime,
+            TimeSpan? duration,
+            long recordsProcessed,
+            long recordsSucceeded,
+            long recordsFailed,
+            string? errorMessage,
+            string executionDetailsUrl)
+        {
+            _logger.LogInformation("📧 [STUB] Pipeline Execution Report would be sent to {Email}", recipientEmail);
+            _logger.LogInformation("   Pipeline: {PipelineName}", pipelineName);
+            _logger.LogInformation("   Execution ID: {ExecutionId}", executionId);
+            _logger.LogInformation("   Status: {Status}", executionStatus);
+            _logger.LogInformation("   Records: {Processed} processed, {Succeeded} succeeded, {Failed} failed", 
+                recordsProcessed, recordsSucceeded, recordsFailed);
+            _logger.LogInformation("   Details URL: {Url}", executionDetailsUrl);
+            return Task.CompletedTask;
+        }
+
+        /// <inheritdoc/>
+        public Task<bool> SendDataExportEmailAsync(
+            List<string> recipients,
+            List<string>? ccRecipients,
+            string subject,
+            string htmlBody,
+            string attachmentFileName,
+            string attachmentMediaType,
+            byte[] attachmentContent)
+        {
+            _logger.LogInformation("[STUB] Data Export Email would be sent:");
+            _logger.LogInformation("   Recipients: {Recipients}", string.Join(", ", recipients));
+            if (ccRecipients != null && ccRecipients.Count > 0)
+            {
+                _logger.LogInformation("   CC: {CcRecipients}", string.Join(", ", ccRecipients));
+            }
+            _logger.LogInformation("   Subject: {Subject}", subject);
+            _logger.LogInformation("   Attachment: {FileName} ({MediaType}, {Size} bytes)",
+                attachmentFileName, attachmentMediaType, attachmentContent.Length);
+            return Task.FromResult(true);
+        }
     }
 }

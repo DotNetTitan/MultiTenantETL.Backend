@@ -8,6 +8,10 @@ using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Infrastructure.Configuration;
 using Npgsql;
 using MySqlConnector;
+using Oracle.ManagedDataAccess.Client;
+using MongoDB.Driver;
+using Microsoft.Azure.Cosmos;
+using System.Text.Json.Nodes;
 
 namespace MultiTenantETL.Infrastructure.Services;
 
@@ -82,6 +86,9 @@ public class SchemaDetector : ISchemaDetector
                 ConnectorProviders.SqlServer => await DetectSqlServerSchemaAsync(dbConfig, tableName),
                 ConnectorProviders.PostgreSQL => await DetectPostgreSqlSchemaAsync(dbConfig, tableName),
                 ConnectorProviders.MySQL => await DetectMySqlSchemaAsync(dbConfig, tableName),
+                ConnectorProviders.Oracle => await DetectOracleSchemaAsync(dbConfig, tableName),
+                ConnectorProviders.MongoDb => await DetectMongoDbSchemaAsync(dbConfig, tableName),
+                ConnectorProviders.CosmosDb => await DetectCosmosDbSchemaAsync(dbConfig, tableName),
                 _ => throw new NotSupportedException($"Database provider {provider} is not supported")
             };
 
@@ -161,7 +168,7 @@ public class SchemaDetector : ISchemaDetector
             fields.Add(new SchemaField
             {
                 Name = reader.GetString(0),
-                DataType = reader.GetString(1),
+                DataType = NormalizeDataType(reader.GetString(1)),
                 IsNullable = reader.GetString(2) == "YES",
                 IsPrimaryKey = reader.GetInt32(7) == 1,
                 MaxLength = reader.IsDBNull(3) ? null : reader.GetInt32(3),
@@ -215,7 +222,7 @@ public class SchemaDetector : ISchemaDetector
             fields.Add(new SchemaField
             {
                 Name = reader.GetString(0),
-                DataType = reader.GetString(1),
+                DataType = NormalizeDataType(reader.GetString(1)),
                 IsNullable = reader.GetString(2) == "YES",
                 IsPrimaryKey = reader.GetBoolean(7),
                 MaxLength = reader.IsDBNull(3) ? null : reader.GetInt32(3),
@@ -262,12 +269,64 @@ public class SchemaDetector : ISchemaDetector
             fields.Add(new SchemaField
             {
                 Name = reader.GetString(0),
-                DataType = reader.GetString(1),
+                DataType = NormalizeDataType(reader.GetString(1)),
                 IsNullable = reader.GetString(2) == "YES",
                 IsPrimaryKey = reader.GetInt32(7) == 1,
                 MaxLength = reader.IsDBNull(3) ? null : Convert.ToInt32(reader.GetInt64(3)),
                 Precision = reader.IsDBNull(4) ? null : Convert.ToInt32(reader.GetUInt64(4)),
                 Scale = reader.IsDBNull(5) ? null : Convert.ToInt32(reader.GetUInt64(5)),
+                DefaultValue = reader.IsDBNull(6) ? null : reader.GetString(6)
+            });
+        }
+
+        return fields;
+    }
+
+    private async Task<List<SchemaField>> DetectOracleSchemaAsync(DatabaseConfig config, string tableName)
+    {
+        using var connection = new OracleConnection(BuildOracleConnectionString(config));
+        await connection.OpenAsync();
+
+        var query = @"
+            SELECT
+                c.COLUMN_NAME as Name,
+                c.DATA_TYPE as DataType,
+                c.NULLABLE as IsNullable,
+                c.DATA_LENGTH as MaxLength,
+                c.DATA_PRECISION as Precision,
+                c.DATA_SCALE as Scale,
+                c.DATA_DEFAULT as DefaultValue,
+                CASE WHEN pk.COLUMN_NAME IS NOT NULL THEN 1 ELSE 0 END as IsPrimaryKey
+            FROM ALL_TAB_COLUMNS c
+            LEFT JOIN (
+                SELECT acc.COLUMN_NAME
+                FROM ALL_CONSTRAINTS ac
+                INNER JOIN ALL_CONS_COLUMNS acc
+                    ON ac.CONSTRAINT_TYPE = 'P'
+                    AND ac.CONSTRAINT_NAME = acc.CONSTRAINT_NAME
+                    AND ac.OWNER = acc.OWNER
+                    AND ac.TABLE_NAME = :TableName
+            ) pk ON c.COLUMN_NAME = pk.COLUMN_NAME AND c.TABLE_NAME = :TableName
+            WHERE c.TABLE_NAME = :TableName
+                AND c.OWNER = USER
+            ORDER BY c.COLUMN_ID";
+
+        using var command = new OracleCommand(query, connection);
+        command.Parameters.Add(new OracleParameter(":TableName", tableName));
+
+        var fields = new List<SchemaField>();
+        using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            fields.Add(new SchemaField
+            {
+                Name = reader.GetString(0),
+                DataType = NormalizeDataType(reader.GetString(1)),
+                IsNullable = reader.GetString(2) == "Y",
+                IsPrimaryKey = reader.GetInt32(7) == 1,
+                MaxLength = reader.IsDBNull(3) ? null : Convert.ToInt32(reader.GetInt64(3)),
+                Precision = reader.IsDBNull(4) ? null : Convert.ToInt32(reader.GetInt64(4)),
+                Scale = reader.IsDBNull(5) ? null : Convert.ToInt32(reader.GetInt64(5)),
                 DefaultValue = reader.IsDBNull(6) ? null : reader.GetString(6)
             });
         }
@@ -626,6 +685,78 @@ public class SchemaDetector : ISchemaDetector
         };
     }
 
+    /// <summary>
+    /// Normalizes database-specific data types to standardized types defined in MetadataConstants.
+    /// This ensures consistent type representation across different database providers.
+    /// </summary>
+    /// <param name="dbType">The database-specific type name</param>
+    /// <returns>The normalized type name from MetadataConstants.DataTypes</returns>
+    private static string NormalizeDataType(string? dbType)
+    {
+        if (string.IsNullOrWhiteSpace(dbType))
+            return "varchar";
+
+        var normalizedInput = dbType.Trim().ToLowerInvariant();
+
+        // Database-specific type mappings to MetadataConstants standard types
+        return normalizedInput switch
+        {
+            // PostgreSQL types → Standard types
+            "integer" or "int4" => "int",
+            "int2" => "smallint",
+            "int8" => "bigint",
+            "smallserial" => "smallint",
+            "serial" => "int",
+            "bigserial" => "bigint",
+            "double precision" => "decimal",
+            "real" => "float",
+            "character varying" => "varchar",
+            "character" => "char",
+            "timestamp without time zone" or "timestamp with time zone" => "timestamp",
+            "time without time zone" or "time with time zone" => "time",
+            "bytea" => "varbinary",
+
+            // MySQL types → Standard types
+            "tinyint unsigned" => "smallint",
+            "smallint unsigned" => "int",
+            "mediumint" or "mediumint unsigned" => "int",
+            "int unsigned" => "bigint",
+            "bigint unsigned" => "bigint",
+            "longtext" or "mediumtext" => "text",
+            "tinytext" => "varchar",
+            "longblob" or "mediumblob" or "tinyblob" or "blob" => "varbinary",
+
+            // Oracle types → Standard types
+            "number" or "numeric" or "bignumeric" => "decimal",
+            "varchar2" => "varchar",
+            "nvarchar2" => "nvarchar",
+            "clob" or "long" => "text",
+            "nclob" => "ntext",
+            "raw" or "long raw" => "varbinary",
+
+            // SQL Server types (most are already standard, but handle some variations)
+            "nvarchar(max)" => "ntext",
+            "varchar(max)" => "text",
+
+            // MongoDB common types → Standard types
+            "string" => "varchar",  // MongoDB
+            "bytes" or "binary" => "varbinary",  // MongoDB
+            "int32" => "int",  // MongoDB
+            "int64" => "bigint",  // MongoDB
+            "float" or "float64" or "double" => "decimal",  // MongoDB
+            "bool" => "boolean",
+            "record" or "struct" or "document" or "array" => "json",  // MongoDB
+            "objectid" => "varchar",  // MongoDB
+
+            // If the type is already in MetadataConstants.DataTypes, return as-is
+            _ when MetadataConstants.DataTypes.Types.Any(t => t.Value.Equals(normalizedInput, StringComparison.OrdinalIgnoreCase))
+                => MetadataConstants.DataTypes.Types.First(t => t.Value.Equals(normalizedInput, StringComparison.OrdinalIgnoreCase)).Value,
+
+            // Unknown types default to varchar
+            _ => "varchar"
+        };
+    }
+
     // Connection string builders (same as ConnectionTester)
     private static string BuildSqlServerConnectionString(DatabaseConfig config)
     {
@@ -683,5 +814,109 @@ public class SchemaDetector : ISchemaDetector
         };
 
         return builder.ConnectionString;
+    }
+
+    private static string BuildOracleConnectionString(DatabaseConfig config)
+    {
+        if (!string.IsNullOrEmpty(config.ConnectionString))
+        {
+            return config.ConnectionString;
+        }
+
+        var port = config.Port > 0 ? config.Port : 1521;
+        var dataSource = $"(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST={config.Host})(PORT={port}))(CONNECT_DATA=(SERVICE_NAME={config.Database})))";
+
+        var builder = new OracleConnectionStringBuilder
+        {
+            DataSource = dataSource,
+            UserID = config.Username!,
+            Password = config.Password!
+        };
+
+        return builder.ConnectionString;
+    }
+
+    private async Task<List<SchemaField>> DetectMongoDbSchemaAsync(DatabaseConfig config, string tableName)
+    {
+        var client = new MongoDB.Driver.MongoClient(config.ConnectionString);
+        var database = client.GetDatabase(config.Database);
+        var collection = database.GetCollection<MongoDB.Bson.BsonDocument>(tableName);
+
+        // Fetch a few documents to sample types
+        var sampleDocs = await collection.Find(MongoDB.Driver.FilterDefinition<MongoDB.Bson.BsonDocument>.Empty)
+            .Limit(10)
+            .ToListAsync();
+
+        if (sampleDocs.Count == 0) return new List<SchemaField>();
+
+        var fieldMap = new Dictionary<string, SchemaField>();
+        foreach (var doc in sampleDocs)
+        {
+            foreach (var element in doc.Elements)
+            {
+                if (fieldMap.ContainsKey(element.Name)) continue;
+
+                fieldMap[element.Name] = new SchemaField
+                {
+                    Name = element.Name,
+                    DataType = NormalizeDataType(element.Value.BsonType.ToString()),
+                    IsNullable = true,
+                    IsPrimaryKey = element.Name == "_id"
+                };
+            }
+        }
+
+        return fieldMap.Values.ToList();
+    }
+
+    private async Task<List<SchemaField>> DetectCosmosDbSchemaAsync(DatabaseConfig config, string tableName)
+    {
+        var endpoint = config.CosmosEndpoint ?? config.Host;
+        var key = config.CosmosKey ?? config.Password;
+        
+        using var client = new Microsoft.Azure.Cosmos.CosmosClient(endpoint, key);
+        var container = client.GetContainer(config.Database, tableName);
+
+        // Fetch a few documents to sample types
+        var query = new Microsoft.Azure.Cosmos.QueryDefinition("SELECT TOP 10 * FROM c");
+        using var iterator = container.GetItemQueryIterator<System.Text.Json.Nodes.JsonObject>(query);
+        
+        if (!iterator.HasMoreResults) return new List<SchemaField>();
+
+        var response = await iterator.ReadNextAsync();
+        if (response.Count == 0) return new List<SchemaField>();
+
+        var fieldMap = new Dictionary<string, SchemaField>();
+        foreach (var doc in response)
+        {
+            foreach (var property in doc)
+            {
+                if (fieldMap.ContainsKey(property.Key)) continue;
+
+                fieldMap[property.Key] = new SchemaField
+                {
+                    Name = property.Key,
+                    DataType = InferDataTypeFromValue(property.Value),
+                    IsNullable = true,
+                    IsPrimaryKey = property.Key == "id"
+                };
+            }
+        }
+
+        return fieldMap.Values.ToList();
+    }
+
+    private string InferDataTypeFromValue(System.Text.Json.Nodes.JsonNode? node)
+    {
+        if (node == null) return "string";
+        
+        var value = node.AsValue();
+        if (value.TryGetValue<int>(out _)) return "int";
+        if (value.TryGetValue<long>(out _)) return "bigint";
+        if (value.TryGetValue<double>(out _)) return "decimal";
+        if (value.TryGetValue<bool>(out _)) return "boolean";
+        if (value.TryGetValue<DateTime>(out _)) return "datetime";
+        
+        return "string";
     }
 }

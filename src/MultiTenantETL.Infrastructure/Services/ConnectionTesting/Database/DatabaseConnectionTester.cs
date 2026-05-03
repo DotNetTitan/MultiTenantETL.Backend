@@ -7,6 +7,11 @@ using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Infrastructure.Configuration;
 using Npgsql;
 using MySqlConnector;
+using Oracle.ManagedDataAccess.Client;
+
+using MongoDB.Driver;
+using MongoDB.Bson;
+using Microsoft.Azure.Cosmos;
 
 namespace MultiTenantETL.Infrastructure.Services.ConnectionTesting.Database;
 
@@ -31,7 +36,7 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
             };
         }
 
-        // Validate required fields
+        // Validate required fields (skip validation for providers with custom validation)
         if (dbConfig.UseCustomConnectionString)
         {
             if (string.IsNullOrEmpty(dbConfig.ConnectionString))
@@ -43,8 +48,11 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
                 };
             }
         }
-        else
+        else if (provider != ConnectorProviders.CosmosDb && 
+                 provider != ConnectorProviders.MongoDb)
         {
+            // Standard SQL database providers require host, database, username, password
+            // CosmosDB and MongoDB have their own validation
             if (string.IsNullOrEmpty(dbConfig.Host) || string.IsNullOrEmpty(dbConfig.Database) ||
                 string.IsNullOrEmpty(dbConfig.Username) || string.IsNullOrEmpty(dbConfig.Password))
             {
@@ -63,6 +71,9 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
                 ConnectorProviders.SqlServer => await TestSqlServerConnectionAsync(dbConfig),
                 ConnectorProviders.PostgreSQL => await TestPostgreSqlConnectionAsync(dbConfig),
                 ConnectorProviders.MySQL => await TestMySqlConnectionAsync(dbConfig),
+                ConnectorProviders.Oracle => await TestOracleConnectionAsync(dbConfig),
+                ConnectorProviders.MongoDb => await TestMongoDbConnectionAsync(dbConfig),
+                ConnectorProviders.CosmosDb => await TestCosmosDbConnectionAsync(dbConfig),
                 _ => new ConnectionTestResult
                 {
                     Success = false,
@@ -141,6 +152,101 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
         };
     }
 
+    private static async Task<ConnectionTestResult> TestOracleConnectionAsync(DatabaseConfig config)
+    {
+        using var connection = new OracleConnection(BuildOracleConnectionString(config));
+        await connection.OpenAsync();
+
+        var details = new Dictionary<string, object>
+        {
+            ["ServerVersion"] = connection.ServerVersion,
+            ["Database"] = connection.DatabaseName ?? "Unknown",
+            ["State"] = connection.State.ToString()
+        };
+
+        return new ConnectionTestResult
+        {
+            Success = true,
+            Message = "Successfully connected to Oracle database",
+            Details = details
+        };
+    }
+
+
+
+    private static async Task<ConnectionTestResult> TestMongoDbConnectionAsync(DatabaseConfig config)
+    {
+        if (string.IsNullOrEmpty(config.ConnectionString))
+        {
+            return new ConnectionTestResult { Success = false, Message = "Connection string is required for MongoDB" };
+        }
+
+        var client = new MongoClient(config.ConnectionString);
+        var database = client.GetDatabase(config.Database ?? "admin");
+        await database.RunCommandAsync((Command<BsonDocument>)"{ping:1}");
+
+        return new ConnectionTestResult
+        {
+            Success = true,
+            Message = "Successfully connected to MongoDB",
+            Details = new Dictionary<string, object>
+            {
+                ["Database"] = database.DatabaseNamespace.DatabaseName
+            }
+        };
+    }
+
+    private static async Task<ConnectionTestResult> TestCosmosDbConnectionAsync(DatabaseConfig config)
+    {
+        var endpoint = config.CosmosEndpoint ?? config.Host;
+        var key = config.CosmosKey ?? config.Password;
+        var database = config.Database;
+        var container = config.Container;
+
+        // Validate required fields for CosmosDB
+        if (string.IsNullOrEmpty(endpoint))
+        {
+            return new ConnectionTestResult { Success = false, Message = "Cosmos DB endpoint is required" };
+        }
+
+        if (string.IsNullOrEmpty(key))
+        {
+            return new ConnectionTestResult { Success = false, Message = "Cosmos DB key is required" };
+        }
+
+        if (string.IsNullOrEmpty(database))
+        {
+            return new ConnectionTestResult { Success = false, Message = "Cosmos DB database name is required" };
+        }
+
+        if (string.IsNullOrEmpty(container))
+        {
+            return new ConnectionTestResult { Success = false, Message = "Cosmos DB container name is required" };
+        }
+
+        using var client = new CosmosClient(endpoint, key);
+        
+        // Test connection by reading account info
+        await client.ReadAccountAsync();
+
+        // Verify database and container exist
+        var db = client.GetDatabase(database);
+        var containerResponse = await db.GetContainer(container).ReadContainerAsync();
+
+        return new ConnectionTestResult
+        {
+            Success = true,
+            Message = "Successfully connected to Azure Cosmos DB",
+            Details = new Dictionary<string, object>
+            {
+                ["Endpoint"] = endpoint,
+                ["Database"] = database,
+                ["Container"] = container,
+                ["Throughput"] = containerResponse.Resource.Id ?? "N/A"
+            }
+        };
+    }
+
     private static string BuildSqlServerConnectionString(DatabaseConfig config)
     {
         if (!string.IsNullOrEmpty(config.ConnectionString))
@@ -203,4 +309,26 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
 
         return builder.ConnectionString;
     }
+
+    private static string BuildOracleConnectionString(DatabaseConfig config)
+    {
+        if (!string.IsNullOrEmpty(config.ConnectionString))
+        {
+            return config.ConnectionString;
+        }
+
+        var port = config.Port > 0 ? config.Port : 1521;
+        var dataSource = $"(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST={config.Host})(PORT={port}))(CONNECT_DATA=(SERVICE_NAME={config.Database})))";
+
+        var builder = new OracleConnectionStringBuilder
+        {
+            DataSource = dataSource,
+            UserID = config.Username!,
+            Password = config.Password!
+        };
+
+        return builder.ConnectionString;
+    }
+
+
 }

@@ -500,8 +500,8 @@ public class TenantServiceTests : IDisposable
 
         // Assert
         result.Should().HaveCount(2); // Only active tenants
-        result[0].Tenant.Name.Should().Be("Alpha Company");
-        result[1].Tenant.Name.Should().Be("Zulu Company");
+        result[0].Tenant!.Name.Should().Be("Alpha Company");
+        result[1].Tenant!.Name.Should().Be("Zulu Company");
     }
 
     [Fact]

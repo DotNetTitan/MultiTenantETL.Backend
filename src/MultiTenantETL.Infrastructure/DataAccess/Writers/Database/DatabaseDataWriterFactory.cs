@@ -14,17 +14,26 @@ public class DatabaseDataWriterFactory : IDatabaseDataWriterFactory
     private readonly SqlServerDataWriter _sqlServerWriter;
     private readonly PostgreSqlDataWriter _postgreSqlWriter;
     private readonly MySqlDataWriter _mySqlWriter;
+    private readonly OracleDataWriter _oracleWriter;
+    private readonly MongoDbDataWriter _mongoDbWriter;
+    private readonly CosmosDbDataWriter _cosmosDbWriter;
     private readonly ILogger<DatabaseDataWriterFactory> _logger;
 
     public DatabaseDataWriterFactory(
         SqlServerDataWriter sqlServerWriter,
         PostgreSqlDataWriter postgreSqlWriter,
         MySqlDataWriter mySqlWriter,
+        OracleDataWriter oracleWriter,
+        MongoDbDataWriter mongoDbWriter,
+        CosmosDbDataWriter cosmosDbWriter,
         ILogger<DatabaseDataWriterFactory> logger)
     {
         _sqlServerWriter = sqlServerWriter;
         _postgreSqlWriter = postgreSqlWriter;
         _mySqlWriter = mySqlWriter;
+        _oracleWriter = oracleWriter;
+        _mongoDbWriter = mongoDbWriter;
+        _cosmosDbWriter = cosmosDbWriter;
         _logger = logger;
     }
 
@@ -37,6 +46,9 @@ public class DatabaseDataWriterFactory : IDatabaseDataWriterFactory
             ConnectorProviders.SqlServer => _sqlServerWriter,
             ConnectorProviders.PostgreSQL => _postgreSqlWriter,
             ConnectorProviders.MySQL => _mySqlWriter,
+            ConnectorProviders.Oracle => _oracleWriter,
+            ConnectorProviders.MongoDb => _mongoDbWriter,
+            ConnectorProviders.CosmosDb => _cosmosDbWriter,
             _ => throw new NotSupportedException($"Database provider '{connector.Provider}' is not supported")
         };
     }

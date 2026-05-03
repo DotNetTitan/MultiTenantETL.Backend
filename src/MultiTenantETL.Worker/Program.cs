@@ -16,7 +16,11 @@ var builder = Host.CreateApplicationBuilder(args);
 // Add Aspire service defaults (includes OpenTelemetry, health checks, service discovery)
 builder.AddServiceDefaults();
 
-// Configuration - bind RabbitMq settings and inject connection string if available from Aspire
+// Configuration - bind Messaging settings
+builder.Services.Configure<MessagingSettings>(
+    builder.Configuration.GetSection(MessagingSettings.SectionName));
+
+// Configuration - bind RabbitMQ settings and inject connection string if available from Aspire
 builder.Services.Configure<RabbitMqSettings>(options =>
 {
     builder.Configuration.GetSection("RabbitMq").Bind(options);
@@ -27,7 +31,35 @@ builder.Services.Configure<RabbitMqSettings>(options =>
         options.ConnectionString = connectionString;
     }
 });
+
+// Configuration - bind Azure Service Bus settings and inject connection string if available from Aspire
+builder.Services.Configure<ServiceBusSettings>(options =>
+{
+    builder.Configuration.GetSection("ServiceBus").Bind(options);
+    // Check for Aspire-provided connection string
+    var connectionString = builder.Configuration.GetConnectionString("ServiceBus");
+    if (!string.IsNullOrEmpty(connectionString))
+    {
+        options.ConnectionString = connectionString;
+    }
+});
+
+// Configuration - bind Azure Storage Queue settings and inject connection string if available from Aspire
+builder.Services.Configure<StorageQueueSettings>(options =>
+{
+    builder.Configuration.GetSection("StorageQueue").Bind(options);
+    // Check for Aspire-provided connection string
+    var connectionString = builder.Configuration.GetConnectionString("StorageQueue");
+    if (!string.IsNullOrEmpty(connectionString))
+    {
+        options.ConnectionString = connectionString;
+    }
+});
 builder.Services.Configure<EtlSettings>(builder.Configuration.GetSection(EtlSettings.SectionName));
+
+// Configuration - bind Azure Communication Services settings
+builder.Services.Configure<AzureCommunicationSettings>(
+    builder.Configuration.GetSection("AzureCommunicationServices"));
 
 // Tenant context provider (scoped per job)
 builder.Services.AddScoped<ITenantProvider, TenantProvider>();
@@ -39,9 +71,32 @@ builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 // Encryption Service (needed for decrypting connector credentials)
 builder.Services.AddSingleton<IEncryptionService, MultiTenantETL.Infrastructure.Security.EncryptionService>();
 
+// Azure Key Vault Configuration
+builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.AzureKeyVaultSettings>(
+    builder.Configuration.GetSection("AzureKeyVault"));
+
+// Secret Storage Services (Azure Key Vault)
+builder.Services.AddSingleton<MultiTenantETL.Application.Common.Interfaces.ISecretStorageService,
+    MultiTenantETL.Infrastructure.Security.KeyVaultSecretStorageService>();
+builder.Services.AddScoped<MultiTenantETL.Application.Common.Interfaces.ISecretResolver,
+    MultiTenantETL.Infrastructure.Security.SecretResolver>();
+
 // Audit Service - use null implementation for worker (actions already audited at API level)
 builder.Services.AddScoped<MultiTenantETL.Application.Interfaces.IAuditService,
     MultiTenantETL.Infrastructure.Services.NullAuditService>();
+
+// Email Service - for pipeline execution notifications
+var useStubEmailService = builder.Configuration.GetValue<bool>("EmailService:UseStub", true);
+if (useStubEmailService)
+{
+    builder.Services.AddScoped<MultiTenantETL.Application.Interfaces.IEmailService,
+        MultiTenantETL.Infrastructure.Services.StubEmailService>();
+}
+else
+{
+    builder.Services.AddScoped<MultiTenantETL.Application.Interfaces.IEmailService,
+        MultiTenantETL.Infrastructure.Services.AzureCommunicationEmailService>();
+}
 
 // Database
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
@@ -69,16 +124,21 @@ builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataAccess.Writers.File
     MultiTenantETL.Infrastructure.DataAccess.Writers.File.FileDataWriterFactory>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataAccess.Writers.Api.IApiDataWriterFactory,
     MultiTenantETL.Infrastructure.DataAccess.Writers.Api.ApiDataWriterFactory>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataAccess.Writers.Email.IEmailDataWriterFactory,
+    MultiTenantETL.Infrastructure.DataAccess.Writers.Email.EmailDataWriterFactory>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.EmailDataWriter>();
 
 // Data Readers
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.SqlServerDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.PostgreSqlDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.MySqlDataReader>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.OracleDataReader>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.MongoDbDataReader>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.CosmosDbDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.CsvDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.JsonDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.JsonLinesDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.RestApiDataReader>();
-builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.S3DataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.AzureBlobDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.SftpDataReader>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.FtpDataReader>();
@@ -87,11 +147,13 @@ builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataReaders.FtpDataRead
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.SqlServerDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.PostgreSqlDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.MySqlDataWriter>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.OracleDataWriter>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.MongoDbDataWriter>();
+builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.CosmosDbDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.CsvDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.JsonDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.JsonLinesDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.RestApiDataWriter>();
-builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.S3DataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.AzureBlobDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.SftpDataWriter>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.DataWriters.FtpDataWriter>();
@@ -104,16 +166,46 @@ builder.Services.AddSingleton<MultiTenantETL.Infrastructure.Services.Storage.ISt
     MultiTenantETL.Infrastructure.Services.Storage.StorageClientFactory>();
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.Services.Http.IHttpClientAuthenticator,
     MultiTenantETL.Infrastructure.Services.Http.HttpClientAuthenticator>();
-builder.Services.AddScoped<MultiTenantETL.Application.Connectors.DataWriters.IFormatValidator,
-    MultiTenantETL.Infrastructure.DataWriters.FormatValidator>();
-
 // Orchestration Services
 builder.Services.AddScoped<IPipelineOrchestrator, PipelineOrchestrator>();
 builder.Services.AddScoped<MultiTenantETL.Application.Orchestration.IFieldMappingService,
     MultiTenantETL.Infrastructure.Orchestration.FieldMappingService>();
 
-// Worker
-builder.Services.AddHostedService<Worker>();
+// Worker - register based on configuration
+var messagingSettings = new MessagingSettings();
+builder.Configuration.GetSection(MessagingSettings.SectionName).Bind(messagingSettings);
+
+// IMessagePublisher is required by ExecutionService and PipelineScheduleJob at runtime.
+// Must be registered before AddHostedService so the DI container can resolve it.
+if (messagingSettings.UseServiceBus)
+{
+    builder.Services.AddSingleton<MultiTenantETL.Application.Messaging.IMessagePublisher,
+        MultiTenantETL.Infrastructure.Messaging.ServiceBusPublisher>();
+}
+else if (messagingSettings.UseStorageQueue)
+{
+    builder.Services.AddSingleton<MultiTenantETL.Application.Messaging.IMessagePublisher,
+        MultiTenantETL.Infrastructure.Messaging.StorageQueuePublisher>();
+}
+else
+{
+    builder.Services.AddSingleton<MultiTenantETL.Application.Messaging.IMessagePublisher,
+        MultiTenantETL.Infrastructure.Messaging.RabbitMqPublisher>();
+}
+
+if (messagingSettings.UseServiceBus)
+{
+    builder.Services.AddHostedService<ServiceBusWorker>();
+}
+else if (messagingSettings.UseStorageQueue)
+{
+    builder.Services.AddHostedService<StorageQueueWorker>();
+}
+else
+{
+    // Default to RabbitMQ for local development
+    builder.Services.AddHostedService<Worker>();
+}
 
 var host = builder.Build();
 host.Run();

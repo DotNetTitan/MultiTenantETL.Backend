@@ -78,9 +78,9 @@ public class TenantService : ITenantService
     {
         return await _context.UserTenants
             .IgnoreQueryFilters()
-            .Include(ut => ut.Tenant)
+            .Include(ut => ut.Tenant!)
             .Where(ut => ut.UserId == userId && ut.IsActive)
-            .OrderBy(ut => ut.Tenant.Name)
+            .OrderBy(ut => ut.Tenant!.Name)
             .ToListAsync();
     }
 
@@ -235,7 +235,7 @@ public class TenantService : ITenantService
         return await _context.UserTenants
             .Include(ut => ut.User)
             .Where(ut => ut.TenantId == tenantId && ut.IsActive)
-            .OrderBy(ut => ut.User.Email)
+            .OrderBy(ut => ut.User!.Email!)
             .ToListAsync();
     }
 
@@ -319,8 +319,8 @@ public class TenantService : ITenantService
             UserTenant = new UserTenantResponse
             {
                 TenantId = userTenant.TenantId,
-                TenantName = userTenant.Tenant.Name,
-                TenantSlug = userTenant.Tenant.Slug,
+                TenantName = userTenant!.Tenant!.Name!,
+                TenantSlug = userTenant!.Tenant!.Slug!,
                 RoleCode = userTenant.RoleCode,
                 IsActive = userTenant.IsActive,
                 IsCurrent = true

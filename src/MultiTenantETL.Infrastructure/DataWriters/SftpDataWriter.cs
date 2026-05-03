@@ -21,7 +21,7 @@ public class SftpDataWriter : IDataWriter
 
     public SftpDataWriter(ILogger<SftpDataWriter> logger)
     {
-        _logger = logger;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task<DataWriteResult> WriteBatchAsync(
@@ -150,8 +150,27 @@ public class SftpDataWriter : IDataWriter
 
     private SftpConfig ParseConfig(string configJson)
     {
-        return JsonSerializer.Deserialize<SftpConfig>(configJson)
-            ?? throw new InvalidOperationException("Invalid SFTP configuration");
+        try
+        {
+            var config = JsonSerializer.Deserialize<SftpConfig>(configJson)
+                ?? throw new InvalidOperationException("Invalid SFTP configuration");
+
+            // Validate required fields
+            if (string.IsNullOrEmpty(config.Host))
+                throw new InvalidOperationException("SFTP host is required");
+            if (string.IsNullOrEmpty(config.Username))
+                throw new InvalidOperationException("SFTP username is required");
+            if (string.IsNullOrEmpty(config.Password))
+                throw new InvalidOperationException("SFTP password is required");
+            if (string.IsNullOrEmpty(config.FilePath))
+                throw new InvalidOperationException("SFTP file path is required");
+
+            return config;
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException("Invalid SFTP configuration JSON", ex);
+        }
     }
 
     public async ValueTask DisposeAsync()

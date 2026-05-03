@@ -14,17 +14,26 @@ public class DatabaseDataReaderFactory : IDatabaseDataReaderFactory
     private readonly SqlServerDataReader _sqlServerReader;
     private readonly PostgreSqlDataReader _postgreSqlReader;
     private readonly MySqlDataReader _mySqlReader;
+    private readonly OracleDataReader _oracleReader;
+    private readonly MongoDbDataReader _mongoDbReader;
+    private readonly CosmosDbDataReader _cosmosDbReader;
     private readonly ILogger<DatabaseDataReaderFactory> _logger;
 
     public DatabaseDataReaderFactory(
         SqlServerDataReader sqlServerReader,
         PostgreSqlDataReader postgreSqlReader,
         MySqlDataReader mySqlReader,
+        OracleDataReader oracleReader,
+        MongoDbDataReader mongoDbReader,
+        CosmosDbDataReader cosmosDbReader,
         ILogger<DatabaseDataReaderFactory> logger)
     {
         _sqlServerReader = sqlServerReader;
         _postgreSqlReader = postgreSqlReader;
         _mySqlReader = mySqlReader;
+        _oracleReader = oracleReader;
+        _mongoDbReader = mongoDbReader;
+        _cosmosDbReader = cosmosDbReader;
         _logger = logger;
     }
 
@@ -37,6 +46,9 @@ public class DatabaseDataReaderFactory : IDatabaseDataReaderFactory
             ConnectorProviders.SqlServer => _sqlServerReader,
             ConnectorProviders.PostgreSQL => _postgreSqlReader,
             ConnectorProviders.MySQL => _mySqlReader,
+            ConnectorProviders.Oracle => _oracleReader,
+            ConnectorProviders.MongoDb => _mongoDbReader,
+            ConnectorProviders.CosmosDb => _cosmosDbReader,
             _ => throw new NotSupportedException($"Database provider '{connector.Provider}' is not supported")
         };
     }

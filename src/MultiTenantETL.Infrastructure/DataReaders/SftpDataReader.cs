@@ -25,10 +25,10 @@ public class SftpDataReader : IDataReader
         JsonLinesDataReader jsonLinesReader,
         ILogger<SftpDataReader> logger)
     {
-        _csvReader = csvReader;
-        _jsonReader = jsonReader;
-        _jsonLinesReader = jsonLinesReader;
-        _logger = logger;
+        _csvReader = csvReader ?? throw new ArgumentNullException(nameof(csvReader));
+        _jsonReader = jsonReader ?? throw new ArgumentNullException(nameof(jsonReader));
+        _jsonLinesReader = jsonLinesReader ?? throw new ArgumentNullException(nameof(jsonLinesReader));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async IAsyncEnumerable<ReadBatch> ReadAsync(
@@ -57,12 +57,19 @@ public class SftpDataReader : IDataReader
             stream.Position = 0;
 
             // Delegate to format-specific reader
-            var streamConnector = CreateStreamConnector(stream, format);
+            var streamConnector = CreateStreamConnector(stream, format, out var registryKey);
             var reader = GetReaderForFormat(format);
 
-            await foreach (var batch in reader.ReadAsync(streamConnector, options, cancellationToken))
+            try
             {
-                yield return batch;
+                await foreach (var batch in reader.ReadAsync(streamConnector, options, cancellationToken))
+                {
+                    yield return batch;
+                }
+            }
+            finally
+            {
+                AzureBlobDataReader.RemoveStreamFromRegistry(registryKey);
             }
         }
         finally
@@ -115,14 +122,19 @@ public class SftpDataReader : IDataReader
             client.DownloadFile(config.FilePath, stream);
             stream.Position = 0;
 
-            var streamConnector = CreateStreamConnector(stream, format);
+            var streamConnector = CreateStreamConnector(stream, format, out var registryKey);
             var reader = GetReaderForFormat(format);
 
-            var result = await reader.DetectSchemaAsync(streamConnector, cancellationToken);
-            
-            client.Disconnect();
-            
-            return result;
+            try
+            {
+                var result = await reader.DetectSchemaAsync(streamConnector, cancellationToken);
+                client.Disconnect();
+                return result;
+            }
+            finally
+            {
+                AzureBlobDataReader.RemoveStreamFromRegistry(registryKey);
+            }
         }
         catch (Exception ex)
         {
@@ -147,19 +159,21 @@ public class SftpDataReader : IDataReader
         };
     }
 
-    private Connector CreateStreamConnector(Stream stream, string format)
+    private static Connector CreateStreamConnector(Stream stream, string format, out Guid registryKey)
     {
+        registryKey = Guid.NewGuid();
+        AzureBlobDataReader.RegisterStream(registryKey, stream);
+
         var configJson = format.ToLower() switch
         {
-            "csv" => JsonSerializer.Serialize(new { Stream = stream, HasHeader = true, Delimiter = "," }),
-            "json" => JsonSerializer.Serialize(new { Stream = stream, IsArray = true }),
-            "jsonl" or "jsonlines" or "ndjson" => JsonSerializer.Serialize(new { Stream = stream }),
-            _ => JsonSerializer.Serialize(new { Stream = stream })
+            "csv"  => JsonSerializer.Serialize(new { StreamRegistryKey = registryKey, HasHeader = true, Delimiter = "," }),
+            "json" => JsonSerializer.Serialize(new { StreamRegistryKey = registryKey, IsArray = true }),
+            _      => JsonSerializer.Serialize(new { StreamRegistryKey = registryKey })
         };
 
         return new Connector
         {
-            Id = Guid.NewGuid(),
+            Id = registryKey,
             TenantId = Guid.Empty,
             Name = "SftpStreamConnector",
             Type = "File",
@@ -194,8 +208,27 @@ public class SftpDataReader : IDataReader
 
     private SftpConfig ParseConfig(string configJson)
     {
-        return JsonSerializer.Deserialize<SftpConfig>(configJson)
-            ?? throw new InvalidOperationException("Invalid SFTP configuration");
+        try
+        {
+            var config = JsonSerializer.Deserialize<SftpConfig>(configJson)
+                ?? throw new InvalidOperationException("Invalid SFTP configuration");
+
+            // Validate required fields
+            if (string.IsNullOrEmpty(config.Host))
+                throw new InvalidOperationException("SFTP host is required");
+            if (string.IsNullOrEmpty(config.Username))
+                throw new InvalidOperationException("SFTP username is required");
+            if (string.IsNullOrEmpty(config.Password))
+                throw new InvalidOperationException("SFTP password is required");
+            if (string.IsNullOrEmpty(config.FilePath))
+                throw new InvalidOperationException("SFTP file path is required");
+
+            return config;
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException("Invalid SFTP configuration JSON", ex);
+        }
     }
 
     private class SftpConfig

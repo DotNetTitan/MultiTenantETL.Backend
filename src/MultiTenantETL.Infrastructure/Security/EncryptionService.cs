@@ -8,7 +8,7 @@ using MultiTenantETL.Application.Common.Interfaces;
 namespace MultiTenantETL.Infrastructure.Security;
 
 /// <summary>
-/// Service for encrypting and decrypting sensitive data using AES-256
+/// Service for encrypting and decrypting sensitive data using AES-GCM (authenticated encryption)
 /// </summary>
 public class EncryptionService : IEncryptionService
 {
@@ -28,8 +28,24 @@ public class EncryptionService : IEncryptionService
                 "Encryption key not configured. Set 'Encryption:Key' in user secrets or environment variables.");
         }
 
-        // Ensure key is 32 bytes (256 bits) for AES-256
-        _key = DeriveKey(encryptionKey);
+        // For AesGcm, we need a 32-byte key. If the config provides a passphrase, derive it with a salt.
+        // But prefer a direct 32-byte key in base64.
+        if (encryptionKey.Length == 44 && IsBase64String(encryptionKey)) // 32 bytes base64 is 44 chars
+        {
+            _key = Convert.FromBase64String(encryptionKey);
+        }
+        else
+        {
+            // Derive from passphrase with salt
+            var saltString = configuration["Encryption:Salt"];
+            if (string.IsNullOrEmpty(saltString))
+            {
+                throw new InvalidOperationException(
+                    "Encryption salt not configured. Set 'Encryption:Salt' in user secrets or environment variables.");
+            }
+            var salt = Encoding.UTF8.GetBytes(saltString);
+            _key = DeriveKey(encryptionKey, salt);
+        }
     }
 
     public string Encrypt(string plainText)
@@ -41,23 +57,23 @@ public class EncryptionService : IEncryptionService
 
         try
         {
-            using var aes = Aes.Create();
-            aes.Key = _key;
-            aes.GenerateIV();
+            using var aesGcm = new AesGcm(_key, 16);
+            var nonce = new byte[AesGcm.NonceByteSizes.MaxSize];
+            RandomNumberGenerator.Fill(nonce);
 
-            using var encryptor = aes.CreateEncryptor(aes.Key, aes.IV);
-            using var msEncrypt = new MemoryStream();
-            
-            // Write IV to the beginning of the stream
-            msEncrypt.Write(aes.IV, 0, aes.IV.Length);
-            
-            using (var csEncrypt = new CryptoStream(msEncrypt, encryptor, CryptoStreamMode.Write))
-            using (var swEncrypt = new StreamWriter(csEncrypt))
-            {
-                swEncrypt.Write(plainText);
-            }
+            var plainBytes = Encoding.UTF8.GetBytes(plainText);
+            var cipherBytes = new byte[plainBytes.Length];
+            var tag = new byte[AesGcm.TagByteSizes.MaxSize];
 
-            return Convert.ToBase64String(msEncrypt.ToArray());
+            aesGcm.Encrypt(nonce, plainBytes, cipherBytes, tag);
+
+            // Combine nonce + tag + ciphertext
+            var result = new byte[nonce.Length + tag.Length + cipherBytes.Length];
+            Buffer.BlockCopy(nonce, 0, result, 0, nonce.Length);
+            Buffer.BlockCopy(tag, 0, result, nonce.Length, tag.Length);
+            Buffer.BlockCopy(cipherBytes, 0, result, nonce.Length + tag.Length, cipherBytes.Length);
+
+            return Convert.ToBase64String(result);
         }
         catch (Exception ex)
         {
@@ -76,33 +92,37 @@ public class EncryptionService : IEncryptionService
         try
         {
             var fullCipher = Convert.FromBase64String(cipherText);
+            const int nonceSize = 12; // AesGcm.NonceByteSizes.MaxSize
+            const int tagSize = 16; // AesGcm.TagByteSizes.MaxSize
 
-            using var aes = Aes.Create();
-            aes.Key = _key;
-
-            // Check if the cipher text is long enough to contain IV
-            if (fullCipher.Length < aes.IV.Length)
+            if (fullCipher.Length < nonceSize + tagSize)
             {
-                throw new InvalidOperationException(
-                    $"Cipher text is too short ({fullCipher.Length} bytes). Expected at least {aes.IV.Length} bytes for IV.");
+                throw new InvalidOperationException("Cipher text is too short.");
             }
 
-            // Extract IV from the beginning of the cipher text
-            var iv = new byte[aes.IV.Length];
-            Array.Copy(fullCipher, 0, iv, 0, iv.Length);
-            aes.IV = iv;
+            var nonce = new byte[nonceSize];
+            var tag = new byte[tagSize];
+            var cipherBytes = new byte[fullCipher.Length - nonceSize - tagSize];
 
-            using var decryptor = aes.CreateDecryptor(aes.Key, aes.IV);
-            using var msDecrypt = new MemoryStream(fullCipher, iv.Length, fullCipher.Length - iv.Length);
-            using var csDecrypt = new CryptoStream(msDecrypt, decryptor, CryptoStreamMode.Read);
-            using var srDecrypt = new StreamReader(csDecrypt);
-            
-            return srDecrypt.ReadToEnd();
+            Buffer.BlockCopy(fullCipher, 0, nonce, 0, nonceSize);
+            Buffer.BlockCopy(fullCipher, nonceSize, tag, 0, tagSize);
+            Buffer.BlockCopy(fullCipher, nonceSize + tagSize, cipherBytes, 0, cipherBytes.Length);
+
+            using var aesGcm = new AesGcm(_key, 16);
+            var plainBytes = new byte[cipherBytes.Length];
+            aesGcm.Decrypt(nonce, cipherBytes, tag, plainBytes);
+
+            return Encoding.UTF8.GetString(plainBytes);
         }
         catch (FormatException ex)
         {
             _logger.LogError(ex, "Failed to decrypt data - invalid base64 format");
             throw new InvalidOperationException("Decryption failed: data is not valid base64", ex);
+        }
+        catch (CryptographicException ex)
+        {
+            _logger.LogError(ex, "Failed to decrypt data - integrity check failed");
+            throw new InvalidOperationException("Decryption failed: data integrity compromised", ex);
         }
         catch (Exception ex)
         {
@@ -214,16 +234,29 @@ public class EncryptionService : IEncryptionService
         }
     }
 
-    private static byte[] DeriveKey(string password)
+    private static byte[] DeriveKey(string password, byte[] salt)
     {
         // Use PBKDF2 to derive a 256-bit key from the password
         using var deriveBytes = new Rfc2898DeriveBytes(
             password,
-            Encoding.UTF8.GetBytes("MultiTenantETL.Salt.v1"), // Salt (should be unique per installation)
+            salt,
             100000, // Iterations
             HashAlgorithmName.SHA256);
         
         return deriveBytes.GetBytes(32); // 32 bytes = 256 bits
+    }
+
+    private static bool IsBase64String(string base64)
+    {
+        try
+        {
+            Convert.FromBase64String(base64);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static object? GetJsonValue(JsonElement element)

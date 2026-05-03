@@ -1,0 +1,311 @@
+# ============================================================================
+# azure-pipelines.beta.yml – MultiTenant ETL Backend – Beta Environment
+#
+# Trigger: push to 'beta' branch
+# Target:  multi-tenant-etl-beta-rg  (East US)
+#
+# PREREQUISITES (one-time manual setup)
+# ──────────────────────────────────────────────────────────────────────────────
+# 1. Azure Resource Group must exist: multi-tenant-etl-beta-rg
+#
+# 2. Azure DevOps ARM Service Connection name: multi-tenant-etl
+#
+# 3. Variable Group in Azure DevOps Library: mtetl-beta-vars
+#    Required variables:
+#      AZURE_SERVICE_CONNECTION               – multi-tenant-etl
+#      Supabase__ConnectionString             – Supabase PostgreSQL connection string (secret)
+#      Encryption__Key                        – 32-byte base64 key (secret)
+#      Encryption__Salt                       – 32-byte base64 salt (secret)
+#      Seeding__AdminPassword                 – Initial admin password (secret)
+#      Seeding__GuestPassword                 – Initial guest password (secret)
+#      Seeding__OAuthClientSecret             – OAuth client secret (secret)
+#      AzureCommunication__ConnectionString   – ACS connection string (secret)
+#      AzureCommunication__SenderEmailAddress – Sender email address
+#      AzureCommunication__ApplicationUrl     – API URL (update after first deploy)
+#      AzureCommunication__FrontendUrl        – SWA URL (update after first deploy)
+#      Cors__AllowedOrigins__0                – SWA URL (same as FrontendUrl)
+#
+#    Note: ServiceBus__ConnectionString is retrieved automatically from Azure.
+# ============================================================================
+
+trigger:
+  branches:
+    include:
+    - beta
+
+pr: none
+
+variables:
+  - group: mtetl-beta-vars
+  - name: DOTNET_VERSION
+    value: '8.0.x'
+  - name: BUILD_CONFIGURATION
+    value: Release
+  - name: ENV_NAME
+    value: beta
+  - name: RESOURCE_GROUP
+    value: multi-tenant-etl-beta-rg
+  - name: API_APP_NAME
+    value: mtetl-api-beta
+  - name: WORKER_APP_NAME
+    value: mtetl-worker-beta
+  - name: SB_NAMESPACE
+    value: mtetl-beta-sb
+  - name: GHCR_REGISTRY
+    value: ghcr.io
+  # GITHUB_REPO must be lowercase - set GITHUB_REPOSITORY in variable group
+  # Example: dotnettitan/multitenantetl.backend (all lowercase)
+  - name: GITHUB_REPO
+    value: $(GITHUB_REPOSITORY)
+
+stages:
+# ════════════════════════════════════════════════════════════════════════════════
+# Stage 1 – Build & Unit Test
+# ════════════════════════════════════════════════════════════════════════════════
+- stage: BuildTest
+  displayName: '① Build & Test'
+  jobs:
+  - job: BuildAndTest
+    displayName: 'dotnet build + unit tests'
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+    - task: UseDotNet@2
+      displayName: 'Install .NET 8 SDK'
+      inputs:
+        packageType: sdk
+        version: $(DOTNET_VERSION)
+
+    - script: dotnet restore MultiTenantETL.sln
+      displayName: 'Restore NuGet packages'
+      workingDirectory: $(Build.SourcesDirectory)
+
+    - script: dotnet build MultiTenantETL.sln --configuration $(BUILD_CONFIGURATION) --no-restore
+      displayName: 'Build solution'
+      workingDirectory: $(Build.SourcesDirectory)
+
+    - script: |
+        dotnet test tests/MultiTenantETL.UnitTests/MultiTenantETL.UnitTests.csproj \
+          --configuration $(BUILD_CONFIGURATION) \
+          --no-build \
+          --logger trx \
+          --results-directory $(Agent.TempDirectory)/TestResults
+      displayName: 'Run unit tests'
+      workingDirectory: $(Build.SourcesDirectory)
+
+    - task: PublishTestResults@2
+      displayName: 'Publish test results'
+      condition: always()
+      inputs:
+        testResultsFormat: VSTest
+        testResultsFiles: '$(Agent.TempDirectory)/TestResults/**/*.trx'
+        failTaskOnFailedTests: true
+
+# ════════════════════════════════════════════════════════════════════════════════
+# Stage 2 – Deploy Bicep infrastructure (incremental, idempotent)
+# ════════════════════════════════════════════════════════════════════════════════
+- stage: Infrastructure
+  displayName: '② Infrastructure (Bicep)'
+  dependsOn: BuildTest
+  jobs:
+  - job: DeployBicep
+    displayName: 'az deployment group create'
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+    - task: AzureCLI@2
+      displayName: 'Deploy Bicep template'
+      inputs:
+        azureSubscription: $(AZURE_SERVICE_CONNECTION)
+        scriptType: bash
+        scriptLocation: inlineScript
+        workingDirectory: $(Build.SourcesDirectory)
+        inlineScript: |
+          az deployment group create \
+            --mode Incremental \
+            --resource-group $(RESOURCE_GROUP) \
+            --template-file infra/main.bicep \
+            --parameters @infra/parameters.$(ENV_NAME).bicepparam \
+            --output table
+          echo "✅ Infrastructure deployment complete."
+
+# ════════════════════════════════════════════════════════════════════════════════
+# Stage 3 – Build & Push container images to GHCR (parallel)
+# ════════════════════════════════════════════════════════════════════════════════
+- stage: BuildImages
+  displayName: '③ Build & Push Images to GHCR'
+  dependsOn: Infrastructure
+  jobs:
+  - job: BuildAPIImage
+    displayName: 'Build & Push: api:$(Build.BuildId)'
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+    - task: Docker@2
+      displayName: 'Build and push API image'
+      inputs:
+        command: buildAndPush
+        repository: '$(GITHUB_REPO)/api'
+        dockerfile: 'src/MultiTenantETL.API/Dockerfile'
+        buildContext: '.'
+        containerRegistry: 'github-container-registry'
+        tags: |
+          $(Build.BuildId)
+          latest
+
+  - job: BuildWorkerImage
+    displayName: 'Build & Push: worker:$(Build.BuildId)'
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+    - task: Docker@2
+      displayName: 'Build and push Worker image'
+      inputs:
+        command: buildAndPush
+        repository: '$(GITHUB_REPO)/worker'
+        dockerfile: 'src/MultiTenantETL.Worker/Dockerfile'
+        buildContext: '.'
+        containerRegistry: 'github-container-registry'
+        tags: |
+          $(Build.BuildId)
+          latest
+
+# ════════════════════════════════════════════════════════════════════════════════
+# Stage 4 – Deploy Container Apps (approval-gated, parallel)
+#
+# HOW TO CONFIGURE APPROVALS (one-time setup in Azure DevOps):
+#   1. Pipelines → Environments → New environment → Name: mtetl-beta, Type: None
+#   2. Open mtetl-beta → Approvals and checks → + → Approvals
+#   3. Add approvers (yourself or your team) → Create
+# The pipeline will pause at this stage until an approver clicks Approve.
+# ════════════════════════════════════════════════════════════════════════════════
+- stage: Deploy
+  displayName: '④ Deploy Container Apps'
+  dependsOn: BuildImages
+  jobs:
+  # 'deployment:' (not 'job:') causes Azure DevOps to enforce the environment's
+  # approval checks before executing any steps in this job.
+  - deployment: DeployAPI
+    displayName: 'Deploy API Container App'
+    environment: mtetl-beta
+    pool:
+      vmImage: ubuntu-latest
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: AzureCLI@2
+            displayName: 'Set secrets + update API image'
+            env:
+              DB_CONN: $(Supabase__ConnectionString)
+              ENC_KEY: $(Encryption__Key)
+              ENC_SALT: $(Encryption__Salt)
+              ADMIN_PASS: $(Seeding__AdminPassword)
+              GUEST_PASS: $(Seeding__GuestPassword)
+              OAUTH_SECRET: $(Seeding__OAuthClientSecret)
+              ACS_CONN: $(AzureCommunication__ConnectionString)
+            inputs:
+              azureSubscription: $(AZURE_SERVICE_CONNECTION)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                SB_CONN=$(az servicebus namespace authorization-rule keys list \
+                  --resource-group $(RESOURCE_GROUP) \
+                  --namespace-name $(SB_NAMESPACE) \
+                  --name RootManageSharedAccessKey \
+                  --query primaryConnectionString -o tsv)
+
+                az containerapp secret set \
+                  --name $(API_APP_NAME) \
+                  --resource-group $(RESOURCE_GROUP) \
+                  --secrets \
+                    "db-connection=${DB_CONN}" \
+                    "sb-connection=${SB_CONN}" \
+                    "encryption-key=${ENC_KEY}" \
+                    "encryption-salt=${ENC_SALT}" \
+                    "admin-password=${ADMIN_PASS}" \
+                    "guest-password=${GUEST_PASS}" \
+                    "oauth-client-secret=${OAUTH_SECRET}" \
+                    "acs-connection=${ACS_CONN}"
+
+                az containerapp update \
+                  --name $(API_APP_NAME) \
+                  --resource-group $(RESOURCE_GROUP) \
+                  --image $(GHCR_REGISTRY)/$(GITHUB_REPO)/api:$(Build.BuildId) \
+                  --set-env-vars \
+                    "ConnectionStrings__DefaultConnection=secretref:db-connection" \
+                    "Messaging__Provider=ServiceBus" \
+                    "ServiceBus__ConnectionString=secretref:sb-connection" \
+                    "ServiceBus__ExecutionQueueName=pipeline-executions" \
+                    "ServiceBus__CancellationQueueName=pipeline-cancellations" \
+                    "Encryption__Key=secretref:encryption-key" \
+                    "Encryption__Salt=secretref:encryption-salt" \
+                    "Seeding__AdminPassword=secretref:admin-password" \
+                    "Seeding__GuestPassword=secretref:guest-password" \
+                    "Seeding__OAuthClientSecret=secretref:oauth-client-secret" \
+                    "AzureCommunicationServices__ConnectionString=secretref:acs-connection" \
+                    "AzureCommunicationServices__SenderEmailAddress=$(AzureCommunication__SenderEmailAddress)" \
+                    "AzureCommunicationServices__ApplicationName=MultiTenantETL" \
+                    "AzureCommunicationServices__ApplicationUrl=$(AzureCommunication__ApplicationUrl)" \
+                    "AzureCommunicationServices__FrontendUrl=$(AzureCommunication__FrontendUrl)" \
+                    "Cors__AllowedOrigins__0=$(Cors__AllowedOrigins__0)" \
+                    "EmailService__UseStub=false" \
+                    "ASPNETCORE_ENVIRONMENT=Production"
+
+                echo "✅ API updated to api:$(Build.BuildId)"
+
+  - deployment: DeployWorker
+    displayName: 'Deploy Worker Container App'
+    environment: mtetl-beta
+    pool:
+      vmImage: ubuntu-latest
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: AzureCLI@2
+            displayName: 'Set secrets + update Worker image'
+            env:
+              DB_CONN: $(Supabase__ConnectionString)
+              ENC_KEY: $(Encryption__Key)
+              ENC_SALT: $(Encryption__Salt)
+              ACS_CONN: $(AzureCommunication__ConnectionString)
+            inputs:
+              azureSubscription: $(AZURE_SERVICE_CONNECTION)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                SB_CONN=$(az servicebus namespace authorization-rule keys list \
+                  --resource-group $(RESOURCE_GROUP) \
+                  --namespace-name $(SB_NAMESPACE) \
+                  --name RootManageSharedAccessKey \
+                  --query primaryConnectionString -o tsv)
+
+                az containerapp secret set \
+                  --name $(WORKER_APP_NAME) \
+                  --resource-group $(RESOURCE_GROUP) \
+                  --secrets \
+                    "db-connection=${DB_CONN}" \
+                    "sb-connection=${SB_CONN}" \
+                    "encryption-key=${ENC_KEY}" \
+                    "encryption-salt=${ENC_SALT}" \
+                    "acs-connection=${ACS_CONN}"
+
+                az containerapp update \
+                  --name $(WORKER_APP_NAME) \
+                  --resource-group $(RESOURCE_GROUP) \
+                  --image $(GHCR_REGISTRY)/$(GITHUB_REPO)/worker:$(Build.BuildId) \
+                  --set-env-vars \
+                    "ConnectionStrings__DefaultConnection=secretref:db-connection" \
+                    "Messaging__Provider=ServiceBus" \
+                    "ServiceBus__ConnectionString=secretref:sb-connection" \
+                    "ServiceBus__ExecutionQueueName=pipeline-executions" \
+                    "ServiceBus__CancellationQueueName=pipeline-cancellations" \
+                    "Encryption__Key=secretref:encryption-key" \
+                    "Encryption__Salt=secretref:encryption-salt" \
+                    "AzureCommunicationServices__ConnectionString=secretref:acs-connection" \
+                    "AzureCommunicationServices__SenderEmailAddress=$(AzureCommunication__SenderEmailAddress)" \
+                    "EmailService__UseStub=false" \
+                    "DOTNET_ENVIRONMENT=Production"
+
+                echo "✅ Worker updated to worker:$(Build.BuildId)"

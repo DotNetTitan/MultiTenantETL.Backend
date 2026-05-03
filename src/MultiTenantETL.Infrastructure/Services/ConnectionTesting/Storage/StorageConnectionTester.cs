@@ -9,20 +9,17 @@ namespace MultiTenantETL.Infrastructure.Services.ConnectionTesting.Storage;
 public class StorageConnectionTester : IStorageConnectionTester
 {
     private readonly AzureBlobConnectionTester _azureBlobTester;
-    private readonly S3ConnectionTester _s3Tester;
     private readonly FtpConnectionTester _ftpTester;
     private readonly SftpConnectionTester _sftpTester;
     private readonly ILogger<StorageConnectionTester> _logger;
 
     public StorageConnectionTester(
         AzureBlobConnectionTester azureBlobTester,
-        S3ConnectionTester s3Tester,
         FtpConnectionTester ftpTester,
         SftpConnectionTester sftpTester,
         ILogger<StorageConnectionTester> logger)
     {
         _azureBlobTester = azureBlobTester;
-        _s3Tester = s3Tester;
         _ftpTester = ftpTester;
         _sftpTester = sftpTester;
         _logger = logger;
@@ -57,7 +54,6 @@ public class StorageConnectionTester : IStorageConnectionTester
                 "Local" => LocalFileConnectionTester.TestConnection(fileConfig),
                 "FTP" => await _ftpTester.TestConnectionAsync(fileConfig),
                 "SFTP" => await _sftpTester.TestConnectionAsync(fileConfig),
-                "S3" => await _s3Tester.TestConnectionAsync(fileConfig),
                 "AzureBlob" => await _azureBlobTester.TestConnectionAsync(fileConfig),
                 _ => new ConnectionTestResult
                 {

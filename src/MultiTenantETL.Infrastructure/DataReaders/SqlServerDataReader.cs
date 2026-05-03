@@ -18,8 +18,8 @@ public class SqlServerDataReader : IDataReader
 
     public SqlServerDataReader(ILogger<SqlServerDataReader> logger, IOptions<EtlSettings> settings)
     {
-        _logger = logger;
-        _settings = settings.Value;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
     }
 
     public async IAsyncEnumerable<ReadBatch> ReadAsync(
@@ -160,8 +160,24 @@ public class SqlServerDataReader : IDataReader
 
     private SqlServerConfig ParseConfig(string configJson)
     {
-        return JsonSerializer.Deserialize<SqlServerConfig>(configJson) 
-            ?? throw new InvalidOperationException("Invalid SQL Server configuration");
+        SqlServerConfig config;
+        try
+        {
+            config = JsonSerializer.Deserialize<SqlServerConfig>(configJson)
+                ?? throw new InvalidOperationException("Invalid SQL Server configuration");
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException("Failed to parse SQL Server connector configuration", ex);
+        }
+
+        // Validate required fields
+        if (string.IsNullOrEmpty(config.ConnectionString))
+        {
+            throw new InvalidOperationException("SQL Server configuration must include ConnectionString");
+        }
+
+        return config;
     }
 
     private class SqlServerConfig

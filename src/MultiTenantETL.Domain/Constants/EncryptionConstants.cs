@@ -6,6 +6,12 @@ namespace MultiTenantETL.Domain.Constants;
 public static class EncryptionConstants
 {
     /// <summary>
+    /// Prefix used to indicate a field value is a Key Vault secret reference.
+    /// Format: keyvault:{secretName}
+    /// </summary>
+    public const string SecretReferencePrefix = "keyvault:";
+
+    /// <summary>
     /// Field names that contain sensitive data and should be encrypted.
     /// Used for encrypting/decrypting connector configurations.
     /// </summary>

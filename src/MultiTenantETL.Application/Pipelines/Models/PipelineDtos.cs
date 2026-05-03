@@ -1,40 +1,38 @@
-using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
+using MultiTenantETL.Application.Scheduling.Models;
 
 namespace MultiTenantETL.Application.Pipelines.Models;
 
 public record CreatePipelineRequest
 {
-    [Required]
-    [StringLength(200, MinimumLength = 2)]
     public required string Name { get; init; }
 
-    [StringLength(500)]
     public string? Description { get; init; }
 
-    [Required]
     public Guid SourceConnectorId { get; init; }
 
-    [Required]
     public Guid DestinationConnectorId { get; init; }
 
-    [Required]
     public required JsonElement FieldMappings { get; init; } // Array of field mappings
+
+    public List<string>? NotificationEmails { get; init; } // Email addresses to notify after execution
+
+    public bool EmailNotificationsEnabled { get; init; } = true; // Email notifications enabled by default
 }
 
 public record UpdatePipelineRequest
 {
-    [Required]
-    [StringLength(200, MinimumLength = 2)]
     public required string Name { get; init; }
 
-    [StringLength(500)]
     public string? Description { get; init; }
 
-    [Required]
     public required JsonElement FieldMappings { get; init; }
 
     public bool? IsActive { get; init; }
+
+    public List<string>? NotificationEmails { get; init; } // Email addresses to notify after execution
+
+    public bool? EmailNotificationsEnabled { get; init; } // Nullable to allow partial updates
 }
 
 public record PipelineResponse
@@ -50,7 +48,10 @@ public record PipelineResponse
     public required string Status { get; init; }
     public required JsonElement FieldMappings { get; init; }
     public bool IsScheduled { get; init; }
+    public ScheduleResponse? Schedule { get; init; }
     public bool IsActive { get; init; }
+    public List<string>? NotificationEmails { get; init; }
+    public bool EmailNotificationsEnabled { get; init; }
     public DateTime? LastRunAt { get; init; }
     public string? LastRunStatus { get; init; }
     public int? LastRunRecordsProcessed { get; init; }

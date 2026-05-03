@@ -26,6 +26,12 @@ public class PipelineSchedule : ITenantResource
     /// Whether this schedule is currently active and should trigger executions
     /// </summary>
     public bool IsActive { get; set; }
+
+    /// <summary>
+    /// Indicates the schedule was auto-paused because its pipeline was deactivated.
+    /// This preserves the difference between pipeline pauses and manual user disables.
+    /// </summary>
+    public bool IsPausedByPipeline { get; set; }
     
     /// <summary>
     /// Human-readable description of the schedule

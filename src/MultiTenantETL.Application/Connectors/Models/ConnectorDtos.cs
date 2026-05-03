@@ -5,26 +5,16 @@ namespace MultiTenantETL.Application.Connectors.Models;
 
 public record CreateConnectorRequest
 {
-    [Required]
-    [StringLength(200, MinimumLength = 2)]
     public required string Name { get; init; }
 
-    [StringLength(500)]
     public string? Description { get; init; }
 
-    [Required]
-    [StringLength(50)]
     public required string Type { get; init; } // Database, File, API
 
-    [Required]
-    [StringLength(100)]
     public required string Provider { get; init; } // SqlServer, PostgreSQL, CSV, etc.
 
-    [Required]
-    [StringLength(20)]
     public required string Direction { get; init; } // source, destination, both
 
-    [Required]
     public required JsonElement Config { get; init; } // Type-specific configuration
 
     public JsonElement? Schema { get; init; } // Optional schema definition
@@ -32,18 +22,16 @@ public record CreateConnectorRequest
 
 public record UpdateConnectorRequest
 {
-    [Required]
-    [StringLength(200, MinimumLength = 2)]
     public required string Name { get; init; }
 
-    [StringLength(500)]
     public string? Description { get; init; }
 
-    [Required]
-    [StringLength(20)]
+    public required string Type { get; init; } // Read-only, used for validation only
+
+    public required string Provider { get; init; } // Read-only, used for validation only
+
     public required string Direction { get; init; }
 
-    [Required]
     public required JsonElement Config { get; init; }
 
     public JsonElement? Schema { get; init; }
@@ -91,15 +79,10 @@ public record ConnectorListResponse
 
 public record TestConnectionRequest
 {
-    [Required]
-    [StringLength(50)]
     public required string Type { get; init; }
 
-    [Required]
-    [StringLength(100)]
     public required string Provider { get; init; }
 
-    [Required]
     public required JsonElement Config { get; init; }
 }
 
@@ -113,27 +96,19 @@ public record TestConnectionResponse
 
 public record DetectSchemaRequest
 {
-    [Required]
     public Guid ConnectorId { get; init; }
 
-    [StringLength(200)]
     public string? TableOrResourceName { get; init; } // For databases: table name, For APIs: endpoint
 }
 
 public record DetectSchemaPreviewRequest
 {
-    [Required]
-    [StringLength(50)]
     public required string Type { get; init; } // Database, File, API
 
-    [Required]
-    [StringLength(100)]
     public required string Provider { get; init; } // SqlServer, PostgreSQL, MySQL, etc.
 
-    [Required]
     public required JsonElement Config { get; init; } // Connection configuration
 
-    [StringLength(200)]
     public string? TableOrResourceName { get; init; } // For databases: table name
 }
 
@@ -189,6 +164,11 @@ public record DatabaseConfig
     public bool UseCustomConnectionString { get; init; }
     public string? ConnectionString { get; init; }
     public Dictionary<string, string>? AdditionalParameters { get; init; }
+    // Cosmos DB fields
+    public string? CosmosEndpoint { get; init; }
+    public string? CosmosKey { get; init; }
+    public string? Container { get; init; }
+    public string? Query { get; init; }
 }
 
 public record FileConfig
@@ -210,12 +190,6 @@ public record FileConfig
     public int? SftpPort { get; init; }
     public string? SftpUsername { get; init; }
     public string? SftpPassword { get; init; }
-    // S3
-    public string? S3Bucket { get; init; }
-    public string? S3Region { get; init; }
-    public string? S3AccessKey { get; init; }
-    public string? S3SecretKey { get; init; }
-    public string? S3Endpoint { get; init; } // Optional custom endpoint (for MinIO, etc.)
     // Azure Blob
     public string? AzureAccountName { get; init; }
     public string? AzureContainer { get; init; }
@@ -250,7 +224,7 @@ public record ApiConfig
 
 public record ApiEndpoint
 {
-    public required string Method { get; init; } // GET, POST, PUT, PATCH, DELETE
+    public required string Method { get; init; } // GET, POST, PUT, DELETE
     public required string Path { get; init; } // e.g., /api/users
     public string? Name { get; init; } // Friendly name
     public string? ResponseDataPath { get; init; } // JSON path to extract data (e.g., data.results)
@@ -284,4 +258,53 @@ public record ApiWriteConfig
     public bool WrapInArray { get; init; }
     public string? RootKey { get; init; }
     public int BatchSize { get; init; } = 100;
+}
+
+/// <summary>
+/// Configuration model for Email connector type.
+/// The email body contains only a summary; all data rows go into the file attachment.
+/// </summary>
+public record EmailConfig
+{
+    /// <summary>Recipient email addresses (required, at least one)</summary>
+    public List<string> Recipients { get; init; } = new();
+
+    /// <summary>CC recipient email addresses (optional)</summary>
+    public List<string>? CcRecipients { get; init; }
+
+    /// <summary>Email subject line (required)</summary>
+    public string? Subject { get; init; }
+
+    /// <summary>Optional custom message included in the email body alongside the auto-generated summary</summary>
+    public string? BodyMessage { get; init; }
+
+    /// <summary>File format for the data attachment: CSV, JSON, or Excel</summary>
+    public string? AttachmentFormat { get; init; } // CSV, JSON, Excel
+
+    /// <summary>Base filename for the attachment (timestamp is appended automatically)</summary>
+    public string? AttachmentFileName { get; init; }
+}
+
+/// <summary>
+/// Write configuration for Email connector destination.
+/// </summary>
+public record EmailWriteConfig
+{
+    /// <summary>Whether to send email when the pipeline produces no data rows</summary>
+    public bool SendEmptyReport { get; init; } = false;
+}
+
+/// <summary>
+/// Request model for previewing the email template with the user's configuration values.
+/// </summary>
+public record EmailPreviewRequest
+{
+    /// <summary>Optional custom body message to include in the email</summary>
+    public string? BodyMessage { get; init; }
+
+    /// <summary>Attachment format: CSV, JSON, or Excel</summary>
+    public string? AttachmentFormat { get; init; }
+
+    /// <summary>Base filename for the attachment</summary>
+    public string? AttachmentFileName { get; init; }
 }

@@ -1,5 +1,6 @@
 using Azure;
 using Azure.Communication.Email;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MultiTenantETL.Application.Interfaces;
@@ -14,10 +15,12 @@ namespace MultiTenantETL.Infrastructure.Services
     {
         private readonly EmailClient _emailClient;
         private readonly string _senderAddress;
+        private readonly string _frontendUrl;
         private readonly ILogger<AzureCommunicationEmailService> _logger;
 
         public AzureCommunicationEmailService(
             IOptions<AzureCommunicationSettings> settings,
+            IConfiguration configuration,
             ILogger<AzureCommunicationEmailService> logger)
         {
             _logger = logger;
@@ -36,6 +39,8 @@ namespace MultiTenantETL.Infrastructure.Services
 
             _emailClient = new EmailClient(settings.Value.ConnectionString);
             _senderAddress = settings.Value.SenderEmailAddress;
+            _frontendUrl = configuration["AppSettings:FrontendUrl"]
+                ?? throw new InvalidOperationException("AppSettings:FrontendUrl is not configured.");
         }
 
         public async Task SendEmailConfirmationAsync(string email, string firstName, string confirmationUrl)
@@ -55,7 +60,7 @@ namespace MultiTenantETL.Infrastructure.Services
         public async Task SendWelcomeEmailAsync(string email, string firstName)
         {
             var subject = "Welcome to MultiTenant ETL!";
-            var htmlContent = EmailTemplates.GetWelcome(firstName);
+            var htmlContent = EmailTemplates.GetWelcome(firstName, _frontendUrl);
             await SendEmailAsync(email, subject, htmlContent);
         }
 
@@ -64,6 +69,100 @@ namespace MultiTenantETL.Infrastructure.Services
             var subject = "Password Changed - MultiTenant ETL";
             var htmlContent = EmailTemplates.GetPasswordChanged(firstName);
             await SendEmailAsync(email, subject, htmlContent);
+        }
+        
+        public async Task SendPipelineExecutionReportAsync(
+            string recipientEmail,
+            string pipelineName,
+            string executionId,
+            string executionStatus,
+            DateTimeOffset startTime,
+            DateTimeOffset? endTime,
+            TimeSpan? duration,
+            long recordsProcessed,
+            long recordsSucceeded,
+            long recordsFailed,
+            string? errorMessage,
+            string executionDetailsUrl)
+        {
+            var subject = $"Pipeline Execution Report: {pipelineName} - {executionStatus}";
+            var htmlContent = EmailTemplates.GetPipelineExecutionReport(
+                pipelineName,
+                executionId,
+                executionStatus,
+                startTime,
+                endTime,
+                duration,
+                recordsProcessed,
+                recordsSucceeded,
+                recordsFailed,
+                errorMessage,
+                executionDetailsUrl);
+            await SendEmailAsync(recipientEmail, subject, htmlContent);
+        }
+
+        /// <inheritdoc/>
+        public async Task<bool> SendDataExportEmailAsync(
+            List<string> recipients,
+            List<string>? ccRecipients,
+            string subject,
+            string htmlBody,
+            string attachmentFileName,
+            string attachmentMediaType,
+            byte[] attachmentContent)
+        {
+            try
+            {
+                if (recipients == null || recipients.Count == 0)
+                {
+                    _logger.LogError("Cannot send data export email: no recipients specified");
+                    return false;
+                }
+
+                var toRecipients = recipients
+                    .Select(r => new EmailAddress(r))
+                    .ToList();
+
+                var ccList = ccRecipients?
+                    .Where(cc => !string.IsNullOrWhiteSpace(cc))
+                    .Select(cc => new EmailAddress(cc))
+                    .ToList() ?? new List<EmailAddress>();
+
+                var emailRecipients = new EmailRecipients(toRecipients, ccList);
+
+                var emailMessage = new EmailMessage(
+                    senderAddress: _senderAddress,
+                    recipients: emailRecipients,
+                    content: new EmailContent(subject)
+                    {
+                        Html = htmlBody
+                    }
+                );
+
+                var attachment = new EmailAttachment(
+                    attachmentFileName,
+                    attachmentMediaType,
+                    new BinaryData(attachmentContent));
+                emailMessage.Attachments.Add(attachment);
+
+                await _emailClient.SendAsync(WaitUntil.Started, emailMessage);
+
+                _logger.LogInformation(
+                    "Data export email sent to {RecipientCount} recipients with attachment '{FileName}' ({Size} bytes)",
+                    recipients.Count, attachmentFileName, attachmentContent.Length);
+                return true;
+            }
+            catch (RequestFailedException ex)
+            {
+                _logger.LogError(ex, "Azure Communication Services error sending data export email: {ErrorCode} - {Message}",
+                    ex.ErrorCode, ex.Message);
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send data export email to {RecipientCount} recipients", recipients.Count);
+                return false;
+            }
         }
 
         private async Task<bool> SendEmailAsync(string to, string subject, string htmlContent)

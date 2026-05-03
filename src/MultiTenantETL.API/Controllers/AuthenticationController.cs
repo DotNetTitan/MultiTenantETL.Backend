@@ -62,7 +62,15 @@ namespace MultiTenantETL.API.Controllers
             if (request.IsRefreshTokenGrantType())
                 return await HandleRefreshTokenFlow(request);
 
-            throw new NotImplementedException("The specified grant type is not implemented.");
+            return Forbid(
+                authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
+                properties: new AuthenticationProperties(new Dictionary<string, string?>
+                {
+                    [OpenIddictServerAspNetCoreConstants.Properties.Error] =
+                        OpenIddictConstants.Errors.UnsupportedGrantType,
+                    [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] =
+                        "The specified grant type is not supported by this authorization server."
+                }));
         }
 
         [HttpPost("revoke")]
@@ -80,16 +88,25 @@ namespace MultiTenantETL.API.Controllers
                 });
             }
 
-            // Find the token in the database
-            var token = await _tokenManager.FindByIdAsync(request.Token);
-            if (token == null)
+            var revoked = false;
+
+            var referenceToken = await _tokenManager.FindByReferenceIdAsync(request.Token);
+            if (referenceToken != null)
             {
-                // Token not found - this is not an error per RFC 7009
-                return Ok();
+                revoked = true;
+                await _tokenManager.TryRevokeAsync(referenceToken);
             }
 
-            // Revoke the token and any associated tokens (e.g., refresh tokens)
-            await _tokenManager.TryRevokeAsync(token);
+            if (!revoked)
+            {
+                // Fallback to token id lookup for compatibility with non-reference tokens.
+                var token = await _tokenManager.FindByIdAsync(request.Token);
+                if (token != null)
+                {
+                    revoked = true;
+                    await _tokenManager.TryRevokeAsync(token);
+                }
+            }
 
             return Ok();
         }
@@ -101,9 +118,13 @@ namespace MultiTenantETL.API.Controllers
             var request = HttpContext.GetOpenIddictServerRequest() ??
                 throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
 
+            // Check if prompt=login is requested (forces re-authentication)
+            var prompt = request.GetParameter("prompt")?.ToString();
+            var forceLogin = prompt == "login";
+
             // Standard OAuth flow: check if user is already authenticated via cookie
             var result = await HttpContext.AuthenticateAsync(IdentityConstants.ApplicationScheme);
-            if (result.Succeeded)
+            if (result.Succeeded && result.Principal != null && !forceLogin)
             {
                 var user = await _userManager.GetUserAsync(result.Principal);
                 if (user != null && await _signInManager.CanSignInAsync(user) && user.IsActive)
@@ -112,6 +133,17 @@ namespace MultiTenantETL.API.Controllers
                     principal.SetScopes(request.GetScopes());
                     return SignIn(principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
                 }
+                else
+                {
+                    // User exists in cookie but is no longer valid - clear the stale authentication
+                    await HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
+                }
+            }
+
+            // If forceLogin is requested, sign out first
+            if (forceLogin && result.Succeeded)
+            {
+                await HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
             }
 
             // User is not authenticated - redirect to login page
@@ -254,7 +286,7 @@ namespace MultiTenantETL.API.Controllers
             var info = await HttpContext.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
             var user = info.Principal != null ? await _userManager.GetUserAsync(info.Principal) : null;
 
-            if (user == null || !await _signInManager.CanSignInAsync(user))
+            if (user == null || !await _signInManager.CanSignInAsync(user) || !user.IsActive)
             {
                 return Forbid(
                     authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,

@@ -24,5 +24,35 @@ namespace MultiTenantETL.Application.Interfaces
         /// Send notification that password was changed
         /// </summary>
         Task SendPasswordChangedNotificationAsync(string email, string firstName);
+        
+        /// <summary>
+        /// Send pipeline execution report to specified email address
+        /// </summary>
+        Task SendPipelineExecutionReportAsync(
+            string recipientEmail, 
+            string pipelineName, 
+            string executionId,
+            string executionStatus,
+            DateTimeOffset startTime,
+            DateTimeOffset? endTime,
+            TimeSpan? duration,
+            long recordsProcessed,
+            long recordsSucceeded,
+            long recordsFailed,
+            string? errorMessage,
+            string executionDetailsUrl);
+
+        /// <summary>
+        /// Send data export email with file attachment. Used by the Email connector destination.
+        /// Exactly one email is sent per pipeline execution containing all exported data as a file attachment.
+        /// </summary>
+        Task<bool> SendDataExportEmailAsync(
+            List<string> recipients,
+            List<string>? ccRecipients,
+            string subject,
+            string htmlBody,
+            string attachmentFileName,
+            string attachmentMediaType,
+            byte[] attachmentContent);
     }
 }

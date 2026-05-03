@@ -78,9 +78,8 @@ public class FormatValidator : IFormatValidator
             return "csv";
         }
 
-        // Default to JSONL for cloud storage (S3, Azure Blob)
-        if (context.DestinationType.Equals("S3", StringComparison.OrdinalIgnoreCase) ||
-            context.DestinationType.Equals("AzureBlob", StringComparison.OrdinalIgnoreCase))
+        // Default to JSONL for cloud storage (Azure Blob)
+        if (context.DestinationType.Equals("AzureBlob", StringComparison.OrdinalIgnoreCase))
         {
             return "jsonl";
         }

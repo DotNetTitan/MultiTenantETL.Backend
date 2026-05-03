@@ -4,9 +4,9 @@ using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
-using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
+using MultiTenantETL.Infrastructure.Security;
 using Npgsql;
 
 namespace MultiTenantETL.Infrastructure.DataWriters;
@@ -14,12 +14,12 @@ namespace MultiTenantETL.Infrastructure.DataWriters;
 public class PostgreSqlDataWriter : IDataWriter
 {
     private readonly ILogger<PostgreSqlDataWriter> _logger;
-    private readonly IEncryptionService _encryptionService;
+    private readonly ISecretResolver _secretResolver;
 
-    public PostgreSqlDataWriter(ILogger<PostgreSqlDataWriter> logger, IEncryptionService encryptionService)
+    public PostgreSqlDataWriter(ILogger<PostgreSqlDataWriter> logger, ISecretResolver secretResolver)
     {
-        _logger = logger;
-        _encryptionService = encryptionService;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _secretResolver = secretResolver ?? throw new ArgumentNullException(nameof(secretResolver));
     }
 
     public async Task<DataWriteResult> WriteBatchAsync(
@@ -28,23 +28,22 @@ public class PostgreSqlDataWriter : IDataWriter
         WriteOptions options,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        
         var result = new DataWriteResult { BatchId = batch.BatchId };
+        
+        var config = ParseConfig(connector.ConfigJson);
         
         try
         {
-            var config = ParseConfig(connector.ConfigJson);
-            
-            if (string.IsNullOrEmpty(config.TableName))
-            {
-                throw new InvalidOperationException("Table name is required for PostgreSQL writer");
-            }
             
             await using var connection = new NpgsqlConnection(config.ConnectionString);
             await connection.OpenAsync(cancellationToken);
 
             if (options.TruncateBeforeLoad)
             {
-                await TruncateTableAsync(connection, config.TableName, cancellationToken);
+                _logger.LogInformation("Truncating table {TableName}", config.TableName);
+                await TruncateTableAsync(connection, config.TableName!, cancellationToken);
             }
 
             _logger.LogDebug("Batch has {RowCount} rows", batch.Rows.Count);
@@ -58,7 +57,7 @@ public class PostgreSqlDataWriter : IDataWriter
             // Use upsert if requested and keys are provided
             if (options.UseUpsert && options.UpsertKeys?.Count > 0)
             {
-                return await UpsertBatchAsync(connection, config.TableName, batch, options, cancellationToken);
+                return await UpsertBatchAsync(connection, config.TableName!, batch, options, cancellationToken);
             }
 
             // Use COPY for bulk insert (fastest for PostgreSQL)
@@ -134,7 +133,7 @@ public class PostgreSqlDataWriter : IDataWriter
         var updateSet = string.Join(", ", updateColumns.Select(c => $"\"{c}\" = EXCLUDED.\"{c}\""));
 
         var sql = $@"
-            INSERT INTO {tableName} ({columnList})
+            INSERT INTO ""{tableName}"" ({columnList})
             VALUES ({valuePlaceholders})
             ON CONFLICT ({conflictColumns})
             DO UPDATE SET {updateSet}";
@@ -146,9 +145,15 @@ public class PostgreSqlDataWriter : IDataWriter
             for (int rowIndex = 0; rowIndex < batch.Rows.Count; rowIndex++)
             {
                 var row = batch.Rows[rowIndex];
+                // Use a safe savepoint name (rowIndex is always a non-negative integer from for loop)
+                var savepointName = $"sp_row_{rowIndex}";
                 
                 try
                 {
+                    // Create a savepoint before each row operation
+                    await using var savepointCommand = new NpgsqlCommand($"SAVEPOINT {savepointName}", connection, transaction);
+                    await savepointCommand.ExecuteNonQueryAsync(cancellationToken);
+                    
                     await using var command = new NpgsqlCommand(sql, connection, transaction);
                     
                     for (int i = 0; i < columns.Count; i++)
@@ -159,9 +164,26 @@ public class PostgreSqlDataWriter : IDataWriter
 
                     await command.ExecuteNonQueryAsync(cancellationToken);
                     result.RowsWritten++;
+                    
+                    // Release the savepoint on success to free resources
+                    await using var releaseCommand = new NpgsqlCommand($"RELEASE SAVEPOINT {savepointName}", connection, transaction);
+                    await releaseCommand.ExecuteNonQueryAsync(cancellationToken);
                 }
                 catch (Exception ex)
                 {
+                    // Rollback to savepoint on error, allowing the transaction to continue
+                    try
+                    {
+                        await using var rollbackCommand = new NpgsqlCommand($"ROLLBACK TO SAVEPOINT {savepointName}", connection, transaction);
+                        await rollbackCommand.ExecuteNonQueryAsync(cancellationToken);
+                    }
+                    catch (Exception rollbackEx)
+                    {
+                        // If savepoint rollback fails, the transaction is likely in an unrecoverable state
+                        // Log the error and let the outer catch block handle transaction rollback
+                        _logger.LogError(rollbackEx, "Failed to rollback to savepoint for row {RowIndex}. Transaction may be in invalid state.", rowIndex);
+                    }
+                    
                     result.RowsFailed++;
                     result.RowErrors.Add(new RowError
                     {
@@ -189,19 +211,34 @@ public class PostgreSqlDataWriter : IDataWriter
 
     private async Task TruncateTableAsync(NpgsqlConnection connection, string tableName, CancellationToken cancellationToken)
     {
+        _logger.LogInformation("Truncating table {TableName}", tableName);
         await using var command = new NpgsqlCommand($"TRUNCATE TABLE {tableName}", connection);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private PostgreSqlConfig ParseConfig(string configJson)
     {
-        var jsonElement = JsonSerializer.Deserialize<JsonElement>(configJson);
-        
-        // Decrypt sensitive fields
-        var decryptedElement = _encryptionService.DecryptJsonFields(jsonElement, EncryptionConstants.SensitiveFields);
-        
-        var config = JsonSerializer.Deserialize<PostgreSqlConfig>(decryptedElement.GetRawText(), JsonSerializerOptionsProvider.Default)
-            ?? throw new InvalidOperationException("Invalid PostgreSQL configuration");
+        PostgreSqlConfig config;
+        try
+        {
+            // Resolve Key Vault secrets
+            var resolvedElement = _secretResolver.ResolveSecretsAsync(configJson).GetAwaiter().GetResult();
+            
+            config = JsonSerializer.Deserialize<PostgreSqlConfig>(resolvedElement.GetRawText(), JsonSerializerOptionsProvider.Default)
+                ?? throw new InvalidOperationException("Invalid PostgreSQL configuration");
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException("Failed to parse PostgreSQL connector configuration", ex);
+        }
+
+        // Validate that either ConnectionString is provided, or all required fields for building it
+        if (string.IsNullOrEmpty(config.ConnectionString) && 
+            (string.IsNullOrEmpty(config.Host) || string.IsNullOrEmpty(config.Database) || 
+             string.IsNullOrEmpty(config.Username) || string.IsNullOrEmpty(config.Password)))
+        {
+            throw new InvalidOperationException("PostgreSQL configuration must include ConnectionString");
+        }
 
         // Build connection string if not provided directly
         if (string.IsNullOrEmpty(config.ConnectionString))
@@ -215,11 +252,28 @@ public class PostgreSqlDataWriter : IDataWriter
             config.TableName = config.WriteConfig.TableName;
         }
 
+        if (string.IsNullOrEmpty(config.TableName))
+        {
+            throw new InvalidOperationException("PostgreSQL configuration must include TableName");
+        }
+
         return config;
     }
 
     private string BuildConnectionString(PostgreSqlConfig config)
     {
+        if (string.IsNullOrEmpty(config.Host))
+            throw new InvalidOperationException("PostgreSQL configuration must include Host");
+
+        if (string.IsNullOrEmpty(config.Database))
+            throw new InvalidOperationException("PostgreSQL configuration must include Database");
+
+        if (string.IsNullOrEmpty(config.Username))
+            throw new InvalidOperationException("PostgreSQL configuration must include Username");
+
+        if (string.IsNullOrEmpty(config.Password))
+            throw new InvalidOperationException("PostgreSQL configuration must include Password");
+
         var builder = new NpgsqlConnectionStringBuilder
         {
             Host = config.Host,

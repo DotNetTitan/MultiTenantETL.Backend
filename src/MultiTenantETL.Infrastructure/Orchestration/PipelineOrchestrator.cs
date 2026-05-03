@@ -1,12 +1,16 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Application.DataAccess;
+using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Application.Orchestration;
+using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Domain.Enums;
+using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.Persistence;
 
 namespace MultiTenantETL.Infrastructure.Orchestration;
@@ -17,6 +21,8 @@ public class PipelineOrchestrator : IPipelineOrchestrator
     private readonly IDataReaderFactory _readerFactory;
     private readonly IDataWriterFactory _writerFactory;
     private readonly IFieldMappingService _fieldMappingService;
+    private readonly IEmailService _emailService;
+    private readonly string? _frontendUrl;
     private readonly ILogger<PipelineOrchestrator> _logger;
 
     public PipelineOrchestrator(
@@ -24,12 +30,16 @@ public class PipelineOrchestrator : IPipelineOrchestrator
         IDataReaderFactory readerFactory,
         IDataWriterFactory writerFactory,
         IFieldMappingService fieldMappingService,
+        IEmailService emailService,
+        IOptions<AzureCommunicationSettings> azureSettings,
         ILogger<PipelineOrchestrator> logger)
     {
         _context = context;
         _readerFactory = readerFactory;
         _writerFactory = writerFactory;
         _fieldMappingService = fieldMappingService;
+        _emailService = emailService;
+        _frontendUrl = azureSettings.Value.FrontendUrl;
         _logger = logger;
     }
 
@@ -60,7 +70,18 @@ public class PipelineOrchestrator : IPipelineOrchestrator
             
             if (!result.WasCancelled)
             {
-                await CompleteExecutionAsync(execution, result, cancellationToken);
+                if (result.HasBatchFailures)
+                {
+                    var errorMessage = result.Errors.Count == 1
+                        ? result.Errors[0]
+                        : $"Execution encountered {result.Errors.Count} failed batches: {string.Join(" | ", result.Errors)}";
+
+                    await FailExecutionAsync(execution, errorMessage, cancellationToken, result);
+                }
+                else
+                {
+                    await CompleteExecutionAsync(execution, result, cancellationToken);
+                }
             }
         }
         catch (Exception ex)
@@ -125,24 +146,43 @@ public class PipelineOrchestrator : IPipelineOrchestrator
 
         _logger.LogInformation("Execution {ExecutionId} completed: {TotalProcessed} records processed",
             execution.Id, result.TotalProcessed);
+        
+        // Send notification emails
+        await SendExecutionNotificationAsync(execution, cancellationToken);
     }
 
-    private async Task FailExecutionAsync(PipelineExecution execution, string errorMessage, CancellationToken cancellationToken)
+    private async Task FailExecutionAsync(
+        PipelineExecution execution,
+        string errorMessage,
+        CancellationToken cancellationToken,
+        BatchProcessingResult? result = null)
     {
         execution.Status = ExecutionStatus.Failed;
         execution.EndTime = DateTimeOffset.UtcNow;
         execution.Duration = execution.EndTime.Value - execution.StartTime;
         execution.ErrorMessage = errorMessage;
 
+        if (result != null)
+        {
+            execution.RecordsProcessed = result.TotalProcessed;
+            execution.RecordsSucceeded = result.TotalSucceeded;
+            execution.RecordsFailed = result.TotalFailed;
+            execution.BatchCount = result.BatchIndex;
+        }
+
         // Update pipeline's last run tracking fields
         if (execution.Pipeline != null)
         {
             execution.Pipeline.LastRunAt = DateTime.UtcNow;
             execution.Pipeline.LastRunStatus = "Failed";
+            execution.Pipeline.LastRunRecordsProcessed = (int?)result?.TotalProcessed;
         }
 
         await _context.SaveChangesAsync(cancellationToken);
         await AddLogEntryAsync(execution, "Error", "System", errorMessage, cancellationToken);
+        
+        // Send notification emails
+        await SendExecutionNotificationAsync(execution, cancellationToken);
     }
 
     private async Task CancelExecutionAsync(PipelineExecution execution, CancellationToken cancellationToken)
@@ -160,6 +200,9 @@ public class PipelineOrchestrator : IPipelineOrchestrator
 
         await _context.SaveChangesAsync(cancellationToken);
         await AddLogEntryAsync(execution, "Warning", "System", "Execution cancelled by user", cancellationToken);
+        
+        // Send notification emails
+        await SendExecutionNotificationAsync(execution, cancellationToken);
     }
 
     private async Task<BatchProcessingResult> ProcessBatchesAsync(
@@ -172,6 +215,16 @@ public class PipelineOrchestrator : IPipelineOrchestrator
 
         var readOptions = new ReadOptions { BatchSize = 1000 };
         var writeOptions = ExtractWriteOptions(pipeline.DestinationConnector!);
+        
+        // Add execution context parameters for filename resolution
+        writeOptions.Parameters = new Dictionary<string, object>
+        {
+            ["executionId"] = execution.Id,
+            ["pipelineId"] = pipeline.Id,
+            ["date"] = DateTime.UtcNow.ToString("yyyy-MM-dd"),
+            ["time"] = DateTime.UtcNow.ToString("HH-mm-ss"),
+            ["timestamp"] = DateTime.UtcNow.ToString("yyyyMMddHHmmss")
+        };
         var result = new BatchProcessingResult();
 
         await foreach (var batch in reader.ReadAsync(pipeline.SourceConnector!, readOptions, cancellationToken))
@@ -184,6 +237,7 @@ public class PipelineOrchestrator : IPipelineOrchestrator
             }
 
             result.BatchIndex++;
+            await AddLogEntryAsync(execution, "Info", "DataReader", $"Batch {result.BatchIndex}: Read {batch.RowCount} rows from source", cancellationToken);
             await ProcessBatchAsync(execution, pipeline, writer, batch, writeOptions, result, cancellationToken);
         }
 
@@ -215,12 +269,22 @@ public class PipelineOrchestrator : IPipelineOrchestrator
 
         try
         {
-            var mappedBatch = _fieldMappingService.ApplyFieldMappings(batch, pipeline.FieldMappingsJson);
+            // For Email destinations, strip unmapped fields so only explicitly
+            // mapped columns appear in the attachment (Email has no schema to
+            // filter columns — it exports all row keys as headers).
+            var stripUnmapped = string.Equals(
+                pipeline.DestinationConnector?.Type,
+                ConnectorTypes.Email,
+                StringComparison.OrdinalIgnoreCase);
+
+            var mappedBatch = _fieldMappingService.ApplyFieldMappings(
+                batch, pipeline.FieldMappingsJson, stripUnmapped);
             
             await AddLogEntryAsync(execution, "Info", "FieldMapping",
                 $"Batch {result.BatchIndex}: Applied field mappings, {batch.RowCount} → {mappedBatch.RowCount} rows",
                 cancellationToken);
 
+            await AddLogEntryAsync(execution, "Info", "DataWriter", $"Batch {result.BatchIndex}: Writing {mappedBatch.RowCount} rows to destination", cancellationToken);
             var writeResult = await writer.WriteBatchAsync(pipeline.DestinationConnector!, mappedBatch, writeOptions, cancellationToken);
 
             executionBatch.Status = BatchStatus.Completed;
@@ -239,6 +303,10 @@ public class PipelineOrchestrator : IPipelineOrchestrator
 
             await _context.SaveChangesAsync(cancellationToken);
 
+            await AddLogEntryAsync(execution, "Info", "Batch", 
+                $"Batch {result.BatchIndex} completed: {writeResult.RowsWritten} rows written, {writeResult.RowsFailed} rows failed", 
+                cancellationToken);
+
             _logger.LogInformation("Batch {BatchIndex} completed for execution {ExecutionId}: {Succeeded} succeeded, {Failed} failed",
                 result.BatchIndex, execution.Id, writeResult.RowsWritten, writeResult.RowsFailed);
         }
@@ -247,9 +315,18 @@ public class PipelineOrchestrator : IPipelineOrchestrator
             _logger.LogError(ex, "Error processing batch {BatchIndex} for execution {ExecutionId}", result.BatchIndex, execution.Id);
 
             executionBatch.Status = BatchStatus.Failed;
+            executionBatch.RowsSucceeded = 0;
             executionBatch.RowsFailed = batch.RowCount;
             executionBatch.EndedAt = DateTimeOffset.UtcNow;
+            result.TotalProcessed += batch.RowCount;
             result.TotalFailed += batch.RowCount;
+            result.HasBatchFailures = true;
+            result.Errors.Add($"Batch {result.BatchIndex} failed: {ex.Message}");
+
+            execution.RecordsProcessed = result.TotalProcessed;
+            execution.RecordsSucceeded = result.TotalSucceeded;
+            execution.RecordsFailed = result.TotalFailed;
+            execution.BatchCount = result.BatchIndex;
 
             await _context.SaveChangesAsync(cancellationToken);
             await AddLogEntryAsync(execution, "Error", "Batch", $"Batch {result.BatchIndex} failed: {ex.Message}", cancellationToken);
@@ -299,6 +376,89 @@ public class PipelineOrchestrator : IPipelineOrchestrator
 
         return options;
     }
+    
+    private async Task SendExecutionNotificationAsync(PipelineExecution execution, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (execution.Pipeline == null || string.IsNullOrEmpty(execution.Pipeline.NotificationEmailsJson))
+            {
+                return; // No notification emails configured
+            }
+
+            // Check if email notifications are enabled for this pipeline
+            if (!execution.Pipeline.EmailNotificationsEnabled)
+            {
+                _logger.LogInformation("Email notifications are disabled for pipeline {PipelineId}, skipping notification",
+                    execution.Pipeline.Id);
+                return;
+            }
+
+            List<string>? notificationEmails = null;
+            try
+            {
+                notificationEmails = JsonSerializer.Deserialize<List<string>>(execution.Pipeline.NotificationEmailsJson);
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogWarning(ex, "Failed to deserialize notification emails for pipeline {PipelineId}", execution.Pipeline.Id);
+                return;
+            }
+
+            if (notificationEmails == null || notificationEmails.Count == 0)
+            {
+                return; // No notification emails to send
+            }
+
+            if (string.IsNullOrEmpty(_frontendUrl))
+            {
+                _logger.LogWarning("Frontend URL not configured, cannot send execution notification emails");
+                return;
+            }
+
+            var executionDetailsUrl = $"{_frontendUrl}/executions";
+            
+            foreach (var email in notificationEmails)
+            {
+                if (string.IsNullOrWhiteSpace(email))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    await _emailService.SendPipelineExecutionReportAsync(
+                        recipientEmail: email.Trim(),
+                        pipelineName: execution.Pipeline.Name,
+                        executionId: execution.Id.ToString(),
+                        executionStatus: execution.Status.ToString(),
+                        startTime: execution.StartTime,
+                        endTime: execution.EndTime,
+                        duration: execution.Duration,
+                        recordsProcessed: execution.RecordsProcessed,
+                        recordsSucceeded: execution.RecordsSucceeded,
+                        recordsFailed: execution.RecordsFailed,
+                        errorMessage: execution.ErrorMessage,
+                        executionDetailsUrl: executionDetailsUrl);
+                        
+                    _logger.LogInformation("Sent execution notification email to {Email} for execution {ExecutionId}", 
+                        email, execution.Id);
+                }
+                catch (Exception ex)
+                {
+                    // Log but don't fail the execution
+                    _logger.LogError(ex, "Failed to send execution notification email to {Email} for execution {ExecutionId}", 
+                        email, execution.Id);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // Catch-all to ensure email failures don't affect execution completion
+            _logger.LogError(ex, "Unexpected error sending execution notification emails for execution {ExecutionId}", 
+                execution.Id);
+        }
+    }
 
     private sealed class BatchProcessingResult
     {
@@ -307,5 +467,7 @@ public class PipelineOrchestrator : IPipelineOrchestrator
         public long TotalSucceeded { get; set; }
         public long TotalFailed { get; set; }
         public bool WasCancelled { get; set; }
+        public bool HasBatchFailures { get; set; }
+        public List<string> Errors { get; } = new();
     }
 }

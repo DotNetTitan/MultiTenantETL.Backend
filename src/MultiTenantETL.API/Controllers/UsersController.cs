@@ -68,7 +68,7 @@ public class UsersController : ControllerBase
             Tenants = tenants.Select(ut => new UserTenantInfo
             {
                 TenantId = ut.TenantId,
-                TenantName = ut.Tenant.Name,
+                TenantName = ut.Tenant!.Name!,
                 RoleCode = ut.RoleCode,
                 IsActive = ut.IsActive
             }).ToList(),
@@ -220,7 +220,7 @@ public class UsersController : ControllerBase
             Tenants = tenants.Select(ut => new UserTenantInfo
             {
                 TenantId = ut.TenantId,
-                TenantName = ut.Tenant.Name,
+                TenantName = ut.Tenant!.Name!,
                 RoleCode = ut.RoleCode,
                 IsActive = ut.IsActive
             }).ToList(),
@@ -417,7 +417,7 @@ public class UsersController : ControllerBase
         var response = tenants.Select(ut => new UserTenantInfo
         {
             TenantId = ut.TenantId,
-            TenantName = ut.Tenant.Name,
+            TenantName = ut.Tenant!.Name!,
             RoleCode = ut.RoleCode,
             IsActive = ut.IsActive
         }).ToList();

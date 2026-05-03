@@ -7,10 +7,12 @@ using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Application.Pipelines;
 using MultiTenantETL.Application.Pipelines.Models;
 using MultiTenantETL.Application.Scheduling;
+using MultiTenantETL.Application.Scheduling.Models;
 using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.Persistence;
+using MultiTenantETL.Infrastructure.Scheduling;
 
 namespace MultiTenantETL.Infrastructure.Services;
 
@@ -72,6 +74,10 @@ public class PipelineService : IPipelineService
             DestinationConnectorId = request.DestinationConnectorId,
             Status = "Idle",
             FieldMappingsJson = NormalizeFieldMappings(request.FieldMappings),
+            NotificationEmailsJson = request.NotificationEmails != null && request.NotificationEmails.Count > 0
+                ? JsonSerializer.Serialize(request.NotificationEmails)
+                : null,
+            EmailNotificationsEnabled = request.EmailNotificationsEnabled,
             IsActive = true,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = userId
@@ -203,10 +209,18 @@ public class PipelineService : IPipelineService
         pipeline.Name = request.Name;
         pipeline.Description = request.Description;
         pipeline.FieldMappingsJson = NormalizeFieldMappings(request.FieldMappings);
+        pipeline.NotificationEmailsJson = request.NotificationEmails != null && request.NotificationEmails.Count > 0
+            ? JsonSerializer.Serialize(request.NotificationEmails)
+            : null;
 
         if (request.IsActive.HasValue)
         {
             pipeline.IsActive = request.IsActive.Value;
+        }
+
+        if (request.EmailNotificationsEnabled.HasValue)
+        {
+            pipeline.EmailNotificationsEnabled = request.EmailNotificationsEnabled.Value;
         }
 
         pipeline.UpdatedAt = DateTime.UtcNow;
@@ -371,7 +385,30 @@ public class PipelineService : IPipelineService
             Status = pipeline.Status,
             FieldMappings = JsonSerializer.Deserialize<JsonElement>(pipeline.FieldMappingsJson),
             IsScheduled = pipeline.Schedule?.IsActive ?? false,
+            Schedule = pipeline.Schedule != null ? new ScheduleResponse
+            {
+                Id = pipeline.Schedule.Id,
+                PipelineId = pipeline.Schedule.PipelineId,
+                PipelineName = pipeline.Name,
+                TenantId = pipeline.Schedule.TenantId,
+                CronExpression = pipeline.Schedule.CronExpression,
+                Timezone = pipeline.Schedule.Timezone,
+                Description = pipeline.Schedule.Description,
+                IsActive = pipeline.Schedule.IsActive,
+                NextRunAt = pipeline.Schedule.NextRunAt,
+                LastRunAt = pipeline.LastRunAt,
+                LastRunStatus = pipeline.LastRunStatus,
+                ConsecutiveFailures = pipeline.Schedule.ConsecutiveFailures,
+                MaxConsecutiveFailures = pipeline.Schedule.MaxConsecutiveFailures,
+                CronDescription = ScheduleService.GetCronDescription(pipeline.Schedule.CronExpression),
+                CreatedAt = pipeline.Schedule.CreatedAt,
+                UpdatedAt = pipeline.Schedule.UpdatedAt
+            } : null,
             IsActive = pipeline.IsActive,
+            EmailNotificationsEnabled = pipeline.EmailNotificationsEnabled,
+            NotificationEmails = !string.IsNullOrEmpty(pipeline.NotificationEmailsJson)
+                ? JsonSerializer.Deserialize<List<string>>(pipeline.NotificationEmailsJson)
+                : null,
             LastRunAt = pipeline.LastRunAt,
             LastRunStatus = pipeline.LastRunStatus,
             LastRunRecordsProcessed = pipeline.LastRunRecordsProcessed,

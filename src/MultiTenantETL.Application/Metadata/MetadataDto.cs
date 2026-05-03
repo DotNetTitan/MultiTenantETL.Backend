@@ -20,6 +20,7 @@ public class ConnectorConfigDto
     public List<FileFormatDto> FileFormats { get; set; } = new();
     public List<WriteOperationDto> WriteOperations { get; set; } = new();
     public List<HttpMethodDto> HttpMethods { get; set; } = new();
+    public List<ApiResponseFormatDto> ApiResponseFormats { get; set; } = new();
 }
 
 public class ConnectorTypeDto
@@ -62,6 +63,13 @@ public class HttpMethodDto
     public string Value { get; set; } = string.Empty;
     public string LabelKey { get; set; } = string.Empty;
     public string Color { get; set; } = string.Empty;
+}
+
+public class ApiResponseFormatDto
+{
+    public string Value { get; set; } = string.Empty;
+    public string LabelKey { get; set; } = string.Empty;
+    public bool IsSupported { get; set; }
 }
 
 public class TransformationTypeDto

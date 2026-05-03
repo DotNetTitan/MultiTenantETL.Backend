@@ -30,9 +30,11 @@ public class JsonLinesDataReader : IDataReader
         Stream stream;
         bool ownsStream = false;
 
-        if (config.Stream != null)
+        // Check if a pre-opened stream was registered (e.g. from AzureBlobDataReader)
+        if (config.StreamRegistryKey.HasValue)
         {
-            stream = config.Stream;
+            stream = AzureBlobDataReader.GetStreamFromRegistry(config.StreamRegistryKey.Value)
+                ?? throw new InvalidOperationException($"Stream registry key {config.StreamRegistryKey.Value} not found");
         }
         else
         {
@@ -58,7 +60,9 @@ public class JsonLinesDataReader : IDataReader
                 if (row == null)
                     continue;
 
-                batch.Rows.Add(row);
+                // Convert JsonElement values to .NET types
+                var convertedRow = ConvertJsonElements(row);
+                batch.Rows.Add(convertedRow);
                 batch.RowCount++;
                 rowsRead++;
 
@@ -151,6 +155,35 @@ public class JsonLinesDataReader : IDataReader
         }
     }
 
+    private static Dictionary<string, object?> ConvertJsonElements(Dictionary<string, object?> dict)
+    {
+        var result = new Dictionary<string, object?>();
+        foreach (var kvp in dict)
+        {
+            result[kvp.Key] = ConvertJsonElement(kvp.Value);
+        }
+        return result;
+    }
+
+    private static object? ConvertJsonElement(object? value)
+    {
+        if (value is JsonElement element)
+        {
+            return element.ValueKind switch
+            {
+                JsonValueKind.String => element.GetString(),
+                JsonValueKind.Number => element.TryGetInt32(out var intValue) ? intValue : element.GetDouble(),
+                JsonValueKind.True => true,
+                JsonValueKind.False => false,
+                JsonValueKind.Null => null,
+                JsonValueKind.Object => ConvertJsonElements(element.Deserialize<Dictionary<string, object?>>() ?? new Dictionary<string, object?>()),
+                JsonValueKind.Array => element.EnumerateArray().Select(x => ConvertJsonElement(x)).ToList(),
+                _ => element.ToString()
+            };
+        }
+        return value;
+    }
+
     private JsonLinesConfig ParseConfig(string configJson)
     {
         return JsonSerializer.Deserialize<JsonLinesConfig>(configJson)
@@ -160,6 +193,7 @@ public class JsonLinesDataReader : IDataReader
     private class JsonLinesConfig
     {
         public string FilePath { get; set; } = string.Empty;
-        public Stream? Stream { get; set; }
+        /// <summary>Key into <see cref="AzureBlobDataReader._streamRegistry"/> for cloud-streamed blobs.</summary>
+        public Guid? StreamRegistryKey { get; set; }
     }
 }

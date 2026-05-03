@@ -8,6 +8,7 @@ using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Persistence;
+using MultiTenantETL.Infrastructure.Security;
 
 namespace MultiTenantETL.Infrastructure.Services;
 
@@ -17,7 +18,8 @@ public class ConnectorService : IConnectorService
     private readonly ILogger<ConnectorService> _logger;
     private readonly IConnectionTester _connectionTester;
     private readonly ISchemaDetector _schemaDetector;
-    private readonly IEncryptionService _encryptionService;
+    private readonly ISecretStorageService _secretStorageService;
+    private readonly ISecretResolver _secretResolver;
     private readonly IAuditService _auditService;
 
     public ConnectorService(
@@ -25,14 +27,16 @@ public class ConnectorService : IConnectorService
         ILogger<ConnectorService> logger,
         IConnectionTester connectionTester,
         ISchemaDetector schemaDetector,
-        IEncryptionService encryptionService,
+        ISecretStorageService secretStorageService,
+        ISecretResolver secretResolver,
         IAuditService auditService)
     {
         _context = context;
         _logger = logger;
         _connectionTester = connectionTester;
         _schemaDetector = schemaDetector;
-        _encryptionService = encryptionService;
+        _secretStorageService = secretStorageService;
+        _secretResolver = secretResolver;
         _auditService = auditService;
     }
 
@@ -46,12 +50,14 @@ public class ConnectorService : IConnectorService
         // Determine direction flags
         var (isSource, isDestination) = ParseDirection(request.Direction);
 
-        // Encrypt sensitive fields in config
-        var encryptedConfig = _encryptionService.EncryptJsonFields(request.Config, EncryptionConstants.SensitiveFields);
+        var connectorId = Guid.NewGuid();
+
+        // Store sensitive fields in Key Vault and replace with references
+        var configWithReferences = await StoreSecretsInKeyVaultAsync(tenantId, connectorId, request.Config);
 
         var connector = new Connector
         {
-            Id = Guid.NewGuid(),
+            Id = connectorId,
             TenantId = tenantId,
             Name = request.Name,
             Description = request.Description,
@@ -61,7 +67,7 @@ public class ConnectorService : IConnectorService
             IsSource = isSource,
             IsDestination = isDestination,
             RequiresCredentials = DetermineRequiresCredentials(request.Type, request.Provider),
-            ConfigJson = JsonSerializer.Serialize(encryptedConfig),
+            ConfigJson = JsonSerializer.Serialize(configWithReferences),
             SchemaJson = request.Schema.HasValue ? JsonSerializer.Serialize(request.Schema.Value) : null,
             IsActive = true,
             CreatedAt = DateTime.UtcNow,
@@ -170,6 +176,17 @@ public class ConnectorService : IConnectorService
 
         _logger.LogInformation("Updating connector {ConnectorId}", id);
 
+        // Validate that Type and Provider haven't changed (they are immutable)
+        if (connector.Type != request.Type)
+        {
+            throw new InvalidOperationException($"Cannot change connector type from '{connector.Type}' to '{request.Type}'. Type is immutable after creation.");
+        }
+
+        if (connector.Provider != request.Provider)
+        {
+            throw new InvalidOperationException($"Cannot change connector provider from '{connector.Provider}' to '{request.Provider}'. Provider is immutable after creation.");
+        }
+
         var oldName = connector.Name;
         var oldIsActive = connector.IsActive;
 
@@ -181,9 +198,9 @@ public class ConnectorService : IConnectorService
         connector.IsSource = isSource;
         connector.IsDestination = isDestination;
         
-        // Encrypt sensitive fields in config
-        var encryptedConfig = _encryptionService.EncryptJsonFields(request.Config, EncryptionConstants.SensitiveFields);
-        connector.ConfigJson = JsonSerializer.Serialize(encryptedConfig);
+        // Store sensitive fields in Key Vault and replace with references
+        var configWithReferences = await StoreSecretsInKeyVaultAsync(tenantId, id, request.Config);
+        connector.ConfigJson = JsonSerializer.Serialize(configWithReferences);
         connector.SchemaJson = request.Schema.HasValue ? JsonSerializer.Serialize(request.Schema.Value) : connector.SchemaJson;
         
         if (request.IsActive.HasValue)
@@ -225,10 +242,28 @@ public class ConnectorService : IConnectorService
             throw new KeyNotFoundException($"Connector with ID {id} not found");
         }
 
+        // Check if connector is being used by any pipelines
+        var pipelinesUsingConnector = await _context.Pipelines
+            .Where(p => p.TenantId == tenantId && 
+                       (p.SourceConnectorId == id || p.DestinationConnectorId == id))
+            .Select(p => p.Name)
+            .ToListAsync();
+
+        if (pipelinesUsingConnector.Any())
+        {
+            var pipelineList = string.Join(", ", pipelinesUsingConnector.Select(p => $"'{p}'"));
+            throw new InvalidOperationException(
+                $"Cannot delete connector '{connector.Name}' because it is being used by the following pipeline(s): {pipelineList}. " +
+                $"Please remove or update these pipelines before deleting the connector.");
+        }
+
         _logger.LogInformation("Deleting connector {ConnectorId}", id);
 
         var connectorName = connector.Name;
         var connectorType = connector.Type;
+
+        // Delete associated secrets from Key Vault
+        await DeleteSecretsFromKeyVaultAsync(tenantId, id, connector.ConfigJson);
 
         _context.Connectors.Remove(connector);
         await _context.SaveChangesAsync();
@@ -251,9 +286,20 @@ public class ConnectorService : IConnectorService
 
         ValidateTypeAndProvider(request.Type, request.Provider);
 
-        // For testing a NEW connection, the config comes in plain text from the request,
-        // so no decryption is needed (it was never encrypted)
-        var result = await _connectionTester.TestConnectionAsync(request.Type, request.Provider, request.Config);
+        // If config contains Key Vault references (e.g., when testing with edited config),
+        // resolve them to get actual secrets before testing the connection
+        var configToTest = request.Config;
+        var configJson = JsonSerializer.Serialize(configToTest);
+        
+        if (_secretResolver.ContainsSecretReferences(configJson))
+        {
+            _logger.LogDebug("Config contains Key Vault references, resolving secrets for connection test");
+            var resolvedConfig = await _secretResolver.ResolveSecretsAsync(configJson);
+            configToTest = resolvedConfig;
+        }
+
+        // For truly new connections (no keyvault refs), config comes in plain text
+        var result = await _connectionTester.TestConnectionAsync(request.Type, request.Provider, configToTest);
 
         // Audit log
         await _auditService.LogAsync(
@@ -286,11 +332,9 @@ public class ConnectorService : IConnectorService
 
         _logger.LogInformation("Testing existing connector {ConnectorId}", id);
 
-        var config = JsonSerializer.Deserialize<JsonElement>(connector.ConfigJson);
-        
-        // Decrypt sensitive fields before testing
-        var decryptedConfig = _encryptionService.DecryptJsonFields(config, EncryptionConstants.SensitiveFields);
-        var result = await _connectionTester.TestConnectionAsync(connector.Type, connector.Provider, decryptedConfig);
+        // Resolve Key Vault secrets before testing
+        var resolvedConfig = await _secretResolver.ResolveSecretsAsync(connector.ConfigJson);
+        var result = await _connectionTester.TestConnectionAsync(connector.Type, connector.Provider, resolvedConfig);
 
         // Update connector with test results
         connector.LastTestedAt = DateTime.UtcNow;
@@ -330,14 +374,12 @@ public class ConnectorService : IConnectorService
 
         _logger.LogInformation("Detecting schema for connector {ConnectorId}", request.ConnectorId);
 
-        var config = JsonSerializer.Deserialize<JsonElement>(connector.ConfigJson);
-        
-        // Decrypt sensitive fields before schema detection
-        var decryptedConfig = _encryptionService.DecryptJsonFields(config, EncryptionConstants.SensitiveFields);
+        // Resolve Key Vault secrets before schema detection
+        var resolvedConfig = await _secretResolver.ResolveSecretsAsync(connector.ConfigJson);
         var result = await _schemaDetector.DetectSchemaAsync(
             connector.Type,
             connector.Provider,
-            decryptedConfig,
+            resolvedConfig,
             request.TableOrResourceName);
 
         if (result.Success && result.Schema != null)
@@ -409,7 +451,7 @@ public class ConnectorService : IConnectorService
     // Helper methods
     private static void ValidateTypeAndProvider(string type, string provider)
     {
-        var validTypes = new[] { ConnectorTypes.Database, ConnectorTypes.File, ConnectorTypes.Api };
+        var validTypes = new[] { ConnectorTypes.Database, ConnectorTypes.File, ConnectorTypes.Api, ConnectorTypes.Email };
         if (!validTypes.Contains(type))
         {
             throw new ArgumentException($"Invalid connector type: {type}");
@@ -417,9 +459,10 @@ public class ConnectorService : IConnectorService
 
         var validProviders = type switch
         {
-            ConnectorTypes.Database => new[] { ConnectorProviders.SqlServer, ConnectorProviders.PostgreSQL, ConnectorProviders.MySQL },
-            ConnectorTypes.File => new[] { ConnectorProviders.Local, ConnectorProviders.FTP, ConnectorProviders.SFTP, ConnectorProviders.S3, ConnectorProviders.AzureBlob },
+            ConnectorTypes.Database => new[] { ConnectorProviders.SqlServer, ConnectorProviders.PostgreSQL, ConnectorProviders.MySQL, ConnectorProviders.Oracle, ConnectorProviders.MongoDb, ConnectorProviders.CosmosDb },
+            ConnectorTypes.File => new[] { ConnectorProviders.FTP, ConnectorProviders.SFTP, ConnectorProviders.AzureBlob },
             ConnectorTypes.Api => new[] { ConnectorProviders.REST },
+            ConnectorTypes.Email => new[] { ConnectorProviders.Email },
             _ => Array.Empty<string>()
         };
 
@@ -443,16 +486,16 @@ public class ConnectorService : IConnectorService
     private static bool DetermineRequiresCredentials(string type, string provider)
     {
         // Most connectors require credentials except local files
-        return !(type == ConnectorTypes.File && provider == ConnectorProviders.Local);
+        // return !(type == ConnectorTypes.File && provider == ConnectorProviders.Local); // Removed Local
+        return true; // All file providers now require credentials
     }
 
     private ConnectorResponse MapToResponse(Connector connector)
     {
         var config = JsonSerializer.Deserialize<JsonElement>(connector.ConfigJson);
         
-        // Decrypt sensitive fields for response
-        var decryptedConfig = _encryptionService.DecryptJsonFields(config, EncryptionConstants.SensitiveFields);
-        
+        // Return config with Key Vault references intact (do NOT resolve secrets in API responses)
+        // Secrets are only resolved when actually used (connections, pipelines, etc.)
         return new ConnectorResponse
         {
             Id = connector.Id,
@@ -466,7 +509,7 @@ public class ConnectorService : IConnectorService
             IsDestination = connector.IsDestination,
             RequiresCredentials = connector.RequiresCredentials,
             IsActive = connector.IsActive,
-            Config = decryptedConfig,
+            Config = config,
             Schema = !string.IsNullOrEmpty(connector.SchemaJson) 
                 ? JsonSerializer.Deserialize<JsonElement>(connector.SchemaJson) 
                 : null,
@@ -475,6 +518,106 @@ public class ConnectorService : IConnectorService
             LastTestMessage = connector.LastTestMessage,
             CreatedAt = connector.CreatedAt,
             UpdatedAt = connector.UpdatedAt
+        };
+    }
+
+    /// <summary>
+    /// Stores sensitive fields in Key Vault and returns config with Key Vault references.
+    /// </summary>
+    private async Task<Dictionary<string, object?>> StoreSecretsInKeyVaultAsync(
+        Guid tenantId, 
+        Guid connectorId, 
+        JsonElement config)
+    {
+        var configDict = new Dictionary<string, object?>();
+
+        foreach (var property in config.EnumerateObject())
+        {
+            var fieldName = property.Name;
+            var value = property.Value;
+
+            // Check if this is a sensitive field
+            if (EncryptionConstants.SensitiveFields.Contains(fieldName, StringComparer.OrdinalIgnoreCase))
+            {
+                if (value.ValueKind == JsonValueKind.String)
+                {
+                    var stringValue = value.GetString();
+
+                    if (!string.IsNullOrWhiteSpace(stringValue))
+                    {
+                        // Generate secret name and store in Key Vault
+                        var secretName = _secretStorageService.GenerateSecretName(tenantId, connectorId, fieldName);
+                        await _secretStorageService.StoreSecretAsync(secretName, stringValue);
+
+                        // Replace with Key Vault reference
+                        configDict[fieldName] = $"{EncryptionConstants.SecretReferencePrefix}{secretName}";
+                        _logger.LogDebug("Stored field {FieldName} in Key Vault as {SecretName}", fieldName, secretName);
+                    }
+                    else
+                    {
+                        configDict[fieldName] = stringValue;
+                    }
+                }
+                else
+                {
+                    configDict[fieldName] = GetJsonValue(value);
+                }
+            }
+            else
+            {
+                // Not a sensitive field, keep as-is
+                configDict[fieldName] = GetJsonValue(value);
+            }
+        }
+
+        return configDict;
+    }
+
+    /// <summary>
+    /// Deletes secrets from Key Vault when a connector is deleted.
+    /// </summary>
+    private async Task DeleteSecretsFromKeyVaultAsync(Guid tenantId, Guid connectorId, string configJson)
+    {
+        try
+        {
+            var config = JsonDocument.Parse(configJson).RootElement;
+
+            foreach (var property in config.EnumerateObject())
+            {
+                if (property.Value.ValueKind == JsonValueKind.String)
+                {
+                    var stringValue = property.Value.GetString();
+
+                    // Check if this is a Key Vault reference
+                    if (!string.IsNullOrWhiteSpace(stringValue) && 
+                        stringValue.StartsWith(EncryptionConstants.SecretReferencePrefix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        var secretName = stringValue.Substring(EncryptionConstants.SecretReferencePrefix.Length);
+                        await _secretStorageService.DeleteSecretAsync(secretName);
+                        _logger.LogInformation("Deleted Key Vault secret: {SecretName}", secretName);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting secrets from Key Vault for connector {ConnectorId}", connectorId);
+            // Don't throw - we still want to delete the connector even if Key Vault cleanup fails
+        }
+    }
+
+    private static object? GetJsonValue(JsonElement element)
+    {
+        return element.ValueKind switch
+        {
+            JsonValueKind.String => element.GetString(),
+            JsonValueKind.Number => element.TryGetInt64(out var l) ? l : element.GetDouble(),
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.Null => null,
+            JsonValueKind.Object => JsonSerializer.Deserialize<Dictionary<string, object>>(element.GetRawText()),
+            JsonValueKind.Array => JsonSerializer.Deserialize<List<object>>(element.GetRawText()),
+            _ => element.GetRawText()
         };
     }
 
@@ -495,5 +638,14 @@ public class ConnectorService : IConnectorService
             LastTestResult = connector.LastTestResult,
             CreatedAt = connector.CreatedAt
         };
+    }
+
+    /// <inheritdoc />
+    public string GenerateEmailPreviewHtml(EmailPreviewRequest request)
+    {
+        return EmailTemplates.GenerateDataExportPreviewHtml(
+            request.BodyMessage,
+            request.AttachmentFormat,
+            request.AttachmentFileName);
     }
 }

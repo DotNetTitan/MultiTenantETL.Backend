@@ -41,34 +41,25 @@ public record UserTenantInfo
 
 public record UpdateUserRequest
 {
-    [Required]
-    [StringLength(50, MinimumLength = 2)]
     public required string FirstName { get; init; }
 
-    [Required]
-    [StringLength(50, MinimumLength = 2)]
     public required string LastName { get; init; }
 
-    [Required]
-    [EmailAddress]
     public required string Email { get; init; }
 }
 
 public record UpdateUserStatusRequest
 {
-    [Required]
     public bool IsActive { get; init; }
 }
 
 public record AssignRoleRequest
 {
-    [Required]
     public required string RoleName { get; init; }
 }
 
 public record RemoveRoleRequest
 {
-    [Required]
     public required string RoleName { get; init; }
 }
 

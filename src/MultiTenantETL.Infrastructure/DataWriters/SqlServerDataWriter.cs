@@ -17,8 +17,8 @@ public class SqlServerDataWriter : IDataWriter
 
     public SqlServerDataWriter(ILogger<SqlServerDataWriter> logger, IOptions<EtlSettings> settings)
     {
-        _logger = logger;
-        _settings = settings.Value;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
     }
 
     public async Task<DataWriteResult> WriteBatchAsync(
@@ -27,11 +27,20 @@ public class SqlServerDataWriter : IDataWriter
         WriteOptions options,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        
         var result = new DataWriteResult { BatchId = batch.BatchId };
+
+        // For empty batches, return success without database operations
+        if (batch.Rows.Count == 0)
+        {
+            return result;
+        }
+
+        var config = ParseConfig(connector.ConfigJson);
         
         try
         {
-            var config = ParseConfig(connector.ConfigJson);
             await using var connection = new SqlConnection(config.ConnectionString);
             await connection.OpenAsync(cancellationToken);
 
@@ -195,8 +204,29 @@ public class SqlServerDataWriter : IDataWriter
 
     private SqlServerConfig ParseConfig(string configJson)
     {
-        return JsonSerializer.Deserialize<SqlServerConfig>(configJson) 
-            ?? throw new InvalidOperationException("Invalid SQL Server configuration");
+        SqlServerConfig config;
+        try
+        {
+            config = JsonSerializer.Deserialize<SqlServerConfig>(configJson)
+                ?? throw new InvalidOperationException("Invalid SQL Server configuration");
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException("Failed to parse SQL Server connector configuration", ex);
+        }
+
+        // Validate required fields
+        if (string.IsNullOrEmpty(config.ConnectionString))
+        {
+            throw new InvalidOperationException("SQL Server configuration must include ConnectionString");
+        }
+
+        if (string.IsNullOrEmpty(config.TableName))
+        {
+            throw new InvalidOperationException("SQL Server configuration must include TableName");
+        }
+
+        return config;
     }
 
     public ValueTask DisposeAsync()

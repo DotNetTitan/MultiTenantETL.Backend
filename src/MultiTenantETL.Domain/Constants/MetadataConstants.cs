@@ -12,7 +12,8 @@ public static class MetadataConstants
         {
             (Constants.ConnectorTypes.Database, "connectors.database", "mdi-database"),
             (Constants.ConnectorTypes.Api, "connectors.api", "mdi-api"),
-            (Constants.ConnectorTypes.File, "connectors.file", "mdi-file-document")
+            (Constants.ConnectorTypes.File, "connectors.file", "mdi-file-document"),
+            (Constants.ConnectorTypes.Email, "connectors.email", "mdi-email")
         };
     }
 
@@ -26,7 +27,10 @@ public static class MetadataConstants
                 { 
                     Constants.ConnectorProviders.SqlServer, 
                     Constants.ConnectorProviders.PostgreSQL, 
-                    Constants.ConnectorProviders.MySQL 
+                    Constants.ConnectorProviders.MySQL,
+                    Constants.ConnectorProviders.Oracle,
+                    Constants.ConnectorProviders.MongoDb,
+                    Constants.ConnectorProviders.CosmosDb
                 } 
             },
             { 
@@ -40,11 +44,16 @@ public static class MetadataConstants
                 Constants.ConnectorTypes.File, 
                 new[] 
                 { 
-                    Constants.ConnectorProviders.Local, 
                     Constants.ConnectorProviders.FTP, 
                     Constants.ConnectorProviders.SFTP, 
-                    Constants.ConnectorProviders.S3, 
-                    Constants.ConnectorProviders.AzureBlob 
+                    Constants.ConnectorProviders.AzureBlob
+                } 
+            },
+            { 
+                Constants.ConnectorTypes.Email, 
+                new[] 
+                { 
+                    Constants.ConnectorProviders.Email
                 } 
             }
         };
@@ -57,17 +66,21 @@ public static class MetadataConstants
             // Database providers
             { Constants.ConnectorProviders.SqlServer, ("mdi-database", "blue-darken-2") },
             { Constants.ConnectorProviders.PostgreSQL, ("mdi-database", "blue-darken-2") },
-            { Constants.ConnectorProviders.MySQL, ("mdi-database", "orange-darken-1") },
+            { Constants.ConnectorProviders.MySQL, ("mdi-database", "blue-darken-2") },
+            { Constants.ConnectorProviders.Oracle, ("mdi-database", "blue-darken-2") },
+            { Constants.ConnectorProviders.MongoDb, ("mdi-database", "green-darken-2") },
+            { Constants.ConnectorProviders.CosmosDb, ("mdi-infinity", "blue-lighten-2") },
             
             // File providers
-            { Constants.ConnectorProviders.Local, ("mdi-folder", "grey-darken-1") },
             { Constants.ConnectorProviders.FTP, ("mdi-server-network", "green-darken-1") },
             { Constants.ConnectorProviders.SFTP, ("mdi-server-security", "green-darken-2") },
-            { Constants.ConnectorProviders.S3, ("mdi-aws", "orange-darken-2") },
             { Constants.ConnectorProviders.AzureBlob, ("mdi-microsoft-azure", "blue-lighten-1") },
             
             // API providers
-            { Constants.ConnectorProviders.REST, ("mdi-api", "purple-darken-1") }
+            { Constants.ConnectorProviders.REST, ("mdi-api", "purple-darken-1") },
+            
+            // Email providers
+            { Constants.ConnectorProviders.Email, ("mdi-email", "deep-orange-darken-1") }
         };
     }
 
@@ -99,9 +112,33 @@ public static class MetadataConstants
             ("CSV", "common.csv", ".csv"),
             ("JSON", "common.json", ".json"),
             ("Excel", "common.excel", ".xlsx"),
-            ("XML", "common.xml", ".xml"),
-            ("Parquet", "common.parquet", ".parquet")
+            ("XML", "common.xml", ".xml")
         };
+
+        /// <summary>
+        /// The default file format (first entry in <see cref="Formats"/>).
+        /// </summary>
+        public static string DefaultFormat => Formats[0].Value;
+
+        /// <summary>
+        /// Case-insensitive lookup from format value to file extension.
+        /// </summary>
+        private static readonly Dictionary<string, string> ExtensionByFormat =
+            Formats.ToDictionary(
+                f => f.Value,
+                f => f.Extension,
+                StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Returns the file extension for a given format value (e.g. "JSON" -> ".json").
+        /// Defaults to the extension of <see cref="DefaultFormat"/> for null or unrecognised formats.
+        /// </summary>
+        public static string GetExtension(string? format)
+        {
+            if (format is not null && ExtensionByFormat.TryGetValue(format, out var ext))
+                return ext;
+            return ExtensionByFormat[DefaultFormat];
+        }
     }
 
     public static class WriteOperations
@@ -122,8 +159,16 @@ public static class MetadataConstants
             ("GET", "common.httpGet", "success"),
             ("POST", "common.httpPost", "primary"),
             ("PUT", "common.httpPut", "warning"),
-            ("PATCH", "common.httpPatch", "info"),
             ("DELETE", "common.httpDelete", "error")
+        };
+    }
+
+    public static class ApiResponseFormats
+    {
+        public static readonly (string Value, string LabelKey, bool IsSupported)[] Formats = new[]
+        {
+            (Constants.ApiResponseFormats.Json, "common.json", true),
+            (Constants.ApiResponseFormats.Xml, "common.xml", false)
         };
     }
 

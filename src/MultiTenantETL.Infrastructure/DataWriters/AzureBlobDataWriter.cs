@@ -20,13 +20,14 @@ public class AzureBlobDataWriter : IDataWriter
     private Stream? _uploadStream;
     private Task? _uploadTask;
     private bool _isFirstBatch = true;
+    private WriteOptions? _writeOptions;
 
     public AzureBlobDataWriter(
         IStorageClientFactory clientFactory,
         ILogger<AzureBlobDataWriter> logger)
     {
-        _clientFactory = clientFactory;
-        _logger = logger;
+        _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task<DataWriteResult> WriteBatchAsync(
@@ -42,6 +43,7 @@ public class AzureBlobDataWriter : IDataWriter
             if (_config == null)
             {
                 _config = ParseConfig(connector.ConfigJson);
+                _writeOptions = options;
                 _format = DetermineFormat(_config.BlobName, _config.Format);
                 
                 // Start streaming upload
@@ -79,7 +81,25 @@ public class AzureBlobDataWriter : IDataWriter
         if (_config == null) return;
 
         var containerClient = _clientFactory.CreateAzureBlobClient(_config.AccountName, _config.AccountKey, _config.ContainerName);
-        var blobClient = containerClient.GetBlobClient(_config.BlobName);
+        
+        string blobName = _config.BlobName;
+        
+        // Resolve dynamic filename if pattern is provided
+        if (!string.IsNullOrEmpty(_config.FilenamePattern))
+        {
+            var directory = Path.GetDirectoryName(_config.BlobName)?.Replace("\\", "/") ?? "";
+            var filename = ResolveFilename(_config.FilenamePattern, _writeOptions?.Parameters);
+            
+            // Add extension if missing
+            if (!Path.HasExtension(filename) && !string.IsNullOrEmpty(_format))
+            {
+                filename = $"{filename}.{_format.ToLower()}";
+            }
+            
+            blobName = string.IsNullOrEmpty(directory) ? filename : $"{directory}/{filename}";
+        }
+        
+        var blobClient = containerClient.GetBlobClient(blobName);
 
         // Create a pipe for streaming upload
         var pipe = new System.IO.Pipelines.Pipe();
@@ -130,7 +150,19 @@ public class AzureBlobDataWriter : IDataWriter
     {
         if (batch.Rows.Count == 0) return;
 
-        var headers = batch.Rows[0].Keys.ToList();
+        if (batch.Rows.Count == 0) return;
+
+        List<string> headers;
+
+        // Use configured column order if available, otherwise use keys from first row
+        if (_config?.ColumnOrder != null && _config.ColumnOrder.Any())
+        {
+            headers = _config.ColumnOrder;
+        }
+        else
+        {
+            headers = batch.Rows[0].Keys.ToList();
+        }
 
         // Write header only for first batch
         if (_isFirstBatch)
@@ -181,10 +213,67 @@ public class AzureBlobDataWriter : IDataWriter
         };
     }
 
+    private string ResolveFilename(string pattern, Dictionary<string, object>? parameters)
+    {
+        if (parameters == null || parameters.Count == 0)
+            return pattern;
+
+        var result = pattern;
+        foreach (var param in parameters)
+        {
+            result = result.Replace($"{{{param.Key}}}", param.Value?.ToString() ?? "", StringComparison.OrdinalIgnoreCase);
+        }
+        
+        return result;
+    }
+
     private AzureBlobConfig ParseConfig(string configJson)
     {
-        return JsonSerializer.Deserialize<AzureBlobConfig>(configJson)
-            ?? throw new InvalidOperationException("Invalid Azure Blob configuration");
+        try
+        {
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+            
+            using var doc = JsonDocument.Parse(configJson);
+            var root = doc.RootElement;
+            
+            // Parse base config
+            var config = JsonSerializer.Deserialize<AzureBlobConfig>(configJson, options)
+                ?? throw new InvalidOperationException("Invalid Azure Blob configuration");
+
+            // Look for FilenamePattern in writeConfig
+            if (root.TryGetProperty("writeConfig", out var writeConfig) && 
+                writeConfig.TryGetProperty("filenamePattern", out var pattern))
+            {
+                config.FilenamePattern = pattern.GetString();
+            }
+
+            // Look for ColumnOrder in writeConfig
+            if (root.TryGetProperty("writeConfig", out _) && 
+                writeConfig.TryGetProperty("columnOrder", out var columnOrderElement) &&
+                columnOrderElement.ValueKind == JsonValueKind.Array)
+            {
+                 config.ColumnOrder = JsonSerializer.Deserialize<List<string>>(columnOrderElement.GetRawText(), options);
+            }
+
+            // Validate required fields
+            if (string.IsNullOrWhiteSpace(config.AccountName))
+                throw new InvalidOperationException("AccountName is required");
+            if (string.IsNullOrWhiteSpace(config.AccountKey))
+                throw new InvalidOperationException("AccountKey is required");
+            if (string.IsNullOrWhiteSpace(config.ContainerName))
+                throw new InvalidOperationException("ContainerName is required");
+            if (string.IsNullOrWhiteSpace(config.BlobName))
+                throw new InvalidOperationException("BlobName is required");
+
+            return config;
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException("Invalid JSON configuration for Azure Blob", ex);
+        }
     }
 
     public async ValueTask DisposeAsync()
@@ -220,5 +309,7 @@ public class AzureBlobDataWriter : IDataWriter
         public string ContainerName { get; set; } = string.Empty;
         public string BlobName { get; set; } = string.Empty;
         public string? Format { get; set; }
+        public string? FilenamePattern { get; set; }
+        public List<string>? ColumnOrder { get; set; }
     }
 }

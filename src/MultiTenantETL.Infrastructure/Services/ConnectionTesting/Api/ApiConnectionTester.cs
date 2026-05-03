@@ -104,7 +104,7 @@ public class ApiConnectionTester : IApiConnectionTester
 
     private async Task AddAuthenticationAsync(HttpClient httpClient, ApiConfig apiConfig)
     {
-        var authType = apiConfig.AuthType.ToLower().Replace(" ", "");
+        var authType = apiConfig.AuthType!.ToLower().Replace(" ", "");
         switch (authType)
         {
             case "bearer":
@@ -117,7 +117,7 @@ public class ApiConnectionTester : IApiConnectionTester
                     {
                         throw new InvalidOperationException($"Failed to generate dynamic token: {tokenResult.Message}");
                     }
-                    token = tokenResult.Token;
+                    token = tokenResult.Token!;
                 }
                 else
                 {
@@ -126,7 +126,7 @@ public class ApiConnectionTester : IApiConnectionTester
                 
                 if (!string.IsNullOrEmpty(token))
                 {
-                    httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+                    httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {token!}");
                 }
                 break;
                 

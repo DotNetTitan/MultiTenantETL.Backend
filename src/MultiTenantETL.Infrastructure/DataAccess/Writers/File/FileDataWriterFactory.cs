@@ -14,7 +14,6 @@ public class FileDataWriterFactory : IFileDataWriterFactory
     private readonly CsvDataWriter _csvWriter;
     private readonly JsonDataWriter _jsonWriter;
     private readonly JsonLinesDataWriter _jsonLinesWriter;
-    private readonly S3DataWriter _s3Writer;
     private readonly AzureBlobDataWriter _azureBlobWriter;
     private readonly SftpDataWriter _sftpWriter;
     private readonly FtpDataWriter _ftpWriter;
@@ -24,7 +23,6 @@ public class FileDataWriterFactory : IFileDataWriterFactory
         CsvDataWriter csvWriter,
         JsonDataWriter jsonWriter,
         JsonLinesDataWriter jsonLinesWriter,
-        S3DataWriter s3Writer,
         AzureBlobDataWriter azureBlobWriter,
         SftpDataWriter sftpWriter,
         FtpDataWriter ftpWriter,
@@ -33,7 +31,6 @@ public class FileDataWriterFactory : IFileDataWriterFactory
         _csvWriter = csvWriter;
         _jsonWriter = jsonWriter;
         _jsonLinesWriter = jsonLinesWriter;
-        _s3Writer = s3Writer;
         _azureBlobWriter = azureBlobWriter;
         _sftpWriter = sftpWriter;
         _ftpWriter = ftpWriter;
@@ -47,11 +44,9 @@ public class FileDataWriterFactory : IFileDataWriterFactory
         // Cloud storage and remote file providers handle their own format detection
         return connector.Provider switch
         {
-            ConnectorProviders.S3 => _s3Writer,
             ConnectorProviders.AzureBlob => _azureBlobWriter,
             ConnectorProviders.SFTP => _sftpWriter,
             ConnectorProviders.FTP => _ftpWriter,
-            ConnectorProviders.Local => CreateLocalFileWriter(connector),
             _ => throw new NotSupportedException($"File provider '{connector.Provider}' is not supported")
         };
     }

@@ -37,6 +37,7 @@ public class ConnectionTester : IConnectionTester
                 ConnectorTypes.Database => await _databaseTester.TestConnectionAsync(provider, config),
                 ConnectorTypes.File => await _storageTester.TestConnectionAsync(provider, config),
                 ConnectorTypes.Api => await _apiTester.TestConnectionAsync(provider, config),
+                ConnectorTypes.Email => ValidateEmailConfig(config),
                 _ => new ConnectionTestResult
                 {
                     Success = false,
@@ -53,5 +54,56 @@ public class ConnectionTester : IConnectionTester
                 Message = $"Connection test failed: {ex.Message}"
             };
         }
+    }
+
+    /// <summary>
+    /// Validates email connector configuration by checking that required fields are present.
+    /// </summary>
+    private static ConnectionTestResult ValidateEmailConfig(JsonElement config)
+    {
+        var hasRecipients = config.TryGetProperty("recipients", out var recipients)
+                            && recipients.ValueKind == JsonValueKind.Array
+                            && recipients.GetArrayLength() > 0;
+
+        var hasSubject = config.TryGetProperty("subject", out var subject)
+                         && subject.ValueKind == JsonValueKind.String
+                         && !string.IsNullOrWhiteSpace(subject.GetString());
+
+        var hasFormat = config.TryGetProperty("attachmentFormat", out var format)
+                        && format.ValueKind == JsonValueKind.String
+                        && !string.IsNullOrWhiteSpace(format.GetString());
+
+        if (!hasRecipients)
+        {
+            return new ConnectionTestResult
+            {
+                Success = false,
+                Message = "At least one recipient email address is required"
+            };
+        }
+
+        if (!hasSubject)
+        {
+            return new ConnectionTestResult
+            {
+                Success = false,
+                Message = "Email subject is required"
+            };
+        }
+
+        if (!hasFormat)
+        {
+            return new ConnectionTestResult
+            {
+                Success = false,
+                Message = "Attachment format is required (CSV, JSON, or Excel)"
+            };
+        }
+
+        return new ConnectionTestResult
+        {
+            Success = true,
+            Message = "Email configuration is valid"
+        };
     }
 }

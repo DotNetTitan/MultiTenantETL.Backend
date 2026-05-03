@@ -1,0 +1,13 @@
+# Docker
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+**/.git/
+**/node_modules/
+**/.idea/
+**/TestResults/
+**/.playwright-mcp/
+**/test-data/
+**/.claude/
+**/.kiro/

@@ -1,4 +1,3 @@
-using Amazon.S3;
 using Azure.Storage.Blobs;
 using FluentFTP;
 using Microsoft.Extensions.Logging;
@@ -10,7 +9,6 @@ public interface IStorageClientFactory
 {
     AsyncFtpClient CreateFtpClient(string host, int port, string username, string password);
     SftpClient CreateSftpClient(string host, int port, string username, string password);
-    AmazonS3Client CreateS3Client(string accessKey, string secretKey, string region, string? endpoint = null);
     BlobContainerClient CreateAzureBlobClient(string accountName, string accountKey, string containerName);
 }
 
@@ -31,27 +29,6 @@ public class StorageClientFactory : IStorageClientFactory
     public SftpClient CreateSftpClient(string host, int port, string username, string password)
     {
         return new SftpClient(host, port, username, password);
-    }
-
-    public AmazonS3Client CreateS3Client(string accessKey, string secretKey, string region, string? endpoint = null)
-    {
-        var s3Config = new AmazonS3Config
-        {
-            MaxErrorRetry = 3,
-            Timeout = TimeSpan.FromSeconds(30),
-            ForcePathStyle = !string.IsNullOrEmpty(endpoint)
-        };
-
-        if (!string.IsNullOrEmpty(endpoint))
-        {
-            s3Config.ServiceURL = endpoint;
-        }
-        else
-        {
-            s3Config.RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(region);
-        }
-
-        return new AmazonS3Client(accessKey, secretKey, s3Config);
     }
 
     public BlobContainerClient CreateAzureBlobClient(string accountName, string accountKey, string containerName)

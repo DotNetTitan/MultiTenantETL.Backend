@@ -29,10 +29,11 @@ public class CsvDataReader : IDataReader
         Stream stream;
         bool ownsStream = false;
 
-        // Check if stream is provided in config (for S3/cloud storage)
-        if (config.Stream != null)
+        // Check if a pre-opened stream was registered (e.g. from AzureBlobDataReader)
+        if (config.StreamRegistryKey.HasValue)
         {
-            stream = config.Stream;
+            stream = AzureBlobDataReader.GetStreamFromRegistry(config.StreamRegistryKey.Value)
+                ?? throw new InvalidOperationException($"Stream registry key {config.StreamRegistryKey.Value} not found");
         }
         else
         {
@@ -42,7 +43,6 @@ public class CsvDataReader : IDataReader
 
         try
         {
-            using var reader = new StreamReader(stream, leaveOpen: !ownsStream);
             var csvConfig = new CsvConfiguration(CultureInfo.InvariantCulture)
             {
                 HasHeaderRecord = config.HasHeader,
@@ -50,44 +50,79 @@ public class CsvDataReader : IDataReader
                 TrimOptions = TrimOptions.Trim
             };
 
-            using var csv = new CsvReader(reader, csvConfig);
+            string[] headers;
+            CsvReader csvReader;
 
-        await csv.ReadAsync();
-        csv.ReadHeader();
-        var headers = csv.HeaderRecord ?? Array.Empty<string>();
-
-        var batch = new ReadBatch { BatchId = Guid.NewGuid() };
-        var rowsRead = 0;
-
-        while (await csv.ReadAsync())
-        {
-            var row = new Dictionary<string, object?>();
-
-            for (int i = 0; i < headers.Length; i++)
+            if (config.HasHeader)
             {
-                var value = csv.GetField(i);
-                row[headers[i]] = string.IsNullOrWhiteSpace(value) ? null : value;
+                var reader = new StreamReader(stream, leaveOpen: !ownsStream);
+                csvReader = new CsvReader(reader, csvConfig);
+                await csvReader.ReadAsync();
+                csvReader.ReadHeader();
+                headers = csvReader.HeaderRecord ?? Array.Empty<string>();
+            }
+            else
+            {
+                // For headerless files, read the first line to determine column count
+                using var tempReader = new StreamReader(stream, leaveOpen: true);
+                var firstLine = await tempReader.ReadLineAsync();
+                if (firstLine == null)
+                {
+                    headers = Array.Empty<string>();
+                }
+                else
+                {
+                    // Count columns by splitting on delimiter
+                    var delimiter = config.Delimiter ?? ",";
+                    var columns = firstLine.Split(delimiter);
+                    headers = new string[columns.Length];
+                    for (int i = 0; i < columns.Length; i++)
+                    {
+                        headers[i] = $"Column{i + 1}";
+                    }
+                }
+
+                // Reset stream for actual reading
+                stream.Position = 0;
+                var reader = new StreamReader(stream, leaveOpen: !ownsStream);
+                csvReader = new CsvReader(reader, csvConfig);
             }
 
-            batch.Rows.Add(row);
-            batch.RowCount++;
-            rowsRead++;
-
-            if (batch.RowCount >= options.BatchSize)
+            using (csvReader)
             {
-                yield return batch;
-                batch = new ReadBatch { BatchId = Guid.NewGuid() };
-            }
+                var batch = new ReadBatch { BatchId = Guid.NewGuid() };
+                var rowsRead = 0;
 
-            if (options.MaxRows.HasValue && rowsRead >= options.MaxRows.Value)
-            {
-                break;
-            }
-        }
+                while (await csvReader.ReadAsync())
+                {
+                    var row = new Dictionary<string, object?>();
 
-            if (batch.RowCount > 0)
-            {
-                yield return batch;
+                    for (int i = 0; i < headers.Length; i++)
+                    {
+                        var value = csvReader.GetField(i);
+                        row[headers[i]] = string.IsNullOrWhiteSpace(value) ? null : value;
+                    }
+
+                    batch.Rows.Add(row);
+                    batch.RowCount++;
+                    rowsRead++;
+
+                    if (batch.RowCount >= options.BatchSize)
+                    {
+                        yield return batch;
+                        batch = new ReadBatch { BatchId = Guid.NewGuid() };
+                    }
+
+                    if (options.MaxRows.HasValue && rowsRead >= options.MaxRows.Value)
+                    {
+                        break;
+                    }
+                }
+
+                if (batch.RowCount > 0)
+                {
+                    yield return batch;
+                }
             }
         }
         finally
@@ -126,11 +161,36 @@ public class CsvDataReader : IDataReader
                 Delimiter = config.Delimiter ?? ","
             };
 
-            using var csv = new CsvReader(reader, csvConfig);
-
-            await csv.ReadAsync();
-            csv.ReadHeader();
-            var headers = csv.HeaderRecord ?? Array.Empty<string>();
+            string[] headers;
+            if (config.HasHeader)
+            {
+                using (var csv = new CsvReader(reader, csvConfig))
+                {
+                    await csv.ReadAsync();
+                    csv.ReadHeader();
+                    headers = csv.HeaderRecord ?? Array.Empty<string>();
+                }
+            }
+            else
+            {
+                // For headerless files, read first line to determine column count
+                var firstLine = await reader.ReadLineAsync();
+                if (firstLine == null)
+                {
+                    headers = Array.Empty<string>();
+                }
+                else
+                {
+                    // Count columns by splitting on delimiter
+                    var delimiter = config.Delimiter ?? ",";
+                    var columns = firstLine.Split(delimiter);
+                    headers = new string[columns.Length];
+                    for (int i = 0; i < columns.Length; i++)
+                    {
+                        headers[i] = $"Column{i + 1}";
+                    }
+                }
+            }
 
             var fields = headers.Select(h => new FieldDefinition
             {
@@ -171,6 +231,7 @@ public class CsvDataReader : IDataReader
         public string FilePath { get; set; } = string.Empty;
         public bool HasHeader { get; set; } = true;
         public string? Delimiter { get; set; }
-        public Stream? Stream { get; set; }
+        /// <summary>Key into <see cref="AzureBlobDataReader._streamRegistry"/> for cloud-streamed blobs.</summary>
+        public Guid? StreamRegistryKey { get; set; }
     }
 }

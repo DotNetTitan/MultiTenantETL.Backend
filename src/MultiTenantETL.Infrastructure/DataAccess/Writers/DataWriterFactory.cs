@@ -4,6 +4,7 @@ using MultiTenantETL.Application.DataAccess;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.DataAccess.Writers.Api;
 using MultiTenantETL.Infrastructure.DataAccess.Writers.Database;
+using MultiTenantETL.Infrastructure.DataAccess.Writers.Email;
 using MultiTenantETL.Infrastructure.DataAccess.Writers.File;
 
 namespace MultiTenantETL.Infrastructure.DataAccess.Writers;
@@ -16,17 +17,20 @@ public class DataWriterFactory : IDataWriterFactory
     private readonly IDatabaseDataWriterFactory _databaseFactory;
     private readonly IFileDataWriterFactory _fileFactory;
     private readonly IApiDataWriterFactory _apiFactory;
+    private readonly IEmailDataWriterFactory _emailFactory;
     private readonly ILogger<DataWriterFactory> _logger;
 
     public DataWriterFactory(
         IDatabaseDataWriterFactory databaseFactory,
         IFileDataWriterFactory fileFactory,
         IApiDataWriterFactory apiFactory,
+        IEmailDataWriterFactory emailFactory,
         ILogger<DataWriterFactory> logger)
     {
         _databaseFactory = databaseFactory;
         _fileFactory = fileFactory;
         _apiFactory = apiFactory;
+        _emailFactory = emailFactory;
         _logger = logger;
     }
 
@@ -40,6 +44,7 @@ public class DataWriterFactory : IDataWriterFactory
             "database" => _databaseFactory.CreateWriter(connector),
             "file" => _fileFactory.CreateWriter(connector),
             "api" => _apiFactory.CreateWriter(connector),
+            "email" => _emailFactory.CreateWriter(connector),
             _ => throw new NotSupportedException($"Connector type '{connector.Type}' is not supported")
         };
     }

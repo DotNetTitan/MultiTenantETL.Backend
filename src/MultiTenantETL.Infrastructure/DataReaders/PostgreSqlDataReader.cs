@@ -4,9 +4,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Connectors.DataReaders;
-using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
+using MultiTenantETL.Infrastructure.Security;
 using Npgsql;
 using IDataReader = MultiTenantETL.Application.Connectors.DataReaders.IDataReader;
 
@@ -16,16 +16,16 @@ public class PostgreSqlDataReader : IDataReader
 {
     private readonly ILogger<PostgreSqlDataReader> _logger;
     private readonly EtlSettings _settings;
-    private readonly IEncryptionService _encryptionService;
+    private readonly ISecretResolver _secretResolver;
 
     public PostgreSqlDataReader(
         ILogger<PostgreSqlDataReader> logger, 
         IOptions<EtlSettings> settings,
-        IEncryptionService encryptionService)
+        ISecretResolver secretResolver)
     {
-        _logger = logger;
-        _settings = settings.Value;
-        _encryptionService = encryptionService;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
+        _secretResolver = secretResolver ?? throw new ArgumentNullException(nameof(secretResolver));
     }
 
     public async IAsyncEnumerable<ReadBatch> ReadAsync(
@@ -164,12 +164,10 @@ public class PostgreSqlDataReader : IDataReader
 
     private PostgreSqlConfig ParseConfig(string configJson)
     {
-        var jsonElement = JsonSerializer.Deserialize<JsonElement>(configJson);
+        // Resolve Key Vault secrets
+        var resolvedElement = _secretResolver.ResolveSecretsAsync(configJson).GetAwaiter().GetResult();
         
-        // Decrypt sensitive fields
-        var decryptedElement = _encryptionService.DecryptJsonFields(jsonElement, EncryptionConstants.SensitiveFields);
-        
-        var config = JsonSerializer.Deserialize<PostgreSqlConfig>(decryptedElement.GetRawText(), JsonSerializerOptionsProvider.Default)
+        var config = JsonSerializer.Deserialize<PostgreSqlConfig>(resolvedElement.GetRawText(), JsonSerializerOptionsProvider.Default)
             ?? throw new InvalidOperationException("Invalid PostgreSQL configuration");
 
         // Build connection string if not provided directly

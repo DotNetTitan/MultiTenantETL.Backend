@@ -65,8 +65,8 @@ public class TenantsController : ControllerBase
         var response = userTenants.Select(ut => new UserTenantResponse
         {
             TenantId = ut.TenantId,
-            TenantName = ut.Tenant.Name,
-            TenantSlug = ut.Tenant.Slug,
+            TenantName = ut.Tenant!.Name!,
+            TenantSlug = ut.Tenant!.Slug!,
             RoleCode = ut.RoleCode,
             IsActive = ut.IsActive,
             IsCurrent = ut.TenantId == currentTenantId
@@ -242,9 +242,9 @@ public class TenantsController : ControllerBase
         var response = userTenants.Select(ut => new TenantUserResponse
         {
             UserId = ut.UserId,
-            Email = ut.User.Email!,
-            FirstName = ut.User.FirstName,
-            LastName = ut.User.LastName,
+            Email = ut.User!.Email!,
+            FirstName = ut.User!.FirstName!,
+            LastName = ut.User!.LastName!,
             RoleCode = ut.RoleCode,
             IsActive = ut.IsActive
         });
