@@ -1,5 +1,8 @@
 namespace MultiTenantETL.Application.Connectors.DataWriters;
 
+/// <summary>
+/// Options for configuring a data write operation.
+/// </summary>
 public class WriteOptions
 {
     public bool TruncateBeforeLoad { get; set; }

@@ -1,5 +1,8 @@
 namespace MultiTenantETL.Application.Executions.Models;
 
+/// <summary>
+/// Represents a single log entry for a pipeline execution.
+/// </summary>
 public class ExecutionLogDto
 {
     public DateTimeOffset Timestamp { get; set; }

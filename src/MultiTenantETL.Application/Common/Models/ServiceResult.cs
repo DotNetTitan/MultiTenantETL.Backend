@@ -3,7 +3,7 @@ using MultiTenantETL.Domain.Enums;
 namespace MultiTenantETL.Application.Common.Models;
 
 /// <summary>
-/// Generic service result for operations without return data
+/// Generic service result for operations without return data.
 /// </summary>
 public class ServiceResult
 {

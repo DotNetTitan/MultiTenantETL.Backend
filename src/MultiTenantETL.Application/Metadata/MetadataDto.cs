@@ -1,5 +1,8 @@
 namespace MultiTenantETL.Application.Metadata;
 
+/// <summary>
+/// Aggregated metadata for the application, including connector configuration, transformation types, and constants.
+/// </summary>
 public class MetadataDto
 {
     public ConnectorConfigDto ConnectorConfig { get; set; } = new();

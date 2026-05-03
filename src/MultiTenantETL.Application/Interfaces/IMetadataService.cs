@@ -2,6 +2,9 @@ using MultiTenantETL.Application.Metadata;
 
 namespace MultiTenantETL.Application.Interfaces;
 
+/// <summary>
+/// Service for retrieving application metadata, configuration, and lookup values.
+/// </summary>
 public interface IMetadataService
 {
     MetadataDto GetAllMetadata();

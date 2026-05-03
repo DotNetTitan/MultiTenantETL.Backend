@@ -1,5 +1,8 @@
 namespace MultiTenantETL.Application.Executions.Models;
 
+/// <summary>
+/// Detailed response model for a pipeline execution, including progress, records, and logs.
+/// </summary>
 public class ExecutionResponse
 {
     public Guid Id { get; set; }

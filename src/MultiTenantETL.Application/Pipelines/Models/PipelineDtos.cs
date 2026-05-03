@@ -3,6 +3,9 @@ using MultiTenantETL.Application.Scheduling.Models;
 
 namespace MultiTenantETL.Application.Pipelines.Models;
 
+/// <summary>
+/// Request to create a new pipeline.
+/// </summary>
 public record CreatePipelineRequest
 {
     public required string Name { get; init; }
@@ -20,6 +23,9 @@ public record CreatePipelineRequest
     public bool EmailNotificationsEnabled { get; init; } = true; // Email notifications enabled by default
 }
 
+/// <summary>
+/// Request to update an existing pipeline.
+/// </summary>
 public record UpdatePipelineRequest
 {
     public required string Name { get; init; }
@@ -35,6 +41,9 @@ public record UpdatePipelineRequest
     public bool? EmailNotificationsEnabled { get; init; } // Nullable to allow partial updates
 }
 
+/// <summary>
+/// Response containing full pipeline details.
+/// </summary>
 public record PipelineResponse
 {
     public Guid Id { get; init; }
@@ -59,6 +68,9 @@ public record PipelineResponse
     public DateTime? UpdatedAt { get; init; }
 }
 
+/// <summary>
+/// Summary response for a pipeline in lists.
+/// </summary>
 public record PipelineListResponse
 {
     public Guid Id { get; init; }
@@ -74,6 +86,9 @@ public record PipelineListResponse
     public DateTime CreatedAt { get; init; }
 }
 
+/// <summary>
+/// Request to search pipelines with filtering and pagination.
+/// </summary>
 public record PipelineSearchRequest
 {
     public string? Name { get; init; }
@@ -86,6 +101,9 @@ public record PipelineSearchRequest
     public int PageSize { get; init; } = 20;
 }
 
+/// <summary>
+/// Paginated response containing pipeline list with pagination metadata.
+/// </summary>
 public record PagedPipelineResponse
 {
     public List<PipelineListResponse> Pipelines { get; init; } = new();
@@ -95,7 +113,9 @@ public record PagedPipelineResponse
     public int TotalPages { get; init; }
 }
 
-// Configuration models for pipeline components
+/// <summary>
+/// Represents a field mapping between source and destination in a pipeline.
+/// </summary>
 public record FieldMapping
 {
     public required string Id { get; init; }
@@ -105,6 +125,9 @@ public record FieldMapping
     public int Order { get; init; }
 }
 
+/// <summary>
+/// Represents a transformation to apply to a field during pipeline execution.
+/// </summary>
 public record FieldTransformation
 {
     public required string Id { get; init; }

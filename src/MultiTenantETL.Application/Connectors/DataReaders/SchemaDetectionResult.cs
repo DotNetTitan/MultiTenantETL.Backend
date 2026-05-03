@@ -1,5 +1,8 @@
 namespace MultiTenantETL.Application.Connectors.DataReaders;
 
+/// <summary>
+/// Result of schema detection from a data source connector.
+/// </summary>
 public class SchemaDetectionResult
 {
     public List<FieldDefinition> Fields { get; set; } = new();
@@ -9,6 +12,9 @@ public class SchemaDetectionResult
     public string? ErrorMessage { get; set; }
 }
 
+/// <summary>
+/// Represents a field definition within a detected schema.
+/// </summary>
 public class FieldDefinition
 {
     public required string Name { get; set; }

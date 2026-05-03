@@ -3,6 +3,9 @@ using MultiTenantETL.Domain.Entities;
 
 namespace MultiTenantETL.Application.Connectors.DataWriters;
 
+/// <summary>
+/// Defines operations for writing data to various connector types.
+/// </summary>
 public interface IDataWriter : IAsyncDisposable
 {
     /// <summary>

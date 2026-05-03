@@ -2,6 +2,9 @@ using MultiTenantETL.Domain.Entities;
 
 namespace MultiTenantETL.Application.Connectors.DataReaders;
 
+/// <summary>
+/// Defines operations for reading data from various connector types.
+/// </summary>
 public interface IDataReader
 {
     /// <summary>

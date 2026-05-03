@@ -1,5 +1,8 @@
 namespace MultiTenantETL.Application.Executions.Models;
 
+/// <summary>
+/// Paginated response containing execution list with pagination metadata.
+/// </summary>
 public class PagedExecutionResponse
 {
     public List<ExecutionListResponse> Executions { get; set; } = new();

@@ -1,5 +1,8 @@
 namespace MultiTenantETL.Application.Executions.Models;
 
+/// <summary>
+/// Aggregated statistics for pipeline executions within a tenant.
+/// </summary>
 public class ExecutionStatsDto
 {
     public int TotalExecutions { get; set; }

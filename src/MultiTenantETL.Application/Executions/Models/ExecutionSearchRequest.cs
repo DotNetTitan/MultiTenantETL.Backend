@@ -1,5 +1,8 @@
 namespace MultiTenantETL.Application.Executions.Models;
 
+/// <summary>
+/// Request model for searching and filtering pipeline executions with pagination.
+/// </summary>
 public class ExecutionSearchRequest
 {
     public Guid? PipelineId { get; set; }

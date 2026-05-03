@@ -1,5 +1,8 @@
 namespace MultiTenantETL.Application.Executions.Models;
 
+/// <summary>
+/// Summary response model for a pipeline execution in lists and search results.
+/// </summary>
 public class ExecutionListResponse
 {
     public Guid Id { get; set; }

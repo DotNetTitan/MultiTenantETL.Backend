@@ -2,6 +2,9 @@ using System.ComponentModel.DataAnnotations;
 
 namespace MultiTenantETL.Application.Scheduling.Models;
 
+/// <summary>
+/// Request to create a new schedule for a pipeline.
+/// </summary>
 public record CreateScheduleRequest
 {
     [Required]
@@ -21,6 +24,9 @@ public record CreateScheduleRequest
     public bool IsActive { get; init; } = true;
 }
 
+/// <summary>
+/// Request to update an existing schedule.
+/// </summary>
 public record UpdateScheduleRequest
 {
     [Required]
@@ -37,6 +43,9 @@ public record UpdateScheduleRequest
     public bool? IsActive { get; init; }
 }
 
+/// <summary>
+/// Response containing full schedule details.
+/// </summary>
 public record ScheduleResponse
 {
     public Guid Id { get; init; }
@@ -57,6 +66,9 @@ public record ScheduleResponse
     public DateTime? UpdatedAt { get; init; }
 }
 
+/// <summary>
+/// Summary response for a schedule in lists.
+/// </summary>
 public record ScheduleListResponse
 {
     public Guid Id { get; init; }
@@ -72,6 +84,9 @@ public record ScheduleListResponse
     public DateTime CreatedAt { get; init; }
 }
 
+/// <summary>
+/// Request to search schedules with filtering and pagination.
+/// </summary>
 public record ScheduleSearchRequest
 {
     public Guid? PipelineId { get; init; }
@@ -82,6 +97,9 @@ public record ScheduleSearchRequest
     public int PageSize { get; init; } = 20;
 }
 
+/// <summary>
+/// Paginated response containing schedule list with pagination metadata.
+/// </summary>
 public record PagedScheduleResponse
 {
     public List<ScheduleListResponse> Schedules { get; init; } = new();

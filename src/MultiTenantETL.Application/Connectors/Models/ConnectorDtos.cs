@@ -3,6 +3,9 @@ using System.Text.Json;
 
 namespace MultiTenantETL.Application.Connectors.Models;
 
+/// <summary>
+/// Request to create a new connector.
+/// </summary>
 public record CreateConnectorRequest
 {
     public required string Name { get; init; }
@@ -20,6 +23,9 @@ public record CreateConnectorRequest
     public JsonElement? Schema { get; init; } // Optional schema definition
 }
 
+/// <summary>
+/// Request to update an existing connector.
+/// </summary>
 public record UpdateConnectorRequest
 {
     public required string Name { get; init; }
@@ -39,6 +45,9 @@ public record UpdateConnectorRequest
     public bool? IsActive { get; init; }
 }
 
+/// <summary>
+/// Response containing full connector details.
+/// </summary>
 public record ConnectorResponse
 {
     public Guid Id { get; init; }
@@ -61,6 +70,9 @@ public record ConnectorResponse
     public DateTime? UpdatedAt { get; init; }
 }
 
+/// <summary>
+/// Summary response for a connector in lists.
+/// </summary>
 public record ConnectorListResponse
 {
     public Guid Id { get; init; }
@@ -77,6 +89,9 @@ public record ConnectorListResponse
     public DateTime CreatedAt { get; init; }
 }
 
+/// <summary>
+/// Request to test a new connection configuration.
+/// </summary>
 public record TestConnectionRequest
 {
     public required string Type { get; init; }
@@ -86,6 +101,9 @@ public record TestConnectionRequest
     public required JsonElement Config { get; init; }
 }
 
+/// <summary>
+/// Response from a connection test operation.
+/// </summary>
 public record TestConnectionResponse
 {
     public bool Success { get; init; }
@@ -94,6 +112,9 @@ public record TestConnectionResponse
     public Dictionary<string, object>? Details { get; init; }
 }
 
+/// <summary>
+/// Request to detect schema from an existing connector.
+/// </summary>
 public record DetectSchemaRequest
 {
     public Guid ConnectorId { get; init; }
@@ -101,6 +122,9 @@ public record DetectSchemaRequest
     public string? TableOrResourceName { get; init; } // For databases: table name, For APIs: endpoint
 }
 
+/// <summary>
+/// Request to preview schema detection without saving a connector.
+/// </summary>
 public record DetectSchemaPreviewRequest
 {
     public required string Type { get; init; } // Database, File, API
@@ -112,6 +136,9 @@ public record DetectSchemaPreviewRequest
     public string? TableOrResourceName { get; init; } // For databases: table name
 }
 
+/// <summary>
+/// Response from a schema detection operation.
+/// </summary>
 public record DetectSchemaResponse
 {
     public bool Success { get; init; }
@@ -120,6 +147,9 @@ public record DetectSchemaResponse
     public DateTime DetectedAt { get; init; }
 }
 
+/// <summary>
+/// Represents a field definition in a detected schema.
+/// </summary>
 public record SchemaField
 {
     public required string Name { get; init; }
@@ -132,6 +162,9 @@ public record SchemaField
     public string? DefaultValue { get; init; }
 }
 
+/// <summary>
+/// Request to search connectors with filtering and pagination.
+/// </summary>
 public record ConnectorSearchRequest
 {
     public string? Name { get; init; }
@@ -143,6 +176,9 @@ public record ConnectorSearchRequest
     public int PageSize { get; init; } = 20;
 }
 
+/// <summary>
+/// Paginated response containing connector list with pagination metadata.
+/// </summary>
 public record PagedConnectorResponse
 {
     public List<ConnectorListResponse> Connectors { get; init; } = new();
@@ -152,7 +188,9 @@ public record PagedConnectorResponse
     public int TotalPages { get; init; }
 }
 
-// Configuration models for different connector types
+/// <summary>
+/// Configuration model for database connector type.
+/// </summary>
 public record DatabaseConfig
 {
     public string? Host { get; init; }
@@ -171,6 +209,9 @@ public record DatabaseConfig
     public string? Query { get; init; }
 }
 
+/// <summary>
+/// Configuration model for file connector type.
+/// </summary>
 public record FileConfig
 {
     public string? Path { get; init; }
@@ -197,6 +238,9 @@ public record FileConfig
     public Dictionary<string, string>? AdditionalParameters { get; init; }
 }
 
+/// <summary>
+/// Configuration model for REST API connector type.
+/// </summary>
 public record ApiConfig
 {
     public string? BaseUrl { get; init; }
@@ -222,6 +266,9 @@ public record ApiConfig
     public List<ApiEndpoint>? Endpoints { get; init; }
 }
 
+/// <summary>
+/// Represents an endpoint definition in an API configuration.
+/// </summary>
 public record ApiEndpoint
 {
     public required string Method { get; init; } // GET, POST, PUT, DELETE
@@ -231,7 +278,9 @@ public record ApiEndpoint
     public string? RequestDataPath { get; init; } // JSON path for request body (for POST/PUT)
 }
 
-// Write configuration models for destination connectors
+/// <summary>
+/// Write configuration for database connector destination.
+/// </summary>
 public record DatabaseWriteConfig
 {
     public string? TableName { get; init; }
@@ -240,6 +289,9 @@ public record DatabaseWriteConfig
     public int BatchSize { get; init; } = 1000;
 }
 
+/// <summary>
+/// Write configuration for file connector destination.
+/// </summary>
 public record FileWriteConfig
 {
     public string? WriteMode { get; init; } // OVERWRITE, APPEND
@@ -261,7 +313,7 @@ public record ApiWriteConfig
 }
 
 /// <summary>
-/// Configuration model for Email connector type.
+/// Configuration model for writing data to email recipients.
 /// The email body contains only a summary; all data rows go into the file attachment.
 /// </summary>
 public record EmailConfig
