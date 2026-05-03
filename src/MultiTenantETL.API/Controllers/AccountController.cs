@@ -127,7 +127,7 @@ namespace MultiTenantETL.API.Controllers
             // Generate and send confirmation email
             var confirmationToken = await _userManager.GenerateEmailConfirmationTokenAsync(user);
             var encodedToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(confirmationToken));
-            var confirmationUrl = $"{_configuration["AppSettings:FrontendUrl"]}/auth/confirm-email?userId={user.Id}&token={encodedToken}";
+            var confirmationUrl = $"{_configuration["AppSettings:FrontendUrl"]}/confirm-email?userId={user.Id}&token={encodedToken}";
 
             try
             {
@@ -213,7 +213,7 @@ namespace MultiTenantETL.API.Controllers
 
             var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
             var encodedToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(resetToken));
-            var resetUrl = $"{_configuration["AppSettings:FrontendUrl"]}/auth/reset-password?userId={user.Id}&token={encodedToken}";
+            var resetUrl = $"{_configuration["AppSettings:FrontendUrl"]}/reset-password?userId={user.Id}&token={encodedToken}";
 
             try
             {
