@@ -771,12 +771,20 @@ Detailed documentation is available in the [docs](./docs/) folder:
 
 ## 📝 License
 
-[Specify your license here]
+This project is licensed under the GNU General Public License Version 3 - see the [LICENSE](LICENSE) file for details.
+
+## 📋 Code of Conduct
+
+This project adheres to the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code.
 
 ## 🤝 Contributing
 
-[Add contribution guidelines if open source]
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct, and the process for submitting pull requests to us.
+
+## 🔒 Security
+
+See [SECURITY.md](SECURITY.md) for our security policy.
 
 ## 📞 Support
 
-For questions or issues, please [open an issue](link-to-issues) on GitHub.
+For questions or issues, please [open an issue](https://github.com/yourusername/MultiTenantETL/issues) on GitHub.
