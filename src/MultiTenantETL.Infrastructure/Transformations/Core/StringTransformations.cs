@@ -1,6 +1,6 @@
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using Microsoft.Extensions.Logging;
 
 namespace MultiTenantETL.Infrastructure.Transformations.Core;
 
@@ -130,7 +130,7 @@ public static class StringTransformations
             "lower" => ToLower(value),
             "title_case" => ToTitleCase(value),
             "camelcase" => ToCamelCase(value),
-            "substring" => Substring(value, 
+            "substring" => Substring(value,
                 config.TryGetProperty("start", out var s) ? s.GetInt32() : 0,
                 config.TryGetProperty("length", out var l) ? l.GetInt32() : (int?)null),
             "replace" => Replace(value,

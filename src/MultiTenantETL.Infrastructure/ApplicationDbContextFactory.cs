@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
 using MultiTenantETL.Application.Common.Interfaces;
-using MultiTenantETL.Infrastructure.Identity;
 using MultiTenantETL.Infrastructure.Persistence;
 
 namespace MultiTenantETL.Infrastructure;

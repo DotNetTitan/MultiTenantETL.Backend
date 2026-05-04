@@ -1,5 +1,5 @@
-using System.Text.Json;
 using MultiTenantETL.Application.Scheduling.Models;
+using System.Text.Json;
 
 namespace MultiTenantETL.Application.Pipelines.Models;
 

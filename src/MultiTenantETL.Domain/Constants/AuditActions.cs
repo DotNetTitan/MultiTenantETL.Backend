@@ -6,8 +6,8 @@ namespace MultiTenantETL.Domain.Constants;
 public static class AuditActions
 {
     /// <summary>
-/// Authentication audit actions.
-/// </summary>
+    /// Authentication audit actions.
+    /// </summary>
     public static class Authentication
     {
         /// <summary>User logged in.</summary>
@@ -36,8 +36,8 @@ public static class AuditActions
     }
 
     /// <summary>
-/// User audit actions.
-/// </summary>
+    /// User audit actions.
+    /// </summary>
     public static class Users
     {
         /// <summary>User was created.</summary>
@@ -72,8 +72,8 @@ public static class AuditActions
     }
 
     /// <summary>
-/// Tenant audit actions.
-/// </summary>
+    /// Tenant audit actions.
+    /// </summary>
     public static class Tenants
     {
         /// <summary>Tenant was created.</summary>
@@ -96,8 +96,8 @@ public static class AuditActions
     }
 
     /// <summary>
-/// Pipeline audit actions.
-/// </summary>
+    /// Pipeline audit actions.
+    /// </summary>
     public static class Pipelines
     {
         /// <summary>Pipeline was created.</summary>
@@ -123,8 +123,8 @@ public static class AuditActions
     }
 
     /// <summary>
-/// Connector audit actions.
-/// </summary>
+    /// Connector audit actions.
+    /// </summary>
     public static class Connectors
     {
         /// <summary>Connector was created.</summary>
@@ -178,8 +178,8 @@ public static class AuditActions
     public const string TransformationDeleted = "Transformation.Deleted";
 
     /// <summary>
-/// Schedule audit actions.
-/// </summary>
+    /// Schedule audit actions.
+    /// </summary>
     public static class Schedules
     {
         /// <summary>Schedule was created.</summary>

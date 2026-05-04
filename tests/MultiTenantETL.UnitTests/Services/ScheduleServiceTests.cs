@@ -10,7 +10,6 @@ using MultiTenantETL.Infrastructure.Persistence;
 using MultiTenantETL.Infrastructure.Scheduling;
 using NSubstitute;
 using Quartz;
-using Quartz.Impl;
 
 namespace MultiTenantETL.UnitTests.Services;
 
@@ -36,7 +35,7 @@ public class ScheduleServiceTests : IDisposable
         _logger = Substitute.For<ILogger<ScheduleService>>();
         _currentUserService = Substitute.For<ICurrentUserService>();
         _auditService = Substitute.For<IAuditService>();
-        
+
         // Setup Quartz scheduler mock
         _schedulerFactory = Substitute.For<ISchedulerFactory>();
         _scheduler = Substitute.For<IScheduler>();

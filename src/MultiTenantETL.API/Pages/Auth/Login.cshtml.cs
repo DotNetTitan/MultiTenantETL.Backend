@@ -1,5 +1,3 @@
-using System.Collections.Immutable;
-using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -7,6 +5,8 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Infrastructure.Identity;
 using MultiTenantETL.Infrastructure.Interfaces;
+using System.Collections.Immutable;
+using System.ComponentModel.DataAnnotations;
 
 namespace MultiTenantETL.API.Pages.Auth;
 

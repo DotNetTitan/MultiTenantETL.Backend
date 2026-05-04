@@ -36,7 +36,7 @@ public class DataWriterFactory : IDataWriterFactory
 
     public IDataWriter CreateWriter(Connector connector)
     {
-        _logger.LogDebug("Creating writer for connector {ConnectorId} of type {Type}", 
+        _logger.LogDebug("Creating writer for connector {ConnectorId} of type {Type}",
             connector.Id, connector.Type);
 
         return connector.Type.ToLower() switch

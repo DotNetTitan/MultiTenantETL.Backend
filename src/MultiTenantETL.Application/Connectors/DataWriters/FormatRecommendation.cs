@@ -21,17 +21,17 @@ public enum RecommendationLevel
     /// Format is optimal for the use case
     /// </summary>
     Optimal = 0,
-    
+
     /// <summary>
     /// Format will work but there's a better option
     /// </summary>
     Suggestion = 1,
-    
+
     /// <summary>
     /// Format may cause performance issues
     /// </summary>
     Warning = 2,
-    
+
     /// <summary>
     /// Format is not recommended and may fail
     /// </summary>

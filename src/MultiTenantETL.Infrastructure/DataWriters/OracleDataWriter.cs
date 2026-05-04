@@ -1,5 +1,3 @@
-using System.Data;
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MultiTenantETL.Application.Connectors.DataReaders;
@@ -7,6 +5,8 @@ using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
 using Oracle.ManagedDataAccess.Client;
+using System.Data;
+using System.Text.Json;
 
 namespace MultiTenantETL.Infrastructure.DataWriters;
 
@@ -30,7 +30,7 @@ public class OracleDataWriter : IDataWriter
         var result = new DataWriteResult { BatchId = batch.BatchId };
 
         var config = ParseConfig(connector.ConfigJson);
-            
+
         try
         {
             await using var connection = new OracleConnection(config.ConnectionString);

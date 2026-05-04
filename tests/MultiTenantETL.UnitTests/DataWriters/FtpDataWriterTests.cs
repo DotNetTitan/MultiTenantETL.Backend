@@ -1,14 +1,10 @@
-using System.Text.Json;
 using FluentAssertions;
-using FluentFTP;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.DataWriters;
 using NSubstitute;
-using NSubstitute.ExceptionExtensions;
-using Xunit;
 
 namespace MultiTenantETL.UnitTests.DataWriters;
 

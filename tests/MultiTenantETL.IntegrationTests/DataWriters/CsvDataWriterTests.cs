@@ -4,7 +4,6 @@ using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.DataWriters;
-using Xunit;
 
 namespace MultiTenantETL.IntegrationTests.DataWriters;
 
@@ -17,7 +16,7 @@ public class CsvDataWriterTests : IAsyncDisposable
     {
         var logger = LoggerFactory.Create(builder => builder.AddConsole())
             .CreateLogger<CsvDataWriter>();
-        
+
         _writer = new CsvDataWriter(logger);
         _testFilePath = Path.Combine(Path.GetTempPath(), $"test_{Guid.NewGuid()}.csv");
     }
@@ -25,7 +24,7 @@ public class CsvDataWriterTests : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await _writer.DisposeAsync();
-        
+
         if (File.Exists(_testFilePath))
             File.Delete(_testFilePath);
     }
@@ -44,7 +43,7 @@ public class CsvDataWriterTests : IAsyncDisposable
         // Assert
         result.RowsWritten.Should().Be(5);
         result.RowsFailed.Should().Be(0);
-        
+
         File.Exists(_testFilePath).Should().BeTrue();
         var lines = File.ReadAllLines(_testFilePath);
         lines.Should().HaveCount(6); // Header + 5 rows
@@ -83,12 +82,12 @@ public class CsvDataWriterTests : IAsyncDisposable
         await _writer.WriteBatchAsync(connector, batch1, new WriteOptions(), CancellationToken.None);
 
         // Act
-        var result = await _writer.WriteBatchAsync(connector, batch2, 
+        var result = await _writer.WriteBatchAsync(connector, batch2,
             new WriteOptions { TruncateBeforeLoad = true }, CancellationToken.None);
 
         // Assert
         result.RowsWritten.Should().Be(2);
-        
+
         var lines = File.ReadAllLines(_testFilePath);
         lines.Should().HaveCount(3); // Header + 2 rows (batch1 was truncated)
         lines[1].Should().Contain("User 10");
@@ -108,7 +107,7 @@ public class CsvDataWriterTests : IAsyncDisposable
         // Assert
         result.RowsWritten.Should().Be(10000);
         result.RowsFailed.Should().Be(0);
-        
+
         var lines = File.ReadAllLines(_testFilePath);
         lines.Should().HaveCount(10001); // Header + 10000 rows
     }
@@ -161,7 +160,7 @@ public class CsvDataWriterTests : IAsyncDisposable
 
         // Assert
         result.RowsWritten.Should().Be(2);
-        
+
         var lines = File.ReadAllLines(_testFilePath);
         lines[1].Should().Contain(",,"); // null email
         lines[2].Should().StartWith("2,"); // null name
@@ -259,7 +258,7 @@ public class CsvDataWriterTests : IAsyncDisposable
     private ReadBatch CreateTestBatch(int rowCount, int startId = 1)
     {
         var rows = new List<Dictionary<string, object?>>();
-        
+
         for (int i = 0; i < rowCount; i++)
         {
             var id = startId + i;

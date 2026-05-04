@@ -20,7 +20,7 @@ public class TenantMiddleware
     {
         // Extract tenant ID from JWT claims
         var tenantIdClaim = context.User?.FindFirst(CustomClaims.TenantId)?.Value;
-        
+
         if (Guid.TryParse(tenantIdClaim, out var tenantId))
         {
             tenantProvider.TenantId = tenantId;

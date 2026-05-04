@@ -183,7 +183,7 @@ public static class DbSeeder
             }
             else
             {
-                logger.LogError("Failed to create admin user. Errors: {Errors}", 
+                logger.LogError("Failed to create admin user. Errors: {Errors}",
                     string.Join(", ", result.Errors.Select(e => e.Description)));
             }
         }
@@ -242,13 +242,13 @@ public static class DbSeeder
             // Update the existing application to use the current FrontendUrl
             var descriptor = new OpenIddictApplicationDescriptor();
             await applicationManager.PopulateAsync(descriptor, spaApp);
-            
+
             descriptor.RedirectUris.Clear();
             descriptor.RedirectUris.Add(new Uri($"{normalizedUrl}/auth/callback"));
-            
+
             descriptor.PostLogoutRedirectUris.Clear();
             descriptor.PostLogoutRedirectUris.Add(new Uri($"{normalizedUrl}/"));
-            
+
             await applicationManager.UpdateAsync(spaApp, descriptor);
             logger.LogInformation("Updated OAuth client: multitenant-etl-spa with frontend URL {Url}", normalizedUrl);
         }

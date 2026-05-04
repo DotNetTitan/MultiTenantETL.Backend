@@ -1,8 +1,8 @@
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors;
 using MultiTenantETL.Application.Connectors.Models;
 using MultiTenantETL.Infrastructure.Configuration;
+using System.Text.Json;
 
 namespace MultiTenantETL.Infrastructure.Services.ConnectionTesting.Api;
 
@@ -70,9 +70,9 @@ public class ApiConnectionTester : IApiConnectionTester
                     testPath = getEndpoint.Path;
                 }
             }
-            
+
             var response = await httpClient.GetAsync(testPath);
-            
+
             var details = new Dictionary<string, object>
             {
                 ["StatusCode"] = (int)response.StatusCode,
@@ -85,8 +85,8 @@ public class ApiConnectionTester : IApiConnectionTester
             return new ConnectionTestResult
             {
                 Success = response.IsSuccessStatusCode,
-                Message = response.IsSuccessStatusCode 
-                    ? $"Successfully connected to API at {testPath}" 
+                Message = response.IsSuccessStatusCode
+                    ? $"Successfully connected to API at {testPath}"
                     : $"API returned status code {response.StatusCode} for {testPath}",
                 Details = details
             };
@@ -109,7 +109,7 @@ public class ApiConnectionTester : IApiConnectionTester
         {
             case "bearer":
                 string? token = null;
-                
+
                 if (apiConfig.UseDynamicToken)
                 {
                     var tokenResult = await GenerateDynamicTokenAsync(apiConfig);
@@ -123,13 +123,13 @@ public class ApiConnectionTester : IApiConnectionTester
                 {
                     token = apiConfig.AuthToken;
                 }
-                
+
                 if (!string.IsNullOrEmpty(token))
                 {
                     httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {token!}");
                 }
                 break;
-                
+
             case "basic":
                 if (!string.IsNullOrEmpty(apiConfig.Username) && !string.IsNullOrEmpty(apiConfig.Password))
                 {
@@ -138,7 +138,7 @@ public class ApiConnectionTester : IApiConnectionTester
                     httpClient.DefaultRequestHeaders.Add("Authorization", $"Basic {credentials}");
                 }
                 break;
-                
+
             case "apikey":
                 if (!string.IsNullOrEmpty(apiConfig.ApiKeyHeader) && !string.IsNullOrEmpty(apiConfig.ApiKeyValue))
                 {
@@ -159,7 +159,7 @@ public class ApiConnectionTester : IApiConnectionTester
         {
             var tokenClient = _httpClientFactory.CreateClient();
             tokenClient.Timeout = TimeSpan.FromSeconds(30);
-            
+
             tokenClient.DefaultRequestHeaders.Add("User-Agent", "MultiTenantETL/1.0");
             tokenClient.DefaultRequestHeaders.Add("Accept", "*/*");
 
@@ -183,13 +183,13 @@ public class ApiConnectionTester : IApiConnectionTester
                 {
                     if (header.Key.Equals("Content-Type", StringComparison.OrdinalIgnoreCase))
                         continue;
-                        
+
                     request.Headers.TryAddWithoutValidation(header.Key, header.Value);
                 }
             }
 
             var response = await tokenClient.SendAsync(request);
-            
+
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
@@ -231,7 +231,7 @@ public class ApiConnectionTester : IApiConnectionTester
 
             var parts = path.Split('.');
             var current = json;
-            
+
             foreach (var part in parts)
             {
                 if (current.TryGetProperty(part, out var next))

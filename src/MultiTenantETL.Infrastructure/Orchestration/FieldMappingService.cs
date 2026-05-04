@@ -1,9 +1,9 @@
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Orchestration;
 using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.Transformations.FieldProcessors;
+using System.Text.Json;
 
 namespace MultiTenantETL.Infrastructure.Orchestration;
 
@@ -39,7 +39,7 @@ public class FieldMappingService : IFieldMappingService
             var simpleMappings = new List<FieldMapping>(mappings.Count);
             var complexMappings = new List<FieldMapping>(mappings.Count);
             var allDestinationFields = new HashSet<string>(mappings.Count);
-            
+
             foreach (var mapping in mappings)
             {
                 allDestinationFields.Add(mapping.DestinationField);
@@ -52,7 +52,7 @@ public class FieldMappingService : IFieldMappingService
                     complexMappings.Add(mapping);
                 }
             }
-            
+
             // Sort once, not per row
             simpleMappings.Sort((a, b) => a.Order.CompareTo(b.Order));
             complexMappings.Sort((a, b) => a.Order.CompareTo(b.Order));
@@ -71,7 +71,7 @@ public class FieldMappingService : IFieldMappingService
                         .Where(t => t.IsEnabled)
                         .OrderBy(t => t.Order)
                         .ToList();
-                    
+
                     if (enabledTransformations.Count > 0)
                     {
                         foreach (var row in batch.Rows)
@@ -79,15 +79,15 @@ public class FieldMappingService : IFieldMappingService
                             if (row.TryGetValue(sourceField, out var fieldValue))
                             {
                                 object? transformedValue = fieldValue;
-                                
+
                                 foreach (var trans in enabledTransformations)
                                 {
                                     transformedValue = ApplyFieldTransformation(transformedValue, trans, sourceField, row);
                                 }
-                                
+
                                 // Store the transformed value in the destination field
                                 row[mapping.DestinationField] = transformedValue;
-                                
+
                                 // Remove source field if different from destination
                                 if (sourceField != mapping.DestinationField)
                                 {
@@ -141,7 +141,7 @@ public class FieldMappingService : IFieldMappingService
                     }
                     mappingTransformations.Add((mapping, enabled));
                 }
-                
+
                 foreach (var row in batch.Rows)
                 {
                     foreach (var (mapping, enabledTransformations) in mappingTransformations)
@@ -169,7 +169,7 @@ public class FieldMappingService : IFieldMappingService
                         }
 
                         row[mapping.DestinationField] = result;
-                        
+
                         // Remove source fields that are not used as destination fields elsewhere
                         // This prevents sending unmapped columns to the destination while preserving mapped ones
                         foreach (var sourceField in mapping.SourceFields)
@@ -234,7 +234,7 @@ public class FieldMappingService : IFieldMappingService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Error applying transformation {Type} to field {Field}, returning original value", 
+            _logger.LogWarning(ex, "Error applying transformation {Type} to field {Field}, returning original value",
                 transformation.Type, fieldName);
             return value; // Return original value on error
         }

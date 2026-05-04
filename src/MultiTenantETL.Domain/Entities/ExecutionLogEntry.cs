@@ -22,7 +22,7 @@ public class ExecutionLogEntry : ITenantResource
     /// Tenant that owns this entry.
     /// </summary>
     public Guid TenantId { get; set; }
-    
+
     /// <summary>
     /// When this entry was created.
     /// </summary>
@@ -47,21 +47,21 @@ public class ExecutionLogEntry : ITenantResource
     /// Additional details as JSON or formatted text.
     /// </summary>
     public string? Details { get; set; }
-    
+
     // Optional batch tracking
-    
+
     /// <summary>
     /// Batch this entry is associated with (if applicable).
     /// </summary>
     public Guid? BatchId { get; set; }
-    
+
     /// <summary>
     /// When this entry was created.
     /// </summary>
     public DateTimeOffset CreatedAt { get; set; }
-    
+
     // Navigation properties
-    
+
     /// <summary>
     /// The execution this entry belongs to.
     /// </summary>

@@ -1,11 +1,9 @@
-using System.Security.Cryptography.X509Certificates;
-using Microsoft.AspNetCore.HttpOverrides;
 using AspNetCoreRateLimit;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MultiTenantETL.API.Middleware;
@@ -22,6 +20,7 @@ using MultiTenantETL.Infrastructure.Security;
 using MultiTenantETL.Infrastructure.Services;
 using OpenIddict.Abstractions;
 using Quartz;
+using System.Security.Cryptography.X509Certificates;
 
 var builder = WebApplication.CreateBuilder(args);
 

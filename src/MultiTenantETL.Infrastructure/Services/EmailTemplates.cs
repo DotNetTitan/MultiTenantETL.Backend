@@ -1,5 +1,5 @@
-using System.Globalization;
 using MultiTenantETL.Domain.Constants;
+using System.Globalization;
 
 namespace MultiTenantETL.Infrastructure.Services
 {
@@ -261,7 +261,7 @@ namespace MultiTenantETL.Infrastructure.Services
 
             return GetDashboardTemplate(header + body);
         }
-        
+
         /// <summary>
         /// Pipeline execution report with execution summary and statistics
         /// </summary>
@@ -307,7 +307,7 @@ namespace MultiTenantETL.Infrastructure.Services
             var durationText = duration.HasValue
                 ? $"{(int)duration.Value.TotalMinutes:00}:{duration.Value.Seconds:00}.{duration.Value.Milliseconds:000}"
                 : "N/A";
-                
+
             var endTimeText = endTime.HasValue
                 ? endTime.Value.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.InvariantCulture)
                 : "N/A";

@@ -68,7 +68,7 @@ public class FileDataWriterFactory : IFileDataWriterFactory
     private string DetermineFormat(Connector connector)
     {
         FileFormatConfig? config;
-        
+
         try
         {
             config = System.Text.Json.JsonSerializer.Deserialize<FileFormatConfig>(connector.ConfigJson);

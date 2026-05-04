@@ -1,11 +1,11 @@
-using System.Runtime.CompilerServices;
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
 using MySqlConnector;
+using System.Runtime.CompilerServices;
+using System.Text.Json;
 using IDataReader = MultiTenantETL.Application.Connectors.DataReaders.IDataReader;
 
 namespace MultiTenantETL.Infrastructure.DataReaders;

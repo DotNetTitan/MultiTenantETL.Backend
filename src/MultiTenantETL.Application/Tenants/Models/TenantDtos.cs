@@ -1,5 +1,3 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace MultiTenantETL.Application.Tenants.Models;
 
 public record CreateTenantRequest

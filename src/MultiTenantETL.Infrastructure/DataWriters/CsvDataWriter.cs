@@ -1,11 +1,11 @@
-using System.Globalization;
-using System.Text.Json;
 using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Domain.Entities;
+using System.Globalization;
+using System.Text.Json;
 
 namespace MultiTenantETL.Infrastructure.DataWriters;
 
@@ -25,11 +25,11 @@ public class CsvDataWriter : IDataWriter
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        
+
         var result = new DataWriteResult { BatchId = batch.BatchId };
 
         var config = ParseConfig(connector.ConfigJson);
-        
+
         try
         {
 
@@ -79,7 +79,7 @@ public class CsvDataWriter : IDataWriter
                 foreach (var row in batch.Rows)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    
+
                     foreach (var header in headers)
                     {
                         csv.WriteField(row[header]);

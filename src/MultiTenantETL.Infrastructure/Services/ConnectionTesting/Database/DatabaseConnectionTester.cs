@@ -1,17 +1,16 @@
-using System.Text.Json;
+using Microsoft.Azure.Cosmos;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
+using MongoDB.Bson;
+using MongoDB.Driver;
 using MultiTenantETL.Application.Connectors;
 using MultiTenantETL.Application.Connectors.Models;
 using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Infrastructure.Configuration;
-using Npgsql;
 using MySqlConnector;
+using Npgsql;
 using Oracle.ManagedDataAccess.Client;
-
-using MongoDB.Driver;
-using MongoDB.Bson;
-using Microsoft.Azure.Cosmos;
+using System.Text.Json;
 
 namespace MultiTenantETL.Infrastructure.Services.ConnectionTesting.Database;
 
@@ -48,7 +47,7 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
                 };
             }
         }
-        else if (provider != ConnectorProviders.CosmosDb && 
+        else if (provider != ConnectorProviders.CosmosDb &&
                  provider != ConnectorProviders.MongoDb)
         {
             // Standard SQL database providers require host, database, username, password
@@ -96,7 +95,7 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
     {
         using var connection = new SqlConnection(BuildSqlServerConnectionString(config));
         await connection.OpenAsync();
-        
+
         var details = new Dictionary<string, object>
         {
             ["ServerVersion"] = connection.ServerVersion,
@@ -116,7 +115,7 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
     {
         using var connection = new NpgsqlConnection(BuildPostgreSqlConnectionString(config));
         await connection.OpenAsync();
-        
+
         var details = new Dictionary<string, object>
         {
             ["ServerVersion"] = connection.ServerVersion,
@@ -136,7 +135,7 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
     {
         using var connection = new MySqlConnection(BuildMySqlConnectionString(config));
         await connection.OpenAsync();
-        
+
         var details = new Dictionary<string, object>
         {
             ["ServerVersion"] = connection.ServerVersion,
@@ -225,7 +224,7 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
         }
 
         using var client = new CosmosClient(endpoint, key);
-        
+
         // Test connection by reading account info
         await client.ReadAccountAsync();
 

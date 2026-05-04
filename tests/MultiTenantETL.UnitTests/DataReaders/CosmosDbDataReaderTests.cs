@@ -1,17 +1,13 @@
-using System.Text.Json;
-using Microsoft.Azure.Cosmos;
+using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MultiTenantETL.Application.Common.Interfaces;
-using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.DataReaders;
-using MultiTenantETL.Infrastructure.Security;
 using NSubstitute;
-using FluentAssertions;
-using Xunit;
+using System.Text.Json;
 
 namespace MultiTenantETL.UnitTests.DataReaders;
 

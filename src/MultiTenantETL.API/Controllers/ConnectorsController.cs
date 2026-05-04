@@ -1,9 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Connectors;
 using MultiTenantETL.Application.Connectors.Models;
-using MultiTenantETL.Application.Common.Interfaces;
-using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Infrastructure.Authorization.Requirements;
 

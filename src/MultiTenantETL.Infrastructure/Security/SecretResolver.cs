@@ -1,7 +1,7 @@
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Domain.Constants;
+using System.Text.Json;
 
 namespace MultiTenantETL.Infrastructure.Security;
 
@@ -42,7 +42,7 @@ public class SecretResolver : ISecretResolver
             var root = jsonDoc.RootElement;
 
             var resolved = await ResolveElementAsync(root, cancellationToken);
-            
+
             var serialized = JsonSerializer.Serialize(resolved);
             return JsonDocument.Parse(serialized).RootElement;
         }
@@ -72,18 +72,18 @@ public class SecretResolver : ISecretResolver
         {
             case JsonValueKind.String:
                 var stringValue = element.GetString();
-                
-                if (!string.IsNullOrWhiteSpace(stringValue) && 
+
+                if (!string.IsNullOrWhiteSpace(stringValue) &&
                     stringValue.StartsWith(EncryptionConstants.SecretReferencePrefix, StringComparison.OrdinalIgnoreCase))
                 {
                     // Extract secret name from reference
                     var secretName = stringValue.Substring(EncryptionConstants.SecretReferencePrefix.Length);
-                    
+
                     _logger.LogDebug("Resolving Key Vault reference: {SecretName}", secretName);
 
                     // Retrieve actual secret value
                     var secretValue = await _secretStorageService.GetSecretAsync(secretName, cancellationToken);
-                    
+
                     if (secretValue == null)
                     {
                         _logger.LogError("Secret not found in Key Vault: {SecretName}", secretName);
@@ -93,7 +93,7 @@ public class SecretResolver : ISecretResolver
                     _logger.LogDebug("Successfully resolved secret: {SecretName}", secretName);
                     return secretValue;
                 }
-                
+
                 return stringValue;
 
             case JsonValueKind.Object:
@@ -114,13 +114,13 @@ public class SecretResolver : ISecretResolver
 
             case JsonValueKind.Number:
                 return element.TryGetInt64(out var l) ? l : element.GetDouble();
-            
+
             case JsonValueKind.True:
                 return true;
-            
+
             case JsonValueKind.False:
                 return false;
-            
+
             case JsonValueKind.Null:
                 return null;
 
@@ -161,7 +161,7 @@ public class SecretResolver : ISecretResolver
         {
             case JsonValueKind.String:
                 var stringValue = element.GetString();
-                return !string.IsNullOrWhiteSpace(stringValue) && 
+                return !string.IsNullOrWhiteSpace(stringValue) &&
                        stringValue.StartsWith(EncryptionConstants.SecretReferencePrefix, StringComparison.OrdinalIgnoreCase);
 
             case JsonValueKind.Object:

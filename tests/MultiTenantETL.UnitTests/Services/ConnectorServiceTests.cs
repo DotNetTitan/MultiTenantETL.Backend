@@ -1,4 +1,3 @@
-using System.Text.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -8,9 +7,9 @@ using MultiTenantETL.Application.Connectors.Models;
 using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Persistence;
-using MultiTenantETL.Infrastructure.Security;
 using MultiTenantETL.Infrastructure.Services;
 using NSubstitute;
+using System.Text.Json;
 
 namespace MultiTenantETL.UnitTests.Services;
 

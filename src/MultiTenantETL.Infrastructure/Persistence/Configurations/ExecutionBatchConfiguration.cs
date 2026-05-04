@@ -25,7 +25,7 @@ public class ExecutionBatchConfiguration : IEntityTypeConfiguration<ExecutionBat
 
         builder.HasIndex(b => b.ExecutionId);
         builder.HasIndex(b => b.TenantId);
-        
+
         builder.HasIndex(b => new { b.ExecutionId, b.BatchIndex })
             .IsUnique();
 

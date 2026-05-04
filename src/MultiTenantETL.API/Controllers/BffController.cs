@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
@@ -6,6 +5,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using MultiTenantETL.Infrastructure.Identity;
 using MultiTenantETL.Infrastructure.Interfaces;
+using System.Collections.Immutable;
 
 namespace MultiTenantETL.API.Controllers;
 

@@ -6,7 +6,6 @@ using MultiTenantETL.Application.Executions.Models;
 using MultiTenantETL.Application.Messaging;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Domain.Enums;
-using MultiTenantETL.Domain.ValueObjects;
 using MultiTenantETL.Infrastructure.Persistence;
 
 namespace MultiTenantETL.Infrastructure.Services;
@@ -31,8 +30,8 @@ public class ExecutionService : IExecutionService
     }
 
     public async Task<ExecutionResponse> StartExecutionAsync(
-        Guid pipelineId, 
-        string triggeredBy, 
+        Guid pipelineId,
+        string triggeredBy,
         Guid? userId,
         CancellationToken cancellationToken = default)
     {
@@ -140,7 +139,7 @@ public class ExecutionService : IExecutionService
     }
 
     public async Task<PagedExecutionResponse> GetAllAsync(
-        ExecutionSearchRequest request, 
+        ExecutionSearchRequest request,
         CancellationToken cancellationToken = default)
     {
         var currentTenantId = _currentUserService.GetTenantId();
@@ -181,7 +180,7 @@ public class ExecutionService : IExecutionService
         if (!string.IsNullOrEmpty(request.Search))
         {
             var searchLower = request.Search.ToLower();
-            query = query.Where(e => 
+            query = query.Where(e =>
                 e.Pipeline!.Name.ToLower().Contains(searchLower) ||
                 e.Id.ToString().ToLower().Contains(searchLower));
         }
@@ -296,12 +295,12 @@ public class ExecutionService : IExecutionService
         var runningExecutions = executions.Count(e => e.Status == ExecutionStatus.Running);
         var cancelledExecutions = executions.Count(e => e.Status == ExecutionStatus.Cancelled);
 
-        var successRate = totalExecutions > 0 
-            ? (decimal)completedExecutions / totalExecutions * 100 
+        var successRate = totalExecutions > 0
+            ? (decimal)completedExecutions / totalExecutions * 100
             : 0;
 
         var completedWithDuration = executions.Where(e => e.Duration.HasValue).ToList();
-        var averageDuration = completedWithDuration.Any() 
+        var averageDuration = completedWithDuration.Any()
             ? TimeSpan.FromTicks((long)completedWithDuration.Average(e => e.Duration!.Value.Ticks))
             : (TimeSpan?)null;
 

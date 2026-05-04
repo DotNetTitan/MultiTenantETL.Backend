@@ -2,8 +2,6 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Common.Interfaces;
-using MultiTenantETL.Application.Executions;
-using MultiTenantETL.Application.Executions.Models;
 using MultiTenantETL.Application.Messaging;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Domain.Enums;
@@ -53,7 +51,7 @@ public class ExecutionServiceTests : IDisposable
         var tenantId = Guid.NewGuid();
         var userId = Guid.NewGuid();
         var pipelineId = Guid.NewGuid();
-        
+
         _tenantProvider.TenantId.Returns(tenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
 
@@ -158,7 +156,7 @@ public class ExecutionServiceTests : IDisposable
         var tenantId = Guid.NewGuid();
         var otherTenantId = Guid.NewGuid();
         var pipelineId = Guid.NewGuid();
-        
+
         _tenantProvider.TenantId.Returns(otherTenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
 
@@ -183,7 +181,7 @@ public class ExecutionServiceTests : IDisposable
 
         _context.Pipelines.Add(pipeline);
         await _context.SaveChangesAsync();
-        
+
         // Switch tenant context for the query (service will use different tenant than inserted pipeline)
         // With tenant query filters, the pipeline won't be found - this is the correct tenant isolation behavior
         _tenantProvider.TenantId.Returns(tenantId);
@@ -203,7 +201,7 @@ public class ExecutionServiceTests : IDisposable
         var tenantId = Guid.NewGuid();
         var executionId = Guid.NewGuid();
         var pipelineId = Guid.NewGuid();
-        
+
         _tenantProvider.TenantId.Returns(tenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
 
@@ -261,7 +259,7 @@ public class ExecutionServiceTests : IDisposable
         var tenantId = Guid.NewGuid();
         var executionId = Guid.NewGuid();
         var pipelineId = Guid.NewGuid();
-        
+
         _tenantProvider.TenantId.Returns(tenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
 
@@ -310,7 +308,7 @@ public class ExecutionServiceTests : IDisposable
         var tenantId = Guid.NewGuid();
         var executionId = Guid.NewGuid();
         var pipelineId = Guid.NewGuid();
-        
+
         _tenantProvider.TenantId.Returns(tenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
 

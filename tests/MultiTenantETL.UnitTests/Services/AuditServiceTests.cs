@@ -1,10 +1,8 @@
-using System.Text.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Common.Interfaces;
-using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Infrastructure.Persistence;
 using MultiTenantETL.Infrastructure.Services;
 using NSubstitute;
@@ -86,10 +84,10 @@ public class AuditServiceTests : IDisposable
 
         // 1. Explicit Error severity
         await _sut.LogAsync("Action.1", "Type", severity: "Error");
-        
+
         // 2. Success false (should be Error internally)
         await _sut.LogAsync("Action.2", "Type", success: false);
-        
+
         // 3. Info severity
         await _sut.LogAsync("Action.3", "Type", severity: "Info");
 

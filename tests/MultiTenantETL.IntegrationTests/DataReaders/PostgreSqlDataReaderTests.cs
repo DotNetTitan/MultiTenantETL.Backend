@@ -8,7 +8,6 @@ using MultiTenantETL.Infrastructure.DataReaders;
 using MultiTenantETL.IntegrationTests.TestUtilities;
 using Npgsql;
 using Testcontainers.PostgreSql;
-using Xunit;
 
 namespace MultiTenantETL.IntegrationTests.DataReaders;
 
@@ -32,18 +31,18 @@ public class PostgreSqlDataReaderTests : IAsyncLifetime
 
         var logger = LoggerFactory.Create(builder => builder.AddConsole())
             .CreateLogger<PostgreSqlDataReader>();
-        
+
         var settings = Options.Create(new EtlSettings
         {
             CommandTimeoutSeconds = 300
         });
-        
+
         _reader = new PostgreSqlDataReader(logger, settings, new StubSecretResolver());
 
         // Create and populate test table
         await using var connection = new NpgsqlConnection(_connectionString);
         await connection.OpenAsync();
-        
+
         await using var createCommand = new NpgsqlCommand(@"
             CREATE TABLE test_products (
                 id SERIAL PRIMARY KEY,
@@ -53,7 +52,7 @@ public class PostgreSqlDataReaderTests : IAsyncLifetime
                 in_stock BOOLEAN DEFAULT true,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )", connection);
-        
+
         await createCommand.ExecuteNonQueryAsync();
 
         // Insert test data
@@ -62,12 +61,12 @@ public class PostgreSqlDataReaderTests : IAsyncLifetime
             await using var insertCommand = new NpgsqlCommand(@"
                 INSERT INTO test_products (name, price, category, in_stock)
                 VALUES (@name, @price, @category, @in_stock)", connection);
-            
+
             insertCommand.Parameters.AddWithValue("@name", $"Product {i}");
             insertCommand.Parameters.AddWithValue("@price", 10.00m + i);
             insertCommand.Parameters.AddWithValue("@category", $"Category {i % 10}");
             insertCommand.Parameters.AddWithValue("@in_stock", i % 3 != 0);
-            
+
             await insertCommand.ExecuteNonQueryAsync();
         }
     }
@@ -147,7 +146,7 @@ public class PostgreSqlDataReaderTests : IAsyncLifetime
         await foreach (var batch in _reader.ReadAsync(connector, options, CancellationToken.None))
         {
             totalRows += batch.RowCount;
-            
+
             // Verify all rows match the filter
             foreach (var row in batch.Rows)
             {
@@ -165,7 +164,7 @@ public class PostgreSqlDataReaderTests : IAsyncLifetime
         // Arrange
         var connector = CreateConnector();
         var options = new ReadOptions { BatchSize = 100 };
-        
+
         var firstBatchReceived = false;
         var firstBatchRows = new List<Dictionary<string, object?>>();
 
@@ -180,7 +179,7 @@ public class PostgreSqlDataReaderTests : IAsyncLifetime
         // Assert
         firstBatchReceived.Should().BeTrue();
         firstBatchRows.Should().HaveCount(100);
-        
+
         // If all data was loaded into memory, we'd have issues with large datasets
         // This test verifies streaming behavior by only consuming first batch
     }
@@ -229,15 +228,15 @@ public class PostgreSqlDataReaderTests : IAsyncLifetime
         result.Should().NotBeNull();
         result.Success.Should().BeTrue();
         result.Fields.Should().HaveCount(6);
-        
+
         var idField = result.Fields.First(f => f.Name == "id");
         idField.IsPrimaryKey.Should().BeTrue();
         idField.IsNullable.Should().BeFalse();
-        
+
         var nameField = result.Fields.First(f => f.Name == "name");
         nameField.DataType.Should().Be("character varying");
         nameField.IsNullable.Should().BeFalse();
-        
+
         var priceField = result.Fields.First(f => f.Name == "price");
         priceField.DataType.Should().Be("numeric");
     }

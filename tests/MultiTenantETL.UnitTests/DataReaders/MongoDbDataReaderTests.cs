@@ -1,4 +1,3 @@
-using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -7,9 +6,8 @@ using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.DataReaders;
-using MultiTenantETL.Infrastructure.Security;
 using NSubstitute;
-using Xunit;
+using System.Text.Json;
 
 namespace MultiTenantETL.UnitTests.DataReaders;
 
@@ -45,13 +43,13 @@ public class MongoDbDataReaderTests
     public async Task ReadAsync_WithInvalidJsonConfig_ShouldThrowJsonException()
     {
         // Arrange
-        var connector = new Connector 
-        { 
+        var connector = new Connector
+        {
             Name = "Test",
             Type = "Database",
             Provider = "MongoDb",
             Direction = "source",
-            ConfigJson = "invalid json" 
+            ConfigJson = "invalid json"
         };
         var options = new ReadOptions();
 
@@ -71,13 +69,13 @@ public class MongoDbDataReaderTests
     public async Task TestConnectionAsync_WithInvalidConfig_ShouldReturnFalse()
     {
         // Arrange
-        var connector = new Connector 
-        { 
+        var connector = new Connector
+        {
             Name = "Test",
             Type = "Database",
             Provider = "MongoDb",
             Direction = "source",
-            ConfigJson = "invalid json" 
+            ConfigJson = "invalid json"
         };
 
         // Act
@@ -91,13 +89,13 @@ public class MongoDbDataReaderTests
     public async Task DetectSchemaAsync_WithInvalidConfig_ShouldReturnErrorResult()
     {
         // Arrange
-        var connector = new Connector 
-        { 
+        var connector = new Connector
+        {
             Name = "Test",
             Type = "Database",
             Provider = "MongoDb",
             Direction = "source",
-            ConfigJson = "invalid json" 
+            ConfigJson = "invalid json"
         };
 
         // Act

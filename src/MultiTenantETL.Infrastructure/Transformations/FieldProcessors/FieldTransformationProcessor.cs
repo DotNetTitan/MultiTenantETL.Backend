@@ -1,8 +1,8 @@
-using System.Text.Json;
 using Jint;
 using Jint.Native;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Infrastructure.Transformations.Core;
+using System.Text.Json;
 
 namespace MultiTenantETL.Infrastructure.Transformations.FieldProcessors;
 
@@ -64,7 +64,7 @@ public class FieldTransformationProcessor : IFieldTransformationProcessor
     private object? ApplyScript(object? value, JsonElement config, List<string> sourceFields, Dictionary<string, object?>? row)
     {
         var script = config.TryGetProperty("script", out var scriptProp) ? scriptProp.GetString() : "";
-        
+
         if (string.IsNullOrEmpty(script))
         {
             _logger.LogWarning("Script transformation has empty script");
@@ -83,10 +83,10 @@ public class FieldTransformationProcessor : IFieldTransformationProcessor
 
             // Set the current field value
             engine.SetValue("value", value);
-            
+
             // Set source field names for reference
             engine.SetValue("sourceFields", sourceFields);
-            
+
             // If we have the full row context, expose it
             if (row != null)
             {

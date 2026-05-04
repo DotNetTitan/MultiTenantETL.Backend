@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Common.Interfaces;
@@ -8,7 +7,7 @@ using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Persistence;
-using MultiTenantETL.Infrastructure.Security;
+using System.Text.Json;
 
 namespace MultiTenantETL.Infrastructure.Services;
 
@@ -193,21 +192,21 @@ public class ConnectorService : IConnectorService
         connector.Name = request.Name;
         connector.Description = request.Description;
         connector.Direction = request.Direction;
-        
+
         var (isSource, isDestination) = ParseDirection(request.Direction);
         connector.IsSource = isSource;
         connector.IsDestination = isDestination;
-        
+
         // Store sensitive fields in Key Vault and replace with references
         var configWithReferences = await StoreSecretsInKeyVaultAsync(tenantId, id, request.Config);
         connector.ConfigJson = JsonSerializer.Serialize(configWithReferences);
         connector.SchemaJson = request.Schema.HasValue ? JsonSerializer.Serialize(request.Schema.Value) : connector.SchemaJson;
-        
+
         if (request.IsActive.HasValue)
         {
             connector.IsActive = request.IsActive.Value;
         }
-        
+
         connector.UpdatedAt = DateTime.UtcNow;
         connector.UpdatedBy = userId;
 
@@ -219,7 +218,7 @@ public class ConnectorService : IConnectorService
         var changes = new List<string>();
         if (oldName != connector.Name) changes.Add($"name: '{oldName}' → '{connector.Name}'");
         if (oldIsActive != connector.IsActive) changes.Add($"active: {oldIsActive} → {connector.IsActive}");
-        
+
         await _auditService.LogAsync(
             action: AuditActions.ConnectorUpdated,
             resourceType: "Connector",
@@ -244,7 +243,7 @@ public class ConnectorService : IConnectorService
 
         // Check if connector is being used by any pipelines
         var pipelinesUsingConnector = await _context.Pipelines
-            .Where(p => p.TenantId == tenantId && 
+            .Where(p => p.TenantId == tenantId &&
                        (p.SourceConnectorId == id || p.DestinationConnectorId == id))
             .Select(p => p.Name)
             .ToListAsync();
@@ -290,7 +289,7 @@ public class ConnectorService : IConnectorService
         // resolve them to get actual secrets before testing the connection
         var configToTest = request.Config;
         var configJson = JsonSerializer.Serialize(configToTest);
-        
+
         if (_secretResolver.ContainsSecretReferences(configJson))
         {
             _logger.LogDebug("Config contains Key Vault references, resolving secrets for connection test");
@@ -457,7 +456,7 @@ public class ConnectorService : IConnectorService
     private ConnectorResponse MapToResponse(Connector connector)
     {
         var config = JsonSerializer.Deserialize<JsonElement>(connector.ConfigJson);
-        
+
         // Return config with Key Vault references intact (do NOT resolve secrets in API responses)
         // Secrets are only resolved when actually used (connections, pipelines, etc.)
         return new ConnectorResponse
@@ -474,8 +473,8 @@ public class ConnectorService : IConnectorService
             RequiresCredentials = connector.RequiresCredentials,
             IsActive = connector.IsActive,
             Config = config,
-            Schema = !string.IsNullOrEmpty(connector.SchemaJson) 
-                ? JsonSerializer.Deserialize<JsonElement>(connector.SchemaJson) 
+            Schema = !string.IsNullOrEmpty(connector.SchemaJson)
+                ? JsonSerializer.Deserialize<JsonElement>(connector.SchemaJson)
                 : null,
             LastTestedAt = connector.LastTestedAt,
             LastTestResult = connector.LastTestResult,
@@ -489,8 +488,8 @@ public class ConnectorService : IConnectorService
     /// Stores sensitive fields in Key Vault and returns config with Key Vault references.
     /// </summary>
     private async Task<Dictionary<string, object?>> StoreSecretsInKeyVaultAsync(
-        Guid tenantId, 
-        Guid connectorId, 
+        Guid tenantId,
+        Guid connectorId,
         JsonElement config)
     {
         var configDict = new Dictionary<string, object?>();
@@ -553,7 +552,7 @@ public class ConnectorService : IConnectorService
                     var stringValue = property.Value.GetString();
 
                     // Check if this is a Key Vault reference
-                    if (!string.IsNullOrWhiteSpace(stringValue) && 
+                    if (!string.IsNullOrWhiteSpace(stringValue) &&
                         stringValue.StartsWith(EncryptionConstants.SecretReferencePrefix, StringComparison.OrdinalIgnoreCase))
                     {
                         var secretName = stringValue.Substring(EncryptionConstants.SecretReferencePrefix.Length);

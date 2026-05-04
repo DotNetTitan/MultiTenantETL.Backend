@@ -12,8 +12,8 @@ public interface IDataWriter : IAsyncDisposable
     /// Writes a batch of data to the connector
     /// </summary>
     Task<DataWriteResult> WriteBatchAsync(
-        Connector connector, 
-        ReadBatch batch, 
+        Connector connector,
+        ReadBatch batch,
         WriteOptions options,
         CancellationToken cancellationToken);
 }

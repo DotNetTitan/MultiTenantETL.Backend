@@ -1,11 +1,3 @@
-using FluentAssertions;
-using Microsoft.Extensions.Logging;
-using MultiTenantETL.Application.Connectors.DataReaders;
-using MultiTenantETL.Domain.Entities;
-using MultiTenantETL.Infrastructure.DataAccess.Readers.Api;
-using MultiTenantETL.Infrastructure.DataReaders;
-using NSubstitute;
-
 namespace MultiTenantETL.UnitTests.DataAccess.Readers.Api;
 
 public class ApiDataReaderFactoryTests

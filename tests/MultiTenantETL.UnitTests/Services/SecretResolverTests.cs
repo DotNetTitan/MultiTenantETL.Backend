@@ -1,10 +1,9 @@
-using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Common.Interfaces;
-using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Infrastructure.Security;
 using NSubstitute;
+using System.Text.Json;
 
 namespace MultiTenantETL.UnitTests.Services;
 
@@ -40,7 +39,7 @@ public class SecretResolverTests
         result.GetProperty("host").GetString().Should().Be("localhost");
         result.GetProperty("port").GetInt32().Should().Be(5432);
         result.GetProperty("database").GetString().Should().Be("mydb");
-        
+
         // Should not call Key Vault when no references exist
         await _secretStorageService.DidNotReceive().GetSecretAsync(Arg.Any<string>());
     }
@@ -63,7 +62,7 @@ public class SecretResolverTests
         // Assert
         result.GetProperty("host").GetString().Should().Be("localhost");
         result.GetProperty("password").GetString().Should().Be("actual-secret-value");
-        
+
         await _secretStorageService.Received(1).GetSecretAsync("connector-test-secret-password");
     }
 
@@ -93,7 +92,7 @@ public class SecretResolverTests
         result.GetProperty("password").GetString().Should().Be("my-password");
         result.GetProperty("apiKey").GetString().Should().Be("my-api-key");
         result.GetProperty("host").GetString().Should().Be("localhost");
-        
+
         await _secretStorageService.Received(3).GetSecretAsync(Arg.Any<string>());
     }
 
@@ -241,7 +240,7 @@ public class SecretResolverTests
         result.GetProperty("secretField").GetString().Should().Be("resolved-value");
         result.GetProperty("plainField").GetString().Should().Be("not-a-secret-value");
         result.GetProperty("anotherPlain").GetString().Should().Be("keyvault-but-not-prefixed");
-        
+
         // Should only resolve properly prefixed references
         await _secretStorageService.Received(1).GetSecretAsync(Arg.Any<string>());
     }

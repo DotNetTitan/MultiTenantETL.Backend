@@ -1,5 +1,3 @@
-using System.Runtime.CompilerServices;
-using System.Text.Json;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -7,7 +5,8 @@ using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
-using MultiTenantETL.Infrastructure.Security;
+using System.Runtime.CompilerServices;
+using System.Text.Json;
 
 namespace MultiTenantETL.Infrastructure.DataReaders;
 
@@ -39,8 +38,8 @@ public class CosmosDbDataReader : IDataReader
         });
 
         var container = client.GetContainer(config.Database, config.Container);
-        var query = string.IsNullOrEmpty(config.Query) 
-            ? "SELECT * FROM c" 
+        var query = string.IsNullOrEmpty(config.Query)
+            ? "SELECT * FROM c"
             : config.Query;
 
         var queryDefinition = new QueryDefinition(query);
@@ -50,7 +49,7 @@ public class CosmosDbDataReader : IDataReader
         {
             cancellationToken.ThrowIfCancellationRequested();
             var response = await feedIterator.ReadNextAsync(cancellationToken);
-            
+
             var batch = new ReadBatch
             {
                 BatchId = Guid.NewGuid(),
@@ -96,7 +95,7 @@ public class CosmosDbDataReader : IDataReader
             // Sample 10 documents
             var query = "SELECT TOP 10 * FROM c";
             using var feedIterator = container.GetItemQueryIterator<Dictionary<string, object?>>(query);
-            
+
             var fieldDict = new Dictionary<string, string>();
             if (feedIterator.HasMoreResults)
             {
@@ -138,7 +137,7 @@ public class CosmosDbDataReader : IDataReader
     {
         // Resolve Key Vault secrets
         var resolvedElement = _secretResolver.ResolveSecretsAsync(configJson).GetAwaiter().GetResult();
-        
+
         var config = JsonSerializer.Deserialize<CosmosConfig>(resolvedElement.GetRawText(), JsonSerializerOptionsProvider.Default)
             ?? throw new InvalidOperationException("Invalid Cosmos DB configuration");
 
@@ -159,7 +158,7 @@ public class CosmosDbDataReader : IDataReader
     {
         string json = JsonSerializer.Serialize(item);
         var element = JsonSerializer.Deserialize<JsonElement>(json);
-        
+
         var result = new Dictionary<string, object?>();
         if (element.ValueKind == JsonValueKind.Object)
         {

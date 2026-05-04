@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Common.Interfaces;
@@ -6,7 +5,7 @@ using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
-using MultiTenantETL.Infrastructure.Security;
+using System.Text.Json;
 
 namespace MultiTenantETL.Infrastructure.DataWriters;
 
@@ -41,7 +40,7 @@ public class CosmosDbDataWriter : IDataWriter
         foreach (var row in batch.Rows)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            
+
             // Ensure ID exists for Cosmos DB
             if (!row.ContainsKey("id"))
             {
@@ -51,9 +50,9 @@ public class CosmosDbDataWriter : IDataWriter
             if (options.UseUpsert)
             {
                 tasks.Add(container.UpsertItemAsync<Dictionary<string, object?>>(row, cancellationToken: cancellationToken)
-                    .ContinueWith(t => 
+                    .ContinueWith(t =>
                     {
-                        if (t.IsFaulted) 
+                        if (t.IsFaulted)
                         {
                             result.RowsFailed++;
                             result.Errors.Add(t.Exception?.Flatten().InnerException?.Message ?? "Upsert failed");
@@ -64,9 +63,9 @@ public class CosmosDbDataWriter : IDataWriter
             else
             {
                 tasks.Add(container.CreateItemAsync<Dictionary<string, object?>>(row, cancellationToken: cancellationToken)
-                    .ContinueWith(t => 
+                    .ContinueWith(t =>
                     {
-                        if (t.IsFaulted) 
+                        if (t.IsFaulted)
                         {
                             result.RowsFailed++;
                             result.Errors.Add(t.Exception?.Flatten().InnerException?.Message ?? "Create failed");
@@ -84,7 +83,7 @@ public class CosmosDbDataWriter : IDataWriter
     {
         // Resolve Key Vault secrets
         var resolvedElement = _secretResolver.ResolveSecretsAsync(configJson).GetAwaiter().GetResult();
-        
+
         var config = JsonSerializer.Deserialize<CosmosConfig>(resolvedElement.GetRawText(), JsonSerializerOptionsProvider.Default)
             ?? throw new InvalidOperationException("Invalid Cosmos DB configuration");
 

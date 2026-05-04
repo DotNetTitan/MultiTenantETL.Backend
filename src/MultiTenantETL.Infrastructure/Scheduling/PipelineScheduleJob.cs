@@ -45,7 +45,7 @@ public class PipelineScheduleJob : IJob
 
         // Create a new scope to get scoped services
         using var scope = _serviceProvider.CreateScope();
-        
+
         // Set tenant context for this job
         var tenantProvider = scope.ServiceProvider.GetRequiredService<ITenantProvider>();
         tenantProvider.TenantId = tenantId;
@@ -160,7 +160,7 @@ public class PipelineScheduleJob : IJob
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, 
+            _logger.LogError(ex,
                 "Error executing scheduled pipeline: ScheduleId={ScheduleId}, PipelineId={PipelineId}",
                 scheduleId, pipelineId);
 

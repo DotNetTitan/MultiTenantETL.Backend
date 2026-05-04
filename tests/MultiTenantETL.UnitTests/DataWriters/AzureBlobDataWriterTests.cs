@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Azure.Storage.Blobs;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
@@ -8,8 +7,7 @@ using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.DataWriters;
 using MultiTenantETL.Infrastructure.Services.Storage;
 using NSubstitute;
-using NSubstitute.ExceptionExtensions;
-using Xunit;
+using System.Text.Json;
 
 namespace MultiTenantETL.UnitTests.DataWriters;
 
@@ -457,7 +455,7 @@ public class AzureBlobDataWriterTests
         var blobClient = Substitute.For<BlobClient>();
         var containerClient = Substitute.For<BlobContainerClient>();
         containerClient.GetBlobClient(Arg.Any<string>()).Returns(blobClient);
-        
+
         _clientFactory.CreateAzureBlobClient(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>())
             .Returns(containerClient);
 

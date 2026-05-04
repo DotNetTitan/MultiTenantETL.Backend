@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.DataAccess;
-using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.DataAccess.Readers.Api;
 using MultiTenantETL.Infrastructure.DataAccess.Readers.Database;
@@ -33,7 +32,7 @@ public class DataReaderFactory : IDataReaderFactory
 
     public IDataReader CreateReader(Connector connector)
     {
-        _logger.LogDebug("Creating reader for connector {ConnectorId} of type {Type}", 
+        _logger.LogDebug("Creating reader for connector {ConnectorId} of type {Type}",
             connector.Id, connector.Type);
 
         return connector.Type.ToLower() switch

@@ -47,12 +47,12 @@ public class FtpConnectionTester
         try
         {
             var port = config.FtpPort ?? 21;
-            
+
             using var ftpClient = new AsyncFtpClient(config.FtpHost, config.FtpUsername, config.FtpPassword, port);
-            
+
             // Connect to FTP server
             await ftpClient.Connect();
-            
+
             if (!ftpClient.IsConnected)
             {
                 return new ConnectionTestResult
@@ -65,7 +65,7 @@ public class FtpConnectionTester
             // Test if path exists (if provided)
             bool pathExists = false;
             string pathType = "Unknown";
-            
+
             if (!string.IsNullOrEmpty(config.Path))
             {
                 var fileExists = await ftpClient.FileExists(config.Path);
@@ -97,9 +97,9 @@ public class FtpConnectionTester
         catch (Exception ex)
         {
             _logger.LogError(ex, "FTP connection test failed");
-            
+
             var errorMessage = GetRootErrorMessage(ex);
-            
+
             return new ConnectionTestResult
             {
                 Success = false,

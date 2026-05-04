@@ -23,7 +23,7 @@ public class ExecutionBatch : ITenantResource
     /// Tenant that owns this batch.
     /// </summary>
     public Guid TenantId { get; set; }
-    
+
     /// <summary>
     /// Index of this batch within the execution.
     /// </summary>
@@ -43,12 +43,12 @@ public class ExecutionBatch : ITenantResource
     /// Number of rows that failed.
     /// </summary>
     public int RowsFailed { get; set; }
-    
+
     /// <summary>
     /// Current status of this batch.
     /// </summary>
     public BatchStatus Status { get; set; }
-    
+
     /// <summary>
     /// When the batch started processing.
     /// </summary>
@@ -58,21 +58,21 @@ public class ExecutionBatch : ITenantResource
     /// When the batch finished.
     /// </summary>
     public DateTimeOffset? EndedAt { get; set; }
-    
+
     // Checkpoint information for resumability (JSONB)
-    
+
     /// <summary>
     /// JSON checkpoint information for resumability.
     /// </summary>
     public string? CheckpointInfoJson { get; set; }
-    
+
     /// <summary>
     /// When this batch was created.
     /// </summary>
     public DateTimeOffset CreatedAt { get; set; }
-    
+
     // Navigation properties
-    
+
     /// <summary>
     /// The execution this batch belongs to.
     /// </summary>

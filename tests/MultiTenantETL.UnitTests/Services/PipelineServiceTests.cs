@@ -1,10 +1,8 @@
-using System.Text.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Interfaces;
-using MultiTenantETL.Application.Pipelines;
 using MultiTenantETL.Application.Pipelines.Models;
 using MultiTenantETL.Application.Scheduling;
 using MultiTenantETL.Domain.Constants;
@@ -12,6 +10,7 @@ using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Persistence;
 using MultiTenantETL.Infrastructure.Services;
 using NSubstitute;
+using System.Text.Json;
 
 namespace MultiTenantETL.UnitTests.Services;
 
@@ -114,7 +113,7 @@ public class PipelineServiceTests : IDisposable
         // Arrange
         var tenantId = Guid.NewGuid();
         var userId = Guid.NewGuid();
-        
+
         _tenantProvider.TenantId.Returns(tenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
         _currentUserService.GetUserId().Returns(userId);
@@ -350,7 +349,7 @@ public class PipelineServiceTests : IDisposable
         var tenantId = Guid.NewGuid();
         var userId = Guid.NewGuid();
         var pipelineId = Guid.NewGuid();
-        
+
         _tenantProvider.TenantId.Returns(tenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
         _currentUserService.GetUserId().Returns(userId);
@@ -392,7 +391,7 @@ public class PipelineServiceTests : IDisposable
         var updatedPipeline = await _context.Pipelines.FindAsync(pipelineId);
         updatedPipeline!.Name.Should().Be("New Name");
         updatedPipeline.UpdatedBy.Should().Be(userId);
-        
+
         // Verify audit log
         await _auditService.Received(1).LogAsync(
             Arg.Is<string>(s => s == AuditActions.Pipelines.Updated),
@@ -485,14 +484,14 @@ public class PipelineServiceTests : IDisposable
             pipelineId.ToString(),
             Arg.Any<string>(),
             Arg.Any<object>());
-            
+
         await _auditService.Received(1).LogAsync(
             Arg.Is<string>(s => s == AuditActions.Pipelines.Activated),
             "Pipeline",
             pipelineId.ToString(),
             Arg.Any<string>(),
             Arg.Any<object>());
-        
+
         // Verify schedule service was called
         await _scheduleService.Received(1).PauseSchedulesForPipelineAsync(pipelineId, Arg.Any<CancellationToken>());
         await _scheduleService.Received(1).ResumeSchedulesForPipelineAsync(pipelineId, Arg.Any<CancellationToken>());
@@ -574,7 +573,7 @@ public class PipelineServiceTests : IDisposable
         // Arrange
         var tenantId = Guid.NewGuid();
         var userId = Guid.NewGuid();
-        
+
         _tenantProvider.TenantId.Returns(tenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
         _currentUserService.GetUserId().Returns(userId);
@@ -663,7 +662,7 @@ public class PipelineServiceTests : IDisposable
 
         // Assert
         result.Should().NotBeNull();
-        
+
         // Get the stored pipeline from database
         var pipeline = await _context.Pipelines.FirstOrDefaultAsync(p => p.Id == result.Id);
         pipeline.Should().NotBeNull();
@@ -718,7 +717,7 @@ public class PipelineServiceTests : IDisposable
         var tenantId = Guid.NewGuid();
         var userId = Guid.NewGuid();
         var pipelineId = Guid.NewGuid();
-        
+
         _tenantProvider.TenantId.Returns(tenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
         _currentUserService.GetUserId().Returns(userId);
@@ -799,7 +798,7 @@ public class PipelineServiceTests : IDisposable
         // Arrange
         var tenantId = Guid.NewGuid();
         var userId = Guid.NewGuid();
-        
+
         _tenantProvider.TenantId.Returns(tenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
         _currentUserService.GetUserId().Returns(userId);
@@ -855,7 +854,7 @@ public class PipelineServiceTests : IDisposable
 
         // Assert
         result.Should().NotBeNull();
-        
+
         var pipeline = await _context.Pipelines.FirstOrDefaultAsync(p => p.Id == result.Id);
         pipeline.Should().NotBeNull();
         pipeline!.FieldMappingsJson.Should().Be("[]");

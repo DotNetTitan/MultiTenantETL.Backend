@@ -1,5 +1,5 @@
-using System.Text.Json;
 using MultiTenantETL.Application.Common.Interfaces;
+using System.Text.Json;
 
 namespace MultiTenantETL.IntegrationTests.TestUtilities;
 

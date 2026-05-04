@@ -1,10 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using MultiTenantETL.Application.Common.Models;
 using MultiTenantETL.Application.Scheduling;
 using MultiTenantETL.Application.Scheduling.Models;
 using MultiTenantETL.Domain.Constants;
-using MultiTenantETL.Domain.Enums;
 using MultiTenantETL.Infrastructure.Authorization.Requirements;
 
 namespace MultiTenantETL.API.Controllers;
@@ -249,7 +247,7 @@ public class SchedulesController : ControllerBase
     public async Task<IActionResult> ValidateCron([FromBody] ValidateCronRequest request)
     {
         var result = await _scheduleService.ValidateCronExpressionAsync(
-            request.CronExpression, 
+            request.CronExpression,
             request.Timezone);
         return Ok(result);
     }

@@ -37,7 +37,7 @@ public class AzureKeyVaultSettings
                     "Set 'AzureKeyVault:VaultUri' in configuration.");
             }
 
-            if (!Uri.TryCreate(VaultUri, UriKind.Absolute, out var uri) || 
+            if (!Uri.TryCreate(VaultUri, UriKind.Absolute, out var uri) ||
                 !uri.Host.EndsWith(".vault.azure.net", StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException(

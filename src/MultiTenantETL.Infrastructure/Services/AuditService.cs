@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -6,6 +5,7 @@ using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Persistence;
+using System.Text.Json;
 
 namespace MultiTenantETL.Infrastructure.Services;
 
@@ -41,7 +41,7 @@ public class AuditService : IAuditService
         try
         {
             var httpContext = _httpContextAccessor.HttpContext;
-            
+
             // Auto-set severity to Error if success is false and no specific severity was provided
             if (!success && severity == "Info")
             {
@@ -86,7 +86,7 @@ public class AuditService : IAuditService
         try
         {
             var httpContext = _httpContextAccessor.HttpContext;
-            
+
             var auditLog = new AuditLog
             {
                 Id = Guid.NewGuid(),

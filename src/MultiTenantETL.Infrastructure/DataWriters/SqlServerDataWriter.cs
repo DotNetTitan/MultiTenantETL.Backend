@@ -1,5 +1,3 @@
-using System.Data;
-using System.Text.Json;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -7,6 +5,8 @@ using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
+using System.Data;
+using System.Text.Json;
 
 namespace MultiTenantETL.Infrastructure.DataWriters;
 
@@ -22,13 +22,13 @@ public class SqlServerDataWriter : IDataWriter
     }
 
     public async Task<DataWriteResult> WriteBatchAsync(
-        Connector connector, 
-        ReadBatch batch, 
+        Connector connector,
+        ReadBatch batch,
         WriteOptions options,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        
+
         var result = new DataWriteResult { BatchId = batch.BatchId };
 
         // For empty batches, return success without database operations
@@ -38,7 +38,7 @@ public class SqlServerDataWriter : IDataWriter
         }
 
         var config = ParseConfig(connector.ConfigJson);
-        
+
         try
         {
             await using var connection = new SqlConnection(config.ConnectionString);
@@ -57,7 +57,7 @@ public class SqlServerDataWriter : IDataWriter
 
             // Use SqlBulkCopy for bulk insert (fastest for SQL Server)
             var dataTable = ConvertToDataTable(batch);
-            
+
             using var bulkCopy = new SqlBulkCopy(connection);
             bulkCopy.DestinationTableName = config.TableName;
             bulkCopy.BatchSize = batch.RowCount;
@@ -69,7 +69,7 @@ public class SqlServerDataWriter : IDataWriter
             }
 
             await bulkCopy.WriteToServerAsync(dataTable, cancellationToken);
-            
+
             result.RowsWritten = batch.RowCount;
             result.RowsFailed = 0;
         }
@@ -96,7 +96,7 @@ public class SqlServerDataWriter : IDataWriter
 
         // Create temp table and bulk insert into it
         var tempTableName = $"#TempUpsert_{Guid.NewGuid():N}";
-        
+
         // Create temp table with same structure
         var createTempTable = $@"
             SELECT TOP 0 * 
@@ -114,12 +114,12 @@ public class SqlServerDataWriter : IDataWriter
         {
             bulkCopy.DestinationTableName = tempTableName;
             bulkCopy.BulkCopyTimeout = _settings.CommandTimeoutSeconds;
-            
+
             foreach (DataColumn column in dataTable.Columns)
             {
                 bulkCopy.ColumnMappings.Add(column.ColumnName, column.ColumnName);
             }
-            
+
             await bulkCopy.WriteToServerAsync(dataTable, cancellationToken);
         }
 
@@ -144,7 +144,7 @@ public class SqlServerDataWriter : IDataWriter
             await using var mergeCmd = new SqlCommand(mergeSql, connection);
             mergeCmd.CommandTimeout = _settings.CommandTimeoutSeconds;
             var rowsAffected = await mergeCmd.ExecuteNonQueryAsync(cancellationToken);
-            
+
             result.RowsWritten = rowsAffected;
             result.RowsFailed = 0;
         }

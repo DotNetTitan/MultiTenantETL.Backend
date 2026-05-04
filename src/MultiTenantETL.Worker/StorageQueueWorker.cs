@@ -1,6 +1,3 @@
-using System.Collections.Concurrent;
-using System.Text;
-using System.Text.Json;
 using Azure.Storage.Queues;
 using Azure.Storage.Queues.Models;
 using Microsoft.Extensions.Options;
@@ -8,6 +5,9 @@ using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Messaging;
 using MultiTenantETL.Application.Orchestration;
 using MultiTenantETL.Infrastructure.Configuration;
+using System.Collections.Concurrent;
+using System.Text;
+using System.Text.Json;
 
 namespace MultiTenantETL.Worker;
 

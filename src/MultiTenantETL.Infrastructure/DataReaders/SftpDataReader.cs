@@ -1,9 +1,9 @@
-using System.Runtime.CompilerServices;
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Domain.Entities;
 using Renci.SshNet;
+using System.Runtime.CompilerServices;
+using System.Text.Json;
 using IDataReader = MultiTenantETL.Application.Connectors.DataReaders.IDataReader;
 
 namespace MultiTenantETL.Infrastructure.DataReaders;
@@ -37,20 +37,20 @@ public class SftpDataReader : IDataReader
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var config = ParseConfig(connector.ConfigJson);
-        
+
         using var client = new SftpClient(config.Host, config.Port, config.Username, config.Password);
-        
+
         try
         {
             client.Connect();
-            
+
             if (!client.Exists(config.FilePath))
             {
                 throw new FileNotFoundException($"File not found on SFTP server: {config.FilePath}");
             }
 
             var format = DetermineFormat(config.FilePath, config.Format);
-            
+
             // Download file to memory stream
             using var stream = new MemoryStream();
             client.DownloadFile(config.FilePath, stream);
@@ -86,13 +86,13 @@ public class SftpDataReader : IDataReader
         try
         {
             var config = ParseConfig(connector.ConfigJson);
-            
+
             using var client = new SftpClient(config.Host, config.Port, config.Username, config.Password);
             client.Connect();
-            
+
             var exists = client.Exists(config.FilePath);
             client.Disconnect();
-            
+
             return exists;
         }
         catch (Exception ex)
@@ -107,7 +107,7 @@ public class SftpDataReader : IDataReader
         try
         {
             var config = ParseConfig(connector.ConfigJson);
-            
+
             using var client = new SftpClient(config.Host, config.Port, config.Username, config.Password);
             client.Connect();
 
@@ -117,7 +117,7 @@ public class SftpDataReader : IDataReader
             }
 
             var format = DetermineFormat(config.FilePath, config.Format);
-            
+
             using var stream = new MemoryStream();
             client.DownloadFile(config.FilePath, stream);
             stream.Position = 0;
@@ -166,9 +166,9 @@ public class SftpDataReader : IDataReader
 
         var configJson = format.ToLower() switch
         {
-            "csv"  => JsonSerializer.Serialize(new { StreamRegistryKey = registryKey, HasHeader = true, Delimiter = "," }),
+            "csv" => JsonSerializer.Serialize(new { StreamRegistryKey = registryKey, HasHeader = true, Delimiter = "," }),
             "json" => JsonSerializer.Serialize(new { StreamRegistryKey = registryKey, IsArray = true }),
-            _      => JsonSerializer.Serialize(new { StreamRegistryKey = registryKey })
+            _ => JsonSerializer.Serialize(new { StreamRegistryKey = registryKey })
         };
 
         return new Connector

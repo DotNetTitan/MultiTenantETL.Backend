@@ -5,7 +5,6 @@ using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.DataWriters;
 using NSubstitute;
-using System.Text;
 
 namespace MultiTenantETL.UnitTests.DataWriters;
 

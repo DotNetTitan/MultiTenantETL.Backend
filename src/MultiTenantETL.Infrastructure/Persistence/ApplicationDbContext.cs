@@ -1,12 +1,12 @@
-using System.Reflection;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
-using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Domain.Interfaces;
 using MultiTenantETL.Infrastructure.Identity;
+using System.Reflection;
 
 namespace MultiTenantETL.Infrastructure.Persistence
 {
@@ -74,7 +74,7 @@ namespace MultiTenantETL.Infrastructure.Persistence
                     var method = typeof(ApplicationDbContext)
                         .GetMethod(nameof(SetTenantQueryFilter), BindingFlags.NonPublic | BindingFlags.Instance)!
                         .MakeGenericMethod(entityType.ClrType);
-                    
+
                     method.Invoke(this, new object[] { modelBuilder });
                 }
             }
@@ -87,7 +87,7 @@ namespace MultiTenantETL.Infrastructure.Persistence
         private void SetTenantQueryFilter<TEntity>(ModelBuilder modelBuilder)
             where TEntity : class, ITenantResource
         {
-            modelBuilder.Entity<TEntity>().HasQueryFilter(e => 
+            modelBuilder.Entity<TEntity>().HasQueryFilter(e =>
                 e.TenantId == CurrentTenantId);
         }
     }

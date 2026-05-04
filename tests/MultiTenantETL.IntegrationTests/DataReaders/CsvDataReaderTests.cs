@@ -3,7 +3,6 @@ using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.DataReaders;
-using Xunit;
 
 namespace MultiTenantETL.IntegrationTests.DataReaders;
 
@@ -17,7 +16,7 @@ public class CsvDataReaderTests : IDisposable
     {
         var logger = LoggerFactory.Create(builder => builder.AddConsole())
             .CreateLogger<CsvDataReader>();
-        
+
         _reader = new CsvDataReader(logger);
         _testFilePath = Path.Combine(Path.GetTempPath(), $"test_{Guid.NewGuid()}.csv");
         _largeTestFilePath = Path.Combine(Path.GetTempPath(), $"large_test_{Guid.NewGuid()}.csv");
@@ -27,7 +26,7 @@ public class CsvDataReaderTests : IDisposable
     {
         if (File.Exists(_testFilePath))
             File.Delete(_testFilePath);
-        
+
         if (File.Exists(_largeTestFilePath))
             File.Delete(_largeTestFilePath);
     }
@@ -138,7 +137,7 @@ public class CsvDataReaderTests : IDisposable
 1,""Smith, John"",""john@test.com"",30
 2,""Doe, Jane"",""jane@test.com"",25
 3,""O'Brien, Mike"",""mike@test.com"",35";
-        
+
         File.WriteAllText(_testFilePath, csvContent);
         var connector = CreateConnector(_testFilePath);
         var options = new ReadOptions { BatchSize = 10 };
@@ -165,7 +164,7 @@ public class CsvDataReaderTests : IDisposable
         var csvContent = @"id;name;email;age
 1;John Smith;john@test.com;30
 2;Jane Doe;jane@test.com;25";
-        
+
         File.WriteAllText(_testFilePath, csvContent);
         var connector = CreateConnectorWithDelimiter(_testFilePath, ";");
         var options = new ReadOptions { BatchSize = 10 };
@@ -191,7 +190,7 @@ public class CsvDataReaderTests : IDisposable
 1,John,john@test.com,30
 2,Jane,,
 3,,mike@test.com,35";
-        
+
         File.WriteAllText(_testFilePath, csvContent);
         var connector = CreateConnector(_testFilePath);
         var options = new ReadOptions { BatchSize = 10 };
@@ -250,12 +249,12 @@ public class CsvDataReaderTests : IDisposable
         result.Should().NotBeNull();
         result.Success.Should().BeTrue();
         result.Fields.Should().HaveCount(4);
-        
+
         result.Fields.Should().Contain(f => f.Name == "id");
         result.Fields.Should().Contain(f => f.Name == "name");
         result.Fields.Should().Contain(f => f.Name == "email");
         result.Fields.Should().Contain(f => f.Name == "age");
-        
+
         // CSV reader infers all fields as string and nullable
         result.Fields.Should().AllSatisfy(f =>
         {
@@ -268,7 +267,7 @@ public class CsvDataReaderTests : IDisposable
     {
         using var writer = new StreamWriter(filePath);
         writer.WriteLine("id,name,email,age");
-        
+
         for (int i = 1; i <= rowCount; i++)
         {
             writer.WriteLine($"{i},User {i},user{i}@test.com,{20 + (i % 50)}");

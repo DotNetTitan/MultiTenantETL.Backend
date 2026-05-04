@@ -1,4 +1,3 @@
-using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Common.Interfaces;
@@ -6,9 +5,8 @@ using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.DataWriters;
-using MultiTenantETL.Infrastructure.Security;
 using NSubstitute;
-using Xunit;
+using System.Text.Json;
 
 namespace MultiTenantETL.UnitTests.DataWriters;
 
@@ -42,13 +40,13 @@ public class MongoDbDataWriterTests
     public async Task WriteBatchAsync_WithInvalidJsonConfig_ShouldThrowInvalidOperationException()
     {
         // Arrange
-        var connector = new Connector 
-        { 
+        var connector = new Connector
+        {
             Name = "Test",
             Type = "Database",
             Provider = "MongoDb",
             Direction = "destination",
-            ConfigJson = "invalid json" 
+            ConfigJson = "invalid json"
         };
         var batch = new ReadBatch { BatchId = Guid.NewGuid() };
         var options = new WriteOptions();

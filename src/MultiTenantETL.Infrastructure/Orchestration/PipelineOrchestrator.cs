@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -12,6 +11,7 @@ using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Domain.Enums;
 using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.Persistence;
+using System.Text.Json;
 
 namespace MultiTenantETL.Infrastructure.Orchestration;
 
@@ -46,7 +46,7 @@ public class PipelineOrchestrator : IPipelineOrchestrator
     public async Task ExecutePipelineAsync(Guid executionId, CancellationToken cancellationToken = default)
     {
         PipelineExecution? execution = null;
-        
+
         try
         {
             execution = await LoadExecutionAsync(executionId, cancellationToken);
@@ -67,7 +67,7 @@ public class PipelineOrchestrator : IPipelineOrchestrator
             await StartExecutionAsync(execution, cancellationToken);
 
             var result = await ProcessBatchesAsync(execution, pipeline, cancellationToken);
-            
+
             if (!result.WasCancelled)
             {
                 if (result.HasBatchFailures)
@@ -87,7 +87,7 @@ public class PipelineOrchestrator : IPipelineOrchestrator
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fatal error executing pipeline for execution {ExecutionId}", executionId);
-            
+
             if (execution != null)
             {
                 await FailExecutionAsync(execution, $"Fatal error: {ex.Message}", cancellationToken);
@@ -140,13 +140,13 @@ public class PipelineOrchestrator : IPipelineOrchestrator
         }
 
         await _context.SaveChangesAsync(cancellationToken);
-        await AddLogEntryAsync(execution, "Info", "System", 
-            $"Pipeline execution completed: {result.TotalSucceeded} succeeded, {result.TotalFailed} failed", 
+        await AddLogEntryAsync(execution, "Info", "System",
+            $"Pipeline execution completed: {result.TotalSucceeded} succeeded, {result.TotalFailed} failed",
             cancellationToken);
 
         _logger.LogInformation("Execution {ExecutionId} completed: {TotalProcessed} records processed",
             execution.Id, result.TotalProcessed);
-        
+
         // Send notification emails
         await SendExecutionNotificationAsync(execution, cancellationToken);
     }
@@ -180,7 +180,7 @@ public class PipelineOrchestrator : IPipelineOrchestrator
 
         await _context.SaveChangesAsync(cancellationToken);
         await AddLogEntryAsync(execution, "Error", "System", errorMessage, cancellationToken);
-        
+
         // Send notification emails
         await SendExecutionNotificationAsync(execution, cancellationToken);
     }
@@ -200,7 +200,7 @@ public class PipelineOrchestrator : IPipelineOrchestrator
 
         await _context.SaveChangesAsync(cancellationToken);
         await AddLogEntryAsync(execution, "Warning", "System", "Execution cancelled by user", cancellationToken);
-        
+
         // Send notification emails
         await SendExecutionNotificationAsync(execution, cancellationToken);
     }
@@ -215,7 +215,7 @@ public class PipelineOrchestrator : IPipelineOrchestrator
 
         var readOptions = new ReadOptions { BatchSize = 1000 };
         var writeOptions = ExtractWriteOptions(pipeline.DestinationConnector!);
-        
+
         // Add execution context parameters for filename resolution
         writeOptions.Parameters = new Dictionary<string, object>
         {
@@ -279,7 +279,7 @@ public class PipelineOrchestrator : IPipelineOrchestrator
 
             var mappedBatch = _fieldMappingService.ApplyFieldMappings(
                 batch, pipeline.FieldMappingsJson, stripUnmapped);
-            
+
             await AddLogEntryAsync(execution, "Info", "FieldMapping",
                 $"Batch {result.BatchIndex}: Applied field mappings, {batch.RowCount} → {mappedBatch.RowCount} rows",
                 cancellationToken);
@@ -303,8 +303,8 @@ public class PipelineOrchestrator : IPipelineOrchestrator
 
             await _context.SaveChangesAsync(cancellationToken);
 
-            await AddLogEntryAsync(execution, "Info", "Batch", 
-                $"Batch {result.BatchIndex} completed: {writeResult.RowsWritten} rows written, {writeResult.RowsFailed} rows failed", 
+            await AddLogEntryAsync(execution, "Info", "Batch",
+                $"Batch {result.BatchIndex} completed: {writeResult.RowsWritten} rows written, {writeResult.RowsFailed} rows failed",
                 cancellationToken);
 
             _logger.LogInformation("Batch {BatchIndex} completed for execution {ExecutionId}: {Succeeded} succeeded, {Failed} failed",
@@ -376,7 +376,7 @@ public class PipelineOrchestrator : IPipelineOrchestrator
 
         return options;
     }
-    
+
     private async Task SendExecutionNotificationAsync(PipelineExecution execution, CancellationToken cancellationToken)
     {
         try
@@ -417,7 +417,7 @@ public class PipelineOrchestrator : IPipelineOrchestrator
             }
 
             var executionDetailsUrl = $"{_frontendUrl}/executions";
-            
+
             foreach (var email in notificationEmails)
             {
                 if (string.IsNullOrWhiteSpace(email))
@@ -440,14 +440,14 @@ public class PipelineOrchestrator : IPipelineOrchestrator
                         recordsFailed: execution.RecordsFailed,
                         errorMessage: execution.ErrorMessage,
                         executionDetailsUrl: executionDetailsUrl);
-                        
-                    _logger.LogInformation("Sent execution notification email to {Email} for execution {ExecutionId}", 
+
+                    _logger.LogInformation("Sent execution notification email to {Email} for execution {ExecutionId}",
                         email, execution.Id);
                 }
                 catch (Exception ex)
                 {
                     // Log but don't fail the execution
-                    _logger.LogError(ex, "Failed to send execution notification email to {Email} for execution {ExecutionId}", 
+                    _logger.LogError(ex, "Failed to send execution notification email to {Email} for execution {ExecutionId}",
                         email, execution.Id);
                 }
             }
@@ -455,7 +455,7 @@ public class PipelineOrchestrator : IPipelineOrchestrator
         catch (Exception ex)
         {
             // Catch-all to ensure email failures don't affect execution completion
-            _logger.LogError(ex, "Unexpected error sending execution notification emails for execution {ExecutionId}", 
+            _logger.LogError(ex, "Unexpected error sending execution notification emails for execution {ExecutionId}",
                 execution.Id);
         }
     }

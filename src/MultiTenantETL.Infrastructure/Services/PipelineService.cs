@@ -1,5 +1,3 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Common.Interfaces;
@@ -13,6 +11,7 @@ using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.Persistence;
 using MultiTenantETL.Infrastructure.Scheduling;
+using System.Text.Json;
 
 namespace MultiTenantETL.Infrastructure.Services;
 

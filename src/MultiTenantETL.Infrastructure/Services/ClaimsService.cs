@@ -1,11 +1,11 @@
-using System.Collections.Immutable;
-using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MultiTenantETL.Infrastructure.Identity;
 using MultiTenantETL.Infrastructure.Interfaces;
 using MultiTenantETL.Infrastructure.Persistence;
 using OpenIddict.Abstractions;
+using System.Collections.Immutable;
+using System.Security.Claims;
 using CustomClaims = MultiTenantETL.Domain.Constants.ClaimTypes;
 
 namespace MultiTenantETL.Infrastructure.Services;
@@ -90,8 +90,8 @@ public class ClaimsService : IClaimsService
                 identity.SetClaim(CustomClaims.TenantName, userTenant.Tenant!.Name);
 
                 // Add permission claims based on the highest role
-                var roleForPermissions = globalRoles.Contains(Domain.Constants.Roles.SuperAdmin) 
-                    ? Domain.Constants.Roles.SuperAdmin 
+                var roleForPermissions = globalRoles.Contains(Domain.Constants.Roles.SuperAdmin)
+                    ? Domain.Constants.Roles.SuperAdmin
                     : userTenant.RoleCode;
                 await AddPermissionClaimsAsync(identity, roleForPermissions);
             }

@@ -1,13 +1,11 @@
-using System.Text;
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
-using MultiTenantETL.Infrastructure.Security;
 using Npgsql;
+using System.Text.Json;
 
 namespace MultiTenantETL.Infrastructure.DataWriters;
 
@@ -23,20 +21,20 @@ public class PostgreSqlDataWriter : IDataWriter
     }
 
     public async Task<DataWriteResult> WriteBatchAsync(
-        Connector connector, 
-        ReadBatch batch, 
+        Connector connector,
+        ReadBatch batch,
         WriteOptions options,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        
+
         var result = new DataWriteResult { BatchId = batch.BatchId };
-        
+
         var config = ParseConfig(connector.ConfigJson);
-        
+
         try
         {
-            
+
             await using var connection = new NpgsqlConnection(config.ConnectionString);
             await connection.OpenAsync(cancellationToken);
 
@@ -47,7 +45,7 @@ public class PostgreSqlDataWriter : IDataWriter
             }
 
             _logger.LogDebug("Batch has {RowCount} rows", batch.Rows.Count);
-            
+
             if (batch.Rows.Count == 0)
             {
                 _logger.LogWarning("Batch is empty, nothing to write");
@@ -63,7 +61,7 @@ public class PostgreSqlDataWriter : IDataWriter
             // Use COPY for bulk insert (fastest for PostgreSQL)
             var columns = batch.Rows[0].Keys.ToList();
             _logger.LogDebug("First row has {ColumnCount} columns: {Columns}", columns.Count, string.Join(", ", columns));
-            
+
             if (columns.Count == 0)
             {
                 _logger.LogError("First row has no columns! Batch RowCount: {RowCount}", batch.RowCount);
@@ -71,10 +69,10 @@ public class PostgreSqlDataWriter : IDataWriter
                 result.Errors.Add("Batch rows have no columns after field mapping");
                 return result;
             }
-            
+
             var quotedColumns = columns.Select(c => $"\"{c}\"");
             var copyCommand = $"COPY \"{config.TableName}\" ({string.Join(", ", quotedColumns)}) FROM STDIN (FORMAT BINARY)";
-            
+
             _logger.LogDebug("COPY command: {CopyCommand}", copyCommand);
 
             await using var writer = await connection.BeginBinaryImportAsync(copyCommand, cancellationToken);
@@ -82,7 +80,7 @@ public class PostgreSqlDataWriter : IDataWriter
             foreach (var row in batch.Rows)
             {
                 await writer.StartRowAsync(cancellationToken);
-                
+
                 foreach (var column in columns)
                 {
                     var value = row[column];
@@ -98,7 +96,7 @@ public class PostgreSqlDataWriter : IDataWriter
             }
 
             await writer.CompleteAsync(cancellationToken);
-            
+
             result.RowsWritten = batch.RowCount;
             result.RowsFailed = 0;
         }
@@ -127,7 +125,7 @@ public class PostgreSqlDataWriter : IDataWriter
         var columnList = string.Join(", ", columns.Select(c => $"\"{c}\""));
         var valuePlaceholders = string.Join(", ", columns.Select((_, i) => $"@p{i}"));
         var conflictColumns = string.Join(", ", upsertKeys.Select(k => $"\"{k}\""));
-        
+
         // Columns to update (exclude upsert keys)
         var updateColumns = columns.Except(upsertKeys).ToList();
         var updateSet = string.Join(", ", updateColumns.Select(c => $"\"{c}\" = EXCLUDED.\"{c}\""));
@@ -147,15 +145,15 @@ public class PostgreSqlDataWriter : IDataWriter
                 var row = batch.Rows[rowIndex];
                 // Use a safe savepoint name (rowIndex is always a non-negative integer from for loop)
                 var savepointName = $"sp_row_{rowIndex}";
-                
+
                 try
                 {
                     // Create a savepoint before each row operation
                     await using var savepointCommand = new NpgsqlCommand($"SAVEPOINT {savepointName}", connection, transaction);
                     await savepointCommand.ExecuteNonQueryAsync(cancellationToken);
-                    
+
                     await using var command = new NpgsqlCommand(sql, connection, transaction);
-                    
+
                     for (int i = 0; i < columns.Count; i++)
                     {
                         var value = row[columns[i]] ?? DBNull.Value;
@@ -164,7 +162,7 @@ public class PostgreSqlDataWriter : IDataWriter
 
                     await command.ExecuteNonQueryAsync(cancellationToken);
                     result.RowsWritten++;
-                    
+
                     // Release the savepoint on success to free resources
                     await using var releaseCommand = new NpgsqlCommand($"RELEASE SAVEPOINT {savepointName}", connection, transaction);
                     await releaseCommand.ExecuteNonQueryAsync(cancellationToken);
@@ -183,7 +181,7 @@ public class PostgreSqlDataWriter : IDataWriter
                         // Log the error and let the outer catch block handle transaction rollback
                         _logger.LogError(rollbackEx, "Failed to rollback to savepoint for row {RowIndex}. Transaction may be in invalid state.", rowIndex);
                     }
-                    
+
                     result.RowsFailed++;
                     result.RowErrors.Add(new RowError
                     {
@@ -192,7 +190,7 @@ public class PostgreSqlDataWriter : IDataWriter
                         ErrorCode = ex is PostgresException pgEx ? pgEx.SqlState : null,
                         RowData = row
                     });
-                    
+
                     _logger.LogWarning(ex, "Failed to upsert row {RowIndex} in batch {BatchId}", rowIndex, batch.BatchId);
                 }
             }
@@ -223,7 +221,7 @@ public class PostgreSqlDataWriter : IDataWriter
         {
             // Resolve Key Vault secrets
             var resolvedElement = _secretResolver.ResolveSecretsAsync(configJson).GetAwaiter().GetResult();
-            
+
             config = JsonSerializer.Deserialize<PostgreSqlConfig>(resolvedElement.GetRawText(), JsonSerializerOptionsProvider.Default)
                 ?? throw new InvalidOperationException("Invalid PostgreSQL configuration");
         }
@@ -233,8 +231,8 @@ public class PostgreSqlDataWriter : IDataWriter
         }
 
         // Validate that either ConnectionString is provided, or all required fields for building it
-        if (string.IsNullOrEmpty(config.ConnectionString) && 
-            (string.IsNullOrEmpty(config.Host) || string.IsNullOrEmpty(config.Database) || 
+        if (string.IsNullOrEmpty(config.ConnectionString) &&
+            (string.IsNullOrEmpty(config.Host) || string.IsNullOrEmpty(config.Database) ||
              string.IsNullOrEmpty(config.Username) || string.IsNullOrEmpty(config.Password)))
         {
             throw new InvalidOperationException("PostgreSQL configuration must include ConnectionString");

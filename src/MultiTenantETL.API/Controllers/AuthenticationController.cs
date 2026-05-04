@@ -1,19 +1,15 @@
-using System.Collections.Immutable;
-using System.Security.Claims;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Infrastructure.Identity;
 using MultiTenantETL.Infrastructure.Interfaces;
 using MultiTenantETL.Infrastructure.Persistence;
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
-using static OpenIddict.Abstractions.OpenIddictConstants;
-using CustomClaims = MultiTenantETL.Domain.Constants.ClaimTypes;
+using System.Collections.Immutable;
+using System.Security.Claims;
 
 namespace MultiTenantETL.API.Controllers
 {
@@ -219,7 +215,7 @@ namespace MultiTenantETL.API.Controllers
             }
 
             var principal = await CreateClaimsPrincipalAsync(user, request.GetScopes());
-            
+
             // Set the scopes in the authentication properties
             principal.SetScopes(request.GetScopes());
 
@@ -228,7 +224,7 @@ namespace MultiTenantETL.API.Controllers
                 Domain.Constants.AuditActions.Authentication.Login,
                 user.Email,
                 success: true);
-            
+
             return SignIn(principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         }
 

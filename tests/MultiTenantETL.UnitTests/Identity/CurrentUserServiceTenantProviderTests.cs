@@ -1,9 +1,9 @@
-using System.Security.Claims;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Infrastructure.Identity;
 using NSubstitute;
+using System.Security.Claims;
 using CustomClaims = MultiTenantETL.Domain.Constants.ClaimTypes;
 
 namespace MultiTenantETL.UnitTests.Identity;

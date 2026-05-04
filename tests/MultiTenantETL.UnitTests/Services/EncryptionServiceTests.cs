@@ -1,9 +1,9 @@
-using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Infrastructure.Security;
 using NSubstitute;
+using System.Text.Json;
 
 namespace MultiTenantETL.UnitTests.Services;
 
@@ -278,7 +278,7 @@ public class EncryptionServiceTests
         // Assert
         encrypted.GetProperty("name").GetString().Should().Be("Test Connector");
         encrypted.GetProperty("enabled").GetBoolean().Should().BeTrue();
-        
+
         // Note: The current implementation only encrypts top-level fields
         // Nested "password" won't be encrypted
         var config = encrypted.GetProperty("config");

@@ -21,40 +21,40 @@ public static class MetadataConstants
     {
         public static readonly Dictionary<string, string[]> ProvidersByType = new()
         {
-            { 
-                Constants.ConnectorTypes.Database, 
-                new[] 
-                { 
-                    Constants.ConnectorProviders.SqlServer, 
-                    Constants.ConnectorProviders.PostgreSQL, 
+            {
+                Constants.ConnectorTypes.Database,
+                new[]
+                {
+                    Constants.ConnectorProviders.SqlServer,
+                    Constants.ConnectorProviders.PostgreSQL,
                     Constants.ConnectorProviders.MySQL,
                     Constants.ConnectorProviders.Oracle,
                     Constants.ConnectorProviders.MongoDb,
                     Constants.ConnectorProviders.CosmosDb
-                } 
+                }
             },
-            { 
-                Constants.ConnectorTypes.Api, 
-                new[] 
-                { 
-                    Constants.ConnectorProviders.REST 
-                } 
+            {
+                Constants.ConnectorTypes.Api,
+                new[]
+                {
+                    Constants.ConnectorProviders.REST
+                }
             },
-            { 
-                Constants.ConnectorTypes.File, 
-                new[] 
-                { 
-                    Constants.ConnectorProviders.FTP, 
-                    Constants.ConnectorProviders.SFTP, 
+            {
+                Constants.ConnectorTypes.File,
+                new[]
+                {
+                    Constants.ConnectorProviders.FTP,
+                    Constants.ConnectorProviders.SFTP,
                     Constants.ConnectorProviders.AzureBlob
-                } 
+                }
             },
-            { 
-                Constants.ConnectorTypes.Email, 
-                new[] 
-                { 
+            {
+                Constants.ConnectorTypes.Email,
+                new[]
+                {
                     Constants.ConnectorProviders.Email
-                } 
+                }
             }
         };
 

@@ -27,13 +27,13 @@ namespace MultiTenantETL.Infrastructure.Services
 
             if (settings.Value.ConnectionString == null)
             {
-                throw new ArgumentNullException(nameof(settings.Value.ConnectionString), 
+                throw new ArgumentNullException(nameof(settings.Value.ConnectionString),
                     "Azure Communication Services connection string is not configured");
             }
 
             if (settings.Value.SenderEmailAddress == null)
             {
-                throw new ArgumentNullException(nameof(settings.Value.SenderEmailAddress), 
+                throw new ArgumentNullException(nameof(settings.Value.SenderEmailAddress),
                     "Sender email address is not configured");
             }
 
@@ -70,7 +70,7 @@ namespace MultiTenantETL.Infrastructure.Services
             var htmlContent = EmailTemplates.GetPasswordChanged(firstName);
             await SendEmailAsync(email, subject, htmlContent);
         }
-        
+
         public async Task SendPipelineExecutionReportAsync(
             string recipientEmail,
             string pipelineName,

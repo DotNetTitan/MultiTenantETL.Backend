@@ -47,12 +47,12 @@ public class SftpConnectionTester
         try
         {
             var port = config.SftpPort ?? 22;
-            
+
             using var sftpClient = new SftpClient(config.SftpHost, port, config.SftpUsername, config.SftpPassword);
-            
+
             // Connect to SFTP server
             await Task.Run(() => sftpClient.Connect());
-            
+
             if (!sftpClient.IsConnected)
             {
                 return new ConnectionTestResult
@@ -65,7 +65,7 @@ public class SftpConnectionTester
             // Test if path exists (if provided)
             bool pathExists = false;
             string pathType = "Unknown";
-            
+
             if (!string.IsNullOrEmpty(config.Path))
             {
                 pathExists = sftpClient.Exists(config.Path);
@@ -104,9 +104,9 @@ public class SftpConnectionTester
         catch (Exception ex)
         {
             _logger.LogError(ex, "SFTP connection test failed");
-            
+
             var errorMessage = GetRootErrorMessage(ex);
-            
+
             return new ConnectionTestResult
             {
                 Success = false,

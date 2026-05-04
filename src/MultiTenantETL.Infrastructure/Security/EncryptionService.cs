@@ -1,9 +1,9 @@
-using System.Security.Cryptography;
-using System.Text;
-using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Common.Interfaces;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 
 namespace MultiTenantETL.Infrastructure.Security;
 
@@ -18,10 +18,10 @@ public class EncryptionService : IEncryptionService
     public EncryptionService(IConfiguration configuration, ILogger<EncryptionService> logger)
     {
         _logger = logger;
-        
+
         // Get encryption key from configuration (should be in user secrets or environment variables)
         var encryptionKey = configuration["Encryption:Key"];
-        
+
         if (string.IsNullOrEmpty(encryptionKey))
         {
             throw new InvalidOperationException(
@@ -242,7 +242,7 @@ public class EncryptionService : IEncryptionService
             salt,
             100000, // Iterations
             HashAlgorithmName.SHA256);
-        
+
         return deriveBytes.GetBytes(32); // 32 bytes = 256 bits
     }
 

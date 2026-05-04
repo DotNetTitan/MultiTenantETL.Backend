@@ -1,5 +1,3 @@
-using System.Linq;
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
 using MongoDB.Driver;
@@ -8,7 +6,7 @@ using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
-using MultiTenantETL.Infrastructure.Security;
+using System.Text.Json;
 
 namespace MultiTenantETL.Infrastructure.DataWriters;
 
@@ -34,10 +32,10 @@ public class MongoDbDataWriter : IDataWriter
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        
+
         var result = new DataWriteResult { BatchId = batch.BatchId };
         var config = ParseConfig(connector.ConfigJson);
-        
+
         try
         {
             var client = new MongoClient(config.ConnectionString);
@@ -105,7 +103,7 @@ public class MongoDbDataWriter : IDataWriter
     {
         // Resolve Key Vault secrets
         var resolvedElement = _secretResolver.ResolveSecretsAsync(configJson).GetAwaiter().GetResult();
-        
+
         var config = JsonSerializer.Deserialize<MongoDbConfig>(resolvedElement.GetRawText(), JsonSerializerOptionsProvider.Default)
             ?? throw new InvalidOperationException("Invalid MongoDB configuration");
 

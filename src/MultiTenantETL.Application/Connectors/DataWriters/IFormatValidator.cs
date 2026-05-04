@@ -12,7 +12,7 @@ public interface IFormatValidator
     /// <param name="context">Context about the write operation</param>
     /// <returns>Recommendation with severity level and alternative suggestions</returns>
     FormatRecommendation ValidateFormat(string format, WriteContext context);
-    
+
     /// <summary>
     /// Gets the recommended format for a given context
     /// </summary>
@@ -30,37 +30,37 @@ public class WriteContext
     /// Estimated number of rows to write
     /// </summary>
     public long? EstimatedRowCount { get; set; }
-    
+
     /// <summary>
     /// Whether the operation will append to existing data
     /// </summary>
     public bool IsAppendMode { get; set; }
-    
+
     /// <summary>
     /// Whether the operation will truncate before writing
     /// </summary>
     public bool IsTruncateMode { get; set; }
-    
+
     /// <summary>
     /// Destination type (File, AzureBlob, Database, API)
     /// </summary>
     public string DestinationType { get; set; } = string.Empty;
-    
+
     /// <summary>
     /// Whether the destination requires a specific format
     /// </summary>
     public string? RequiredFormat { get; set; }
-    
+
     /// <summary>
     /// Whether human readability is a priority
     /// </summary>
     public bool RequiresReadability { get; set; }
-    
+
     /// <summary>
     /// Whether this is a production pipeline
     /// </summary>
     public bool IsProduction { get; set; }
-    
+
     /// <summary>
     /// Expected frequency of writes (once, hourly, daily, etc.)
     /// </summary>

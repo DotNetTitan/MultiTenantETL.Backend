@@ -1,10 +1,10 @@
-using System.Text;
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MultiTenantETL.Application.Messaging;
 using MultiTenantETL.Infrastructure.Configuration;
 using RabbitMQ.Client;
+using System.Text;
+using System.Text.Json;
 
 namespace MultiTenantETL.Infrastructure.Messaging;
 

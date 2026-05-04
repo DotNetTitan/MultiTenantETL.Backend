@@ -1,9 +1,9 @@
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Domain.Entities;
 using Renci.SshNet;
+using System.Text.Json;
 
 namespace MultiTenantETL.Infrastructure.DataWriters;
 
@@ -188,7 +188,7 @@ public class SftpDataWriter : IDataWriter
                 client.UploadFile(_bufferStream, _config.FilePath, true);
 
                 client.Disconnect();
-                
+
                 _logger.LogInformation("Successfully uploaded file to SFTP: {FilePath}", _config.FilePath);
             }
         }

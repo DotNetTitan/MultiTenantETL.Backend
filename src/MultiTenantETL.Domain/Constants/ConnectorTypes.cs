@@ -42,7 +42,7 @@ public static class ConnectorProviders
 
     /// <summary>Azure Cosmos DB provider.</summary>
     public const string CosmosDb = "CosmosDb";
-    
+
     // File providers (storage locations)
 
     /// <summary>FTP provider.</summary>
@@ -53,12 +53,12 @@ public static class ConnectorProviders
 
     /// <summary>Azure Blob Storage provider.</summary>
     public const string AzureBlob = "AzureBlob";
-    
+
     // API providers
 
     /// <summary>REST API provider.</summary>
     public const string REST = "REST";
-    
+
     // Email providers
 
     /// <summary>Email provider.</summary>

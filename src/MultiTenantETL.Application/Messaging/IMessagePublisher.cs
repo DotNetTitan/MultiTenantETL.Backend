@@ -9,7 +9,7 @@ public interface IMessagePublisher
     /// Publishes an execution task to the queue
     /// </summary>
     Task PublishExecutionTaskAsync(ExecutionTask task, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// Publishes a cancellation request for an execution
     /// </summary>

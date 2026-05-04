@@ -1,15 +1,14 @@
+using FluentValidation.TestHelper;
 using MultiTenantETL.Application.Authentication.Models;
 using MultiTenantETL.Application.Authentication.Validators;
-using MultiTenantETL.Application.Tenants.Models;
-using MultiTenantETL.Application.Tenants.Validators;
-using MultiTenantETL.Application.Users.Models;
-using MultiTenantETL.Application.Users.Validators;
 using MultiTenantETL.Application.Connectors.Models;
 using MultiTenantETL.Application.Connectors.Validators;
 using MultiTenantETL.Application.Pipelines.Models;
 using MultiTenantETL.Application.Pipelines.Validators;
-using Xunit;
-using FluentValidation.TestHelper;
+using MultiTenantETL.Application.Tenants.Models;
+using MultiTenantETL.Application.Tenants.Validators;
+using MultiTenantETL.Application.Users.Models;
+using MultiTenantETL.Application.Users.Validators;
 using System.Text.Json;
 
 namespace MultiTenantETL.UnitTests.Validators;
@@ -82,13 +81,13 @@ public class ValidatorTests
     [Fact]
     public void CreateConnectorRequest_ShouldHaveError_WhenNameIsTooShort()
     {
-        var model = new CreateConnectorRequest 
-        { 
-            Name = "A", 
-            Type = "Database", 
-            Provider = "SqlServer", 
-            Direction = "source", 
-            Config = JsonDocument.Parse("{}").RootElement 
+        var model = new CreateConnectorRequest
+        {
+            Name = "A",
+            Type = "Database",
+            Provider = "SqlServer",
+            Direction = "source",
+            Config = JsonDocument.Parse("{}").RootElement
         };
         var result = _createConnectorValidator.TestValidate(model);
         result.ShouldHaveValidationErrorFor(x => x.Name);
@@ -97,13 +96,13 @@ public class ValidatorTests
     [Fact]
     public void CreateConnectorRequest_ShouldHaveError_WhenTypeIsInvalid()
     {
-        var model = new CreateConnectorRequest 
-        { 
-            Name = "Valid Name", 
-            Type = "InvalidType", 
-            Provider = "SqlServer", 
-            Direction = "source", 
-            Config = JsonDocument.Parse("{}").RootElement 
+        var model = new CreateConnectorRequest
+        {
+            Name = "Valid Name",
+            Type = "InvalidType",
+            Provider = "SqlServer",
+            Direction = "source",
+            Config = JsonDocument.Parse("{}").RootElement
         };
         var result = _createConnectorValidator.TestValidate(model);
         result.ShouldHaveValidationErrorFor(x => x.Type);
@@ -112,10 +111,10 @@ public class ValidatorTests
     [Fact]
     public void CreatePipelineRequest_ShouldHaveError_WhenConnectorsAreMissing()
     {
-        var model = new CreatePipelineRequest 
-        { 
-            Name = "Valid Name", 
-            SourceConnectorId = Guid.Empty, 
+        var model = new CreatePipelineRequest
+        {
+            Name = "Valid Name",
+            SourceConnectorId = Guid.Empty,
             DestinationConnectorId = Guid.Empty,
             FieldMappings = JsonDocument.Parse("[]").RootElement
         };

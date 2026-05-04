@@ -34,7 +34,7 @@ public class PermissionAuthorizationHandler : AuthorizationHandler<PermissionReq
         // Parse permission for wildcard checking (support both : and . separators)
         var separator = requirement.Permission.Contains(':') ? ':' : '.';
         var parts = requirement.Permission.Split(separator);
-        
+
         if (parts.Length >= 2)
         {
             var resource = parts[0];

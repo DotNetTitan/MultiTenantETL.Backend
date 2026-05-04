@@ -1,10 +1,10 @@
-using System.Collections.Concurrent;
-using System.Runtime.CompilerServices;
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Services.Storage;
+using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
+using System.Text.Json;
 using IDataReader = MultiTenantETL.Application.Connectors.DataReaders.IDataReader;
 
 namespace MultiTenantETL.Infrastructure.DataReaders;
@@ -137,9 +137,9 @@ public class AzureBlobDataReader : IDataReader
 
         var configJson = format.ToLower() switch
         {
-            "csv"  => JsonSerializer.Serialize(new { StreamRegistryKey = registryKey, HasHeader = true, Delimiter = "," }),
+            "csv" => JsonSerializer.Serialize(new { StreamRegistryKey = registryKey, HasHeader = true, Delimiter = "," }),
             "json" => JsonSerializer.Serialize(new { StreamRegistryKey = registryKey, IsArray = true }),
-            _      => JsonSerializer.Serialize(new { StreamRegistryKey = registryKey })
+            _ => JsonSerializer.Serialize(new { StreamRegistryKey = registryKey })
         };
 
         return new Connector
@@ -197,7 +197,7 @@ public class AzureBlobDataReader : IDataReader
         var extension = Path.GetExtension(blobName).TrimStart('.').ToLower();
         return extension switch
         {
-            "csv"  => "csv",
+            "csv" => "csv",
             "json" => "json",
             "jsonl" or "ndjson" => "jsonl",
             _ => "jsonl"

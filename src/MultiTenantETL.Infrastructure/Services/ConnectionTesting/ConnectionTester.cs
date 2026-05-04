@@ -1,11 +1,10 @@
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors;
-using MultiTenantETL.Application.Connectors.Models;
 using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Infrastructure.Services.ConnectionTesting.Api;
 using MultiTenantETL.Infrastructure.Services.ConnectionTesting.Database;
 using MultiTenantETL.Infrastructure.Services.ConnectionTesting.Storage;
+using System.Text.Json;
 
 namespace MultiTenantETL.Infrastructure.Services.ConnectionTesting;
 

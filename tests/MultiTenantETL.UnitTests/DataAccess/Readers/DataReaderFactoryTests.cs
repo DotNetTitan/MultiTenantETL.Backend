@@ -1,7 +1,6 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
-using MultiTenantETL.Application.DataAccess;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.DataAccess.Readers;
 using MultiTenantETL.Infrastructure.DataAccess.Readers.Api;

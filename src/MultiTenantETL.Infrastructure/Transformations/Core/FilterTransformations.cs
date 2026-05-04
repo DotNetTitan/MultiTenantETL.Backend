@@ -33,7 +33,7 @@ public static class FilterTransformations
     {
         var operatorType = config.TryGetProperty("operator", out var opProp) ? opProp.GetString() ?? "" : "";
         var compareValue = config.TryGetProperty("value", out var valProp) ? valProp.GetString() : null;
-        
+
         List<string>? compareValues = null;
         if (config.TryGetProperty("values", out var valuesProp) && valuesProp.ValueKind == JsonValueKind.Array)
         {

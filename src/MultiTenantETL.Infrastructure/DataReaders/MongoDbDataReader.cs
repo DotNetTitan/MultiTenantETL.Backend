@@ -1,5 +1,3 @@
-using System.Runtime.CompilerServices;
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MongoDB.Bson;
@@ -8,7 +6,8 @@ using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
-using MultiTenantETL.Infrastructure.Security;
+using System.Runtime.CompilerServices;
+using System.Text.Json;
 using IDataReader = MultiTenantETL.Application.Connectors.DataReaders.IDataReader;
 
 namespace MultiTenantETL.Infrastructure.DataReaders;
@@ -43,8 +42,8 @@ public class MongoDbDataReader : IDataReader
         var database = client.GetDatabase(config.Database);
         var collection = database.GetCollection<BsonDocument>(config.CollectionName);
 
-        var filter = string.IsNullOrEmpty(config.FilterJson) 
-            ? FilterDefinition<BsonDocument>.Empty 
+        var filter = string.IsNullOrEmpty(config.FilterJson)
+            ? FilterDefinition<BsonDocument>.Empty
             : BsonDocument.Parse(config.FilterJson);
 
         var findOptions = new FindOptions<BsonDocument>();
@@ -182,7 +181,7 @@ public class MongoDbDataReader : IDataReader
         if (value.IsString) return value.AsString;
         if (value.IsObjectId) return value.AsObjectId.ToString();
         if (value.IsDecimal128) return (decimal)value.AsDecimal128;
-        
+
         // Complex types returned as string representation or serialized JSON
         return value.ToString();
     }
@@ -208,7 +207,7 @@ public class MongoDbDataReader : IDataReader
     {
         // Resolve Key Vault secrets
         var resolvedElement = _secretResolver.ResolveSecretsAsync(configJson).GetAwaiter().GetResult();
-        
+
         var config = JsonSerializer.Deserialize<MongoDbConfig>(resolvedElement.GetRawText(), JsonSerializerOptionsProvider.Default)
             ?? throw new InvalidOperationException("Invalid MongoDB configuration");
 

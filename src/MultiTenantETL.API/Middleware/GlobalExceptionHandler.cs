@@ -1,9 +1,8 @@
-using System.Net;
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
+using System.Net;
 
 namespace MultiTenantETL.API.Middleware;
 

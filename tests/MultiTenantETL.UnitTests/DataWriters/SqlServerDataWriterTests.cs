@@ -1,6 +1,3 @@
-using System.Data;
-using System.Linq;
-using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -10,7 +7,6 @@ using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.DataWriters;
 using NSubstitute;
-using Xunit;
 
 namespace MultiTenantETL.UnitTests.DataWriters;
 

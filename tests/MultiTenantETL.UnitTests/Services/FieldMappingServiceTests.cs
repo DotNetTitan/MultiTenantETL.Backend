@@ -1,4 +1,3 @@
-using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
@@ -339,13 +338,13 @@ public class FieldMappingServiceTests
         result.Should().NotBeNull();
         result.RowCount.Should().Be(2); // Both rows should still be present
         result.Rows.Should().HaveCount(2);
-        
+
         // Other fields should be properly mapped
         result.Rows[0].Should().ContainKey("product_id");
         result.Rows[0]["product_id"].Should().Be(1);
         result.Rows[0].Should().ContainKey("product_name");
         result.Rows[0]["product_name"].Should().Be("Product A");
-        
+
         result.Rows[1].Should().ContainKey("product_id");
         result.Rows[1]["product_id"].Should().Be(2);
         result.Rows[1].Should().ContainKey("product_name");

@@ -1,7 +1,3 @@
-using System.Globalization;
-using System.Text;
-using System.Text.Json;
-using System.Xml;
 using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.Extensions.Logging;
@@ -12,6 +8,10 @@ using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Services;
 using OfficeOpenXml;
+using System.Globalization;
+using System.Text;
+using System.Text.Json;
+using System.Xml;
 
 namespace MultiTenantETL.Infrastructure.DataWriters;
 

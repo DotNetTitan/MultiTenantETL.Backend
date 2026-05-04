@@ -1,5 +1,3 @@
-using System.Linq;
-using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -9,8 +7,6 @@ using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.DataWriters;
 using NSubstitute;
-using NSubstitute.ExceptionExtensions;
-using Xunit;
 
 namespace MultiTenantETL.UnitTests.DataWriters;
 
@@ -118,15 +114,15 @@ public class MySqlDataWriterTests : IDisposable
             CreatedAt = DateTime.UtcNow,
             CreatedBy = Guid.NewGuid()
         };
-        var batch = new ReadBatch 
-        { 
-            BatchId = Guid.NewGuid(), 
+        var batch = new ReadBatch
+        {
+            BatchId = Guid.NewGuid(),
             Rows = new List<Dictionary<string, object?>>
             {
                 new() { ["id"] = 1, ["name"] = "Test" }
             }
         };
-        var options = new WriteOptions {  };
+        var options = new WriteOptions { };
 
         // Act
         var act = () => _sut.WriteBatchAsync(connector, batch, options, CancellationToken.None);
@@ -157,15 +153,15 @@ public class MySqlDataWriterTests : IDisposable
             CreatedAt = DateTime.UtcNow,
             CreatedBy = Guid.NewGuid()
         };
-        var batch = new ReadBatch 
-        { 
-            BatchId = Guid.NewGuid(), 
+        var batch = new ReadBatch
+        {
+            BatchId = Guid.NewGuid(),
             Rows = new List<Dictionary<string, object?>>
             {
                 new() { ["id"] = 1, ["name"] = "Test" }
             }
         };
-        var options = new WriteOptions {  };
+        var options = new WriteOptions { };
 
         // Act
         var act = () => _sut.WriteBatchAsync(connector, batch, options, CancellationToken.None);
@@ -196,15 +192,15 @@ public class MySqlDataWriterTests : IDisposable
             CreatedAt = DateTime.UtcNow,
             CreatedBy = Guid.NewGuid()
         };
-        var batch = new ReadBatch 
-        { 
-            BatchId = Guid.NewGuid(), 
+        var batch = new ReadBatch
+        {
+            BatchId = Guid.NewGuid(),
             Rows = new List<Dictionary<string, object?>>
             {
                 new() { ["id"] = 1, ["name"] = "Test" }
             }
         };
-        var options = new WriteOptions {  };
+        var options = new WriteOptions { };
 
         // Act
         var act = () => _sut.WriteBatchAsync(connector, batch, options, CancellationToken.None);
@@ -223,7 +219,7 @@ public class MySqlDataWriterTests : IDisposable
             BatchId = Guid.NewGuid(),
             Rows = new List<Dictionary<string, object?>>()
         };
-        var options = new WriteOptions {  };
+        var options = new WriteOptions { };
 
         // Act
         var result = await _sut.WriteBatchAsync(connector, batch, options, CancellationToken.None);
@@ -272,7 +268,7 @@ public class MySqlDataWriterTests : IDisposable
                 new() { ["id"] = 1, ["name"] = "Test User" }
             }
         };
-        var options = new WriteOptions {  };
+        var options = new WriteOptions { };
         var cts = new CancellationTokenSource();
         cts.Cancel();
 
@@ -321,7 +317,7 @@ public class MySqlDataWriterTests : IDisposable
             rows.Add(new() { ["id"] = i, ["name"] = $"User {i}", ["email"] = $"user{i}@test.com" });
         }
         var batch = new ReadBatch { BatchId = Guid.NewGuid(), Rows = rows };
-        var options = new WriteOptions {  };
+        var options = new WriteOptions { };
 
         // Act
         var result = await _sut.WriteBatchAsync(connector, batch, options, CancellationToken.None);

@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using Azure;
 using Azure.Identity;
 using Azure.Security.KeyVault.Secrets;
@@ -6,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Infrastructure.Configuration;
+using System.Text.RegularExpressions;
 
 namespace MultiTenantETL.Infrastructure.Security;
 
@@ -27,7 +27,7 @@ public class KeyVaultSecretStorageService : ISecretStorageService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         // Validate settings
-       // _settings.Validate();
+        // _settings.Validate();
 
         // Create SecretClient using DefaultAzureCredential
         // This works with Managed Identity in Azure and developer credentials locally
@@ -88,7 +88,7 @@ public class KeyVaultSecretStorageService : ISecretStorageService
             _logger.LogDebug("Retrieving secret: {SecretName}", secretName);
 
             var response = await _secretClient.GetSecretAsync(secretName, cancellationToken: cancellationToken);
-            
+
             _logger.LogDebug("Successfully retrieved secret: {SecretName}", secretName);
             return response.Value.Value;
         }
@@ -128,7 +128,7 @@ public class KeyVaultSecretStorageService : ISecretStorageService
 
             // Start the delete operation (soft delete in Key Vault)
             var operation = await _secretClient.StartDeleteSecretAsync(secretName, cancellationToken);
-            
+
             // Wait for deletion to complete
             await operation.WaitForCompletionAsync(cancellationToken);
 
@@ -170,7 +170,7 @@ public class KeyVaultSecretStorageService : ISecretStorageService
 
             // Try to get the secret properties (metadata only, not the value)
             await _secretClient.GetSecretAsync(secretName, cancellationToken: cancellationToken);
-            
+
             _logger.LogDebug("Secret exists: {SecretName}", secretName);
             return true;
         }
@@ -217,7 +217,7 @@ public class KeyVaultSecretStorageService : ISecretStorageService
 
         // Sanitize field name (remove special characters, convert to lowercase)
         var sanitizedFieldName = Regex.Replace(fieldName, @"[^a-zA-Z0-9-]", "").ToLowerInvariant();
-        
+
         if (string.IsNullOrWhiteSpace(sanitizedFieldName))
         {
             throw new ArgumentException($"Field name '{fieldName}' contains no valid characters for Key Vault", nameof(fieldName));
@@ -227,16 +227,16 @@ public class KeyVaultSecretStorageService : ISecretStorageService
         // Remove hyphens from GUIDs and truncate if needed
         var tenantIdStr = tenantId.ToString("N"); // 32 chars, no hyphens
         var connectorIdStr = connectorId.ToString("N"); // 32 chars, no hyphens
-        
+
         var secretName = $"{_settings.SecretNamePrefix}-{tenantIdStr}-{connectorIdStr}-{sanitizedFieldName}";
 
         // Ensure it doesn't exceed 127 characters
         if (secretName.Length > 127)
         {
             _logger.LogWarning(
-                "Generated secret name exceeds 127 characters. Truncating field name. Original: {SecretName}", 
+                "Generated secret name exceeds 127 characters. Truncating field name. Original: {SecretName}",
                 secretName);
-            
+
             // Truncate field name to fit within 127 character limit
             var maxFieldNameLength = 127 - _settings.SecretNamePrefix.Length - tenantIdStr.Length - connectorIdStr.Length - 3; // 3 hyphens
             sanitizedFieldName = sanitizedFieldName.Substring(0, Math.Max(1, maxFieldNameLength));

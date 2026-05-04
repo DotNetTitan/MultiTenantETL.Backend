@@ -1,10 +1,10 @@
-using System.Net.Http.Headers;
-using System.Runtime.CompilerServices;
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
+using System.Net.Http.Headers;
+using System.Runtime.CompilerServices;
+using System.Text.Json;
 using IDataReader = MultiTenantETL.Application.Connectors.DataReaders.IDataReader;
 
 namespace MultiTenantETL.Infrastructure.DataReaders;

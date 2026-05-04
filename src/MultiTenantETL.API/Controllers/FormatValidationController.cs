@@ -44,7 +44,7 @@ public class FormatValidationController : ControllerBase
         };
 
         var recommendation = _formatValidator.ValidateFormat(request.Format, context);
-        
+
         _logger.LogInformation(
             "Format validation: {Format} for {DestinationType} with {RowCount} rows - Level: {Level}",
             request.Format,
@@ -160,7 +160,7 @@ public class FormatValidationController : ControllerBase
         var alternatives = new List<string>();
 
         // Always include JSONL as an alternative for file destinations
-        if (recommendedFormat != "jsonl" && 
+        if (recommendedFormat != "jsonl" &&
             !context.DestinationType.Equals("API", StringComparison.OrdinalIgnoreCase))
         {
             alternatives.Add("jsonl");
@@ -173,8 +173,8 @@ public class FormatValidationController : ControllerBase
         }
 
         // JSON for small datasets or APIs
-        if (recommendedFormat != "json" && 
-            (context.EstimatedRowCount < 10_000 || 
+        if (recommendedFormat != "json" &&
+            (context.EstimatedRowCount < 10_000 ||
              context.DestinationType.Equals("API", StringComparison.OrdinalIgnoreCase)))
         {
             alternatives.Add("json");

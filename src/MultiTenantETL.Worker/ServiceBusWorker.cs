@@ -1,12 +1,12 @@
-using System.Collections.Concurrent;
-using System.Text;
-using System.Text.Json;
 using Azure.Messaging.ServiceBus;
 using Microsoft.Extensions.Options;
 using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Messaging;
 using MultiTenantETL.Application.Orchestration;
 using MultiTenantETL.Infrastructure.Configuration;
+using System.Collections.Concurrent;
+using System.Text;
+using System.Text.Json;
 
 namespace MultiTenantETL.Worker;
 
@@ -225,7 +225,7 @@ public class ServiceBusWorker : BackgroundService
 
     private Task HandleErrorAsync(ProcessErrorEventArgs args)
     {
-        _logger.LogError(args.Exception, 
+        _logger.LogError(args.Exception,
             "Error processing message from {EntityPath}: {ErrorSource}",
             args.EntityPath, args.ErrorSource);
         return Task.CompletedTask;

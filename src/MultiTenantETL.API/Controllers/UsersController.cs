@@ -399,7 +399,7 @@ public class UsersController : ControllerBase
     public async Task<IActionResult> GetUserTenants(Guid id)
     {
         var userRole = _currentUserService.GetRole();
-        
+
         // TenantAdmin can only view users in their tenant
         if (userRole == Roles.TenantAdmin)
         {
@@ -450,7 +450,7 @@ public class UsersController : ControllerBase
             return BadRequest(new ErrorResponse(result.ErrorCode!.Value, result.ErrorMessage!));
         }
 
-        _logger.LogInformation("User {UserId} added to tenant {TenantId} with role {RoleCode}", 
+        _logger.LogInformation("User {UserId} added to tenant {TenantId} with role {RoleCode}",
             id, request.TenantId, request.RoleCode);
 
         await _auditService.LogAsync(
@@ -523,7 +523,7 @@ public class UsersController : ControllerBase
             return BadRequest(new ErrorResponse(result.ErrorCode!.Value, result.ErrorMessage!));
         }
 
-        _logger.LogInformation("User {UserId} role updated to {RoleCode} in tenant {TenantId}", 
+        _logger.LogInformation("User {UserId} role updated to {RoleCode} in tenant {TenantId}",
             userId, request.RoleCode, tenantId);
 
         await _auditService.LogAsync(

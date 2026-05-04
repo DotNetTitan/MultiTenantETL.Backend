@@ -1,15 +1,12 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Domain.Entities;
-using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.DataWriters;
 using MultiTenantETL.IntegrationTests.TestUtilities;
 using Npgsql;
 using Testcontainers.PostgreSql;
-using Xunit;
 
 namespace MultiTenantETL.IntegrationTests.DataWriters;
 
@@ -33,13 +30,13 @@ public class PostgreSqlDataWriterTests : IAsyncLifetime
 
         var logger = LoggerFactory.Create(builder => builder.AddConsole())
             .CreateLogger<PostgreSqlDataWriter>();
-        
+
         _writer = new PostgreSqlDataWriter(logger, new StubSecretResolver());
 
         // Create test table
         await using var connection = new NpgsqlConnection(_connectionString);
         await connection.OpenAsync();
-        
+
         await using var command = new NpgsqlCommand(@"
             CREATE TABLE test_users (
                 id INTEGER PRIMARY KEY,
@@ -48,7 +45,7 @@ public class PostgreSqlDataWriterTests : IAsyncLifetime
                 age INTEGER,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )", connection);
-        
+
         await command.ExecuteNonQueryAsync();
     }
 
@@ -86,11 +83,11 @@ public class PostgreSqlDataWriterTests : IAsyncLifetime
         var connector = CreateConnector();
         var batch1 = CreateTestBatch(3);
         var batch2 = CreateTestBatch(2, startId: 10);
-        
+
         await _writer.WriteBatchAsync(connector, batch1, new WriteOptions(), CancellationToken.None);
 
         // Act
-        var result = await _writer.WriteBatchAsync(connector, batch2, 
+        var result = await _writer.WriteBatchAsync(connector, batch2,
             new WriteOptions { TruncateBeforeLoad = true }, CancellationToken.None);
 
         // Assert
@@ -117,7 +114,7 @@ public class PostgreSqlDataWriterTests : IAsyncLifetime
         // Assert
         result.RowsWritten.Should().Be(3);
         result.RowsFailed.Should().Be(0);
-        
+
         var count = await GetRowCount();
         count.Should().Be(3);
     }
@@ -127,7 +124,7 @@ public class PostgreSqlDataWriterTests : IAsyncLifetime
     {
         // Arrange
         var connector = CreateConnector();
-        
+
         // Insert initial data
         var initialBatch = new ReadBatch
         {
@@ -138,7 +135,7 @@ public class PostgreSqlDataWriterTests : IAsyncLifetime
             },
             RowCount = 1
         };
-        
+
         await _writer.WriteBatchAsync(connector, initialBatch, new WriteOptions(), CancellationToken.None);
 
         // Update with different name and age
@@ -164,7 +161,7 @@ public class PostgreSqlDataWriterTests : IAsyncLifetime
         // Assert
         result.RowsWritten.Should().Be(1);
         result.RowsFailed.Should().Be(0);
-        
+
         var count = await GetRowCount();
         count.Should().Be(1); // Still only 1 row
 
@@ -177,7 +174,7 @@ public class PostgreSqlDataWriterTests : IAsyncLifetime
     {
         // Arrange
         var connector = CreateConnector();
-        
+
         // Insert initial row
         var initialBatch = CreateTestBatch(1);
         await _writer.WriteBatchAsync(connector, initialBatch, new WriteOptions(), CancellationToken.None);
@@ -207,7 +204,7 @@ public class PostgreSqlDataWriterTests : IAsyncLifetime
         // Assert
         result.RowsWritten.Should().Be(3);
         result.RowsFailed.Should().Be(0);
-        
+
         var count = await GetRowCount();
         count.Should().Be(3);
 
@@ -220,7 +217,7 @@ public class PostgreSqlDataWriterTests : IAsyncLifetime
     {
         // Arrange
         var connector = CreateConnector();
-        
+
         var batch = new ReadBatch
         {
             BatchId = Guid.NewGuid(),
@@ -277,7 +274,7 @@ public class PostgreSqlDataWriterTests : IAsyncLifetime
         // Assert
         result.RowsWritten.Should().Be(10000);
         result.RowsFailed.Should().Be(0);
-        
+
         var count = await GetRowCount();
         count.Should().Be(10000);
     }
@@ -287,7 +284,7 @@ public class PostgreSqlDataWriterTests : IAsyncLifetime
     {
         // Arrange
         var connector = CreateConnector();
-        
+
         // Insert some initial data
         var initialBatch = new ReadBatch
         {
@@ -298,7 +295,7 @@ public class PostgreSqlDataWriterTests : IAsyncLifetime
             },
             RowCount = 1
         };
-        
+
         await _writer.WriteBatchAsync(connector, initialBatch, new WriteOptions(), CancellationToken.None);
 
         // Create a batch with mixed success and failure
@@ -329,15 +326,15 @@ public class PostgreSqlDataWriterTests : IAsyncLifetime
         result.RowErrors.Should().HaveCount(1);
         result.RowErrors[0].RowIndex.Should().Be(1);
         result.RowErrors[0].ErrorCode.Should().Be("23505"); // PostgreSQL unique violation
-        
+
         // Verify that the successful rows were actually inserted
         var count = await GetRowCount();
         count.Should().Be(3); // Initial row + 2 successful rows from mixed batch
-        
+
         // Verify the specific rows exist
         var validRow1 = await GetUserName(10);
         validRow1.Should().Be("Valid 1");
-        
+
         var validRow2 = await GetUserName(12);
         validRow2.Should().Be("Valid 2");
     }
@@ -369,7 +366,7 @@ public class PostgreSqlDataWriterTests : IAsyncLifetime
     private ReadBatch CreateTestBatch(int rowCount, int startId = 1)
     {
         var rows = new List<Dictionary<string, object?>>();
-        
+
         for (int i = 0; i < rowCount; i++)
         {
             var id = startId + i;
@@ -394,10 +391,10 @@ public class PostgreSqlDataWriterTests : IAsyncLifetime
     {
         await using var connection = new NpgsqlConnection(_connectionString);
         await connection.OpenAsync();
-        
+
         await using var command = new NpgsqlCommand("SELECT COUNT(*) FROM test_users", connection);
         var result = await command.ExecuteScalarAsync();
-        
+
         return Convert.ToInt32(result);
     }
 
@@ -405,10 +402,10 @@ public class PostgreSqlDataWriterTests : IAsyncLifetime
     {
         await using var connection = new NpgsqlConnection(_connectionString);
         await connection.OpenAsync();
-        
+
         await using var command = new NpgsqlCommand("SELECT name FROM test_users WHERE id = @id", connection);
         command.Parameters.AddWithValue("@id", id);
-        
+
         return await command.ExecuteScalarAsync() as string;
     }
 
@@ -416,10 +413,10 @@ public class PostgreSqlDataWriterTests : IAsyncLifetime
     {
         await using var connection = new NpgsqlConnection(_connectionString);
         await connection.OpenAsync();
-        
+
         await using var command = new NpgsqlCommand("SELECT age FROM test_users WHERE id = @id", connection);
         command.Parameters.AddWithValue("@id", id);
-        
+
         var result = await command.ExecuteScalarAsync();
         return result as int?;
     }

@@ -39,7 +39,7 @@ public class TenantsController : ControllerBase
     public async Task<IActionResult> GetAllTenants()
     {
         var tenants = await _tenantService.GetAllTenantsAsync();
-        
+
         var response = tenants.Select(t => new TenantResponse
         {
             Id = t.Id,
@@ -82,7 +82,7 @@ public class TenantsController : ControllerBase
     public async Task<IActionResult> GetTenantById(Guid id)
     {
         var tenant = await _tenantService.GetTenantByIdAsync(id);
-        
+
         if (tenant == null)
         {
             return NotFound(new ErrorResponse(
@@ -93,7 +93,7 @@ public class TenantsController : ControllerBase
         // Check if user has access to this tenant (unless SuperAdmin)
         var userId = _currentUserService.GetUserId();
         var userRole = _currentUserService.GetRole();
-        
+
         if (userRole != Roles.SuperAdmin)
         {
             var userTenants = await _tenantService.GetUserTenantsAsync(userId);

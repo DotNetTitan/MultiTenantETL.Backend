@@ -45,7 +45,7 @@ namespace MultiTenantETL.Infrastructure.Services
             _logger.LogInformation("   Name: {FirstName}", firstName);
             return Task.CompletedTask;
         }
-        
+
         public Task SendPipelineExecutionReportAsync(
             string recipientEmail,
             string pipelineName,
@@ -64,7 +64,7 @@ namespace MultiTenantETL.Infrastructure.Services
             _logger.LogInformation("   Pipeline: {PipelineName}", pipelineName);
             _logger.LogInformation("   Execution ID: {ExecutionId}", executionId);
             _logger.LogInformation("   Status: {Status}", executionStatus);
-            _logger.LogInformation("   Records: {Processed} processed, {Succeeded} succeeded, {Failed} failed", 
+            _logger.LogInformation("   Records: {Processed} processed, {Succeeded} succeeded, {Failed} failed",
                 recordsProcessed, recordsSucceeded, recordsFailed);
             _logger.LogInformation("   Details URL: {Url}", executionDetailsUrl);
             return Task.CompletedTask;

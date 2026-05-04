@@ -8,7 +8,6 @@ using MultiTenantETL.Infrastructure.DataAccess.Writers;
 using MultiTenantETL.Infrastructure.Identity;
 using MultiTenantETL.Infrastructure.Orchestration;
 using MultiTenantETL.Infrastructure.Persistence;
-using MultiTenantETL.Infrastructure.Transformations;
 using MultiTenantETL.Worker;
 
 var builder = Host.CreateApplicationBuilder(args);

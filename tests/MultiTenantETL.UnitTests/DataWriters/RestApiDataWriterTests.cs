@@ -1,6 +1,3 @@
-using System.Net;
-using System.Net.Http;
-using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
@@ -9,6 +6,8 @@ using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.DataWriters;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
+using System.Net;
+using System.Text.Json;
 
 namespace MultiTenantETL.UnitTests.DataWriters;
 

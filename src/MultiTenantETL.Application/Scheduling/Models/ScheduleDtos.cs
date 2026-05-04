@@ -9,18 +9,18 @@ public record CreateScheduleRequest
 {
     [Required]
     public Guid PipelineId { get; init; }
-    
+
     [Required]
     [StringLength(100, MinimumLength = 9)]
     public required string CronExpression { get; init; }
-    
+
     [Required]
     [StringLength(50)]
     public required string Timezone { get; init; }
-    
+
     [StringLength(500)]
     public string? Description { get; init; }
-    
+
     public bool IsActive { get; init; } = true;
 }
 
@@ -32,14 +32,14 @@ public record UpdateScheduleRequest
     [Required]
     [StringLength(100, MinimumLength = 9)]
     public required string CronExpression { get; init; }
-    
+
     [Required]
     [StringLength(50)]
     public required string Timezone { get; init; }
-    
+
     [StringLength(500)]
     public string? Description { get; init; }
-    
+
     public bool? IsActive { get; init; }
 }
 

@@ -1,11 +1,11 @@
-using System.Net.Http.Headers;
-using System.Text;
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
 
 namespace MultiTenantETL.Infrastructure.DataWriters;
 
@@ -125,7 +125,7 @@ public class RestApiDataWriter : IDataWriter
         {
             PropertyNameCaseInsensitive = true
         };
-        
+
         var config = JsonSerializer.Deserialize<RestApiConfig>(configJson, options)
             ?? throw new InvalidOperationException("Invalid REST API configuration");
 
@@ -145,11 +145,11 @@ public class RestApiDataWriter : IDataWriter
 
         // Determine endpoint path - support both old single EndpointPath and new endpoints array
         string? endpointPath = null;
-        
+
         if (config.Endpoints?.Count > 0)
         {
             // Use first POST/PUT endpoint for destination connectors
-            var endpoint = config.Endpoints.FirstOrDefault(e => 
+            var endpoint = config.Endpoints.FirstOrDefault(e =>
                 new[] { "POST", "PUT" }.Contains(e.Method?.ToUpperInvariant()))
                           ?? config.Endpoints[0];
             endpointPath = endpoint.Path;
@@ -165,7 +165,7 @@ public class RestApiDataWriter : IDataWriter
             endpointPath = endpointPath.TrimStart('/');
             var baseUrlTrimmed = baseUrl.TrimEnd('/');
             config.FullUrl = $"{baseUrlTrimmed}/{endpointPath}";
-            
+
             // Validate the combined URL
             if (!Uri.TryCreate(config.FullUrl, UriKind.Absolute, out _))
             {
@@ -182,7 +182,7 @@ public class RestApiDataWriter : IDataWriter
         {
             config.Token = config.AuthToken;
         }
-        
+
         // Support both old and new API key field names
         if (string.IsNullOrWhiteSpace(config.ApiKey) && !string.IsNullOrWhiteSpace(config.ApiKeyValue))
         {

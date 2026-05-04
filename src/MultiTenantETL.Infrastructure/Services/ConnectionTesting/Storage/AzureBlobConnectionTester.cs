@@ -50,7 +50,7 @@ public class AzureBlobConnectionTester
             // Create credentials securely
             var credential = new StorageSharedKeyCredential(config.AzureAccountName, config.AzureAccountKey);
             var serviceUri = new Uri($"https://{config.AzureAccountName}.blob.core.windows.net");
-            
+
             // Configure retry options - reduce from default 6 to 3 attempts
             var blobClientOptions = new BlobClientOptions
             {
@@ -61,16 +61,16 @@ public class AzureBlobConnectionTester
                     Mode = Azure.Core.RetryMode.Fixed
                 }
             };
-            
+
             // Create blob service client with custom retry policy
             var blobServiceClient = new BlobServiceClient(serviceUri, credential, blobClientOptions);
-            
+
             // Get container client
             var containerClient = blobServiceClient.GetBlobContainerClient(config.AzureContainer);
-            
+
             // Test connection by checking if container exists
             var exists = await containerClient.ExistsAsync();
-            
+
             if (!exists.Value)
             {
                 return new ConnectionTestResult
@@ -82,7 +82,7 @@ public class AzureBlobConnectionTester
 
             // Get container properties to verify access
             var properties = await containerClient.GetPropertiesAsync();
-            
+
             var details = new Dictionary<string, object>
             {
                 ["AccountName"] = config.AzureAccountName ?? string.Empty,
@@ -126,9 +126,9 @@ public class AzureBlobConnectionTester
         catch (Exception ex)
         {
             _logger.LogError(ex, "Azure Blob connection test failed");
-            
+
             var errorMessage = GetRootErrorMessage(ex);
-            
+
             return new ConnectionTestResult
             {
                 Success = false,

@@ -1,17 +1,14 @@
-using System.Data;
-using System.Text.Json;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
+using MongoDB.Driver;
 using MultiTenantETL.Application.Connectors;
 using MultiTenantETL.Application.Connectors.Models;
 using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Infrastructure.Configuration;
-using Npgsql;
 using MySqlConnector;
+using Npgsql;
 using Oracle.ManagedDataAccess.Client;
-using MongoDB.Driver;
-using Microsoft.Azure.Cosmos;
-using System.Text.Json.Nodes;
+using System.Text.Json;
 
 namespace MultiTenantETL.Infrastructure.Services;
 
@@ -387,7 +384,7 @@ public class SchemaDetector : ISchemaDetector
                 {
                     case "bearer":
                         string? token = null;
-                        
+
                         // Check if dynamic token generation is enabled
                         if (apiConfig.UseDynamicToken)
                         {
@@ -406,13 +403,13 @@ public class SchemaDetector : ISchemaDetector
                         {
                             token = apiConfig.AuthToken;
                         }
-                        
+
                         if (!string.IsNullOrEmpty(token))
                         {
                             httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
                         }
                         break;
-                        
+
                     case "basic":
                         if (!string.IsNullOrEmpty(apiConfig.Username) && !string.IsNullOrEmpty(apiConfig.Password))
                         {
@@ -421,7 +418,7 @@ public class SchemaDetector : ISchemaDetector
                             httpClient.DefaultRequestHeaders.Add("Authorization", $"Basic {credentials}");
                         }
                         break;
-                        
+
                     case "apikey":
                         if (!string.IsNullOrEmpty(apiConfig.ApiKeyHeader) && !string.IsNullOrEmpty(apiConfig.ApiKeyValue))
                         {
@@ -442,7 +439,7 @@ public class SchemaDetector : ISchemaDetector
 
             // Call the API endpoint
             var response = await httpClient.GetAsync(endpointPath);
-            
+
             if (!response.IsSuccessStatusCode)
             {
                 return new SchemaDetectionResult
@@ -461,7 +458,7 @@ public class SchemaDetector : ISchemaDetector
 
             // Extract data from response using the path
             var dataElement = ExtractDataFromResponse(responseJson, dataPath);
-            
+
             // Infer schema from the data
             var fields = InferSchemaFromJson(dataElement);
 
@@ -537,7 +534,7 @@ public class SchemaDetector : ISchemaDetector
             }
 
             var response = await tokenClient.SendAsync(request);
-            
+
             if (!response.IsSuccessStatusCode)
             {
                 return (false, null, $"Token endpoint returned {response.StatusCode}");
@@ -576,7 +573,7 @@ public class SchemaDetector : ISchemaDetector
 
             var parts = path.Split('.');
             var current = json;
-            
+
             foreach (var part in parts)
             {
                 if (current.TryGetProperty(part, out var next))
@@ -618,7 +615,7 @@ public class SchemaDetector : ISchemaDetector
 
             var parts = path.Split('.');
             var current = json;
-            
+
             foreach (var part in parts)
             {
                 if (current.TryGetProperty(part, out var next))
@@ -873,14 +870,14 @@ public class SchemaDetector : ISchemaDetector
     {
         var endpoint = config.CosmosEndpoint ?? config.Host;
         var key = config.CosmosKey ?? config.Password;
-        
+
         using var client = new Microsoft.Azure.Cosmos.CosmosClient(endpoint, key);
         var container = client.GetContainer(config.Database, tableName);
 
         // Fetch a few documents to sample types
         var query = new Microsoft.Azure.Cosmos.QueryDefinition("SELECT TOP 10 * FROM c");
         using var iterator = container.GetItemQueryIterator<System.Text.Json.Nodes.JsonObject>(query);
-        
+
         if (!iterator.HasMoreResults) return new List<SchemaField>();
 
         var response = await iterator.ReadNextAsync();
@@ -909,14 +906,14 @@ public class SchemaDetector : ISchemaDetector
     private string InferDataTypeFromValue(System.Text.Json.Nodes.JsonNode? node)
     {
         if (node == null) return "string";
-        
+
         var value = node.AsValue();
         if (value.TryGetValue<int>(out _)) return "int";
         if (value.TryGetValue<long>(out _)) return "bigint";
         if (value.TryGetValue<double>(out _)) return "decimal";
         if (value.TryGetValue<bool>(out _)) return "boolean";
         if (value.TryGetValue<DateTime>(out _)) return "datetime";
-        
+
         return "string";
     }
 }

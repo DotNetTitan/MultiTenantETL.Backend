@@ -1,7 +1,4 @@
-using System.Linq;
-using System.Text.Json;
 using FluentAssertions;
-using FluentAssertions.Specialized;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MultiTenantETL.Application.Connectors.DataReaders;
@@ -10,6 +7,7 @@ using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.DataReaders;
 using MultiTenantETL.Infrastructure.Services.Storage;
 using NSubstitute;
+using System.Text.Json;
 
 namespace MultiTenantETL.UnitTests.DataReaders;
 

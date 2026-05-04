@@ -1,8 +1,4 @@
-using System.Text.Json;
-using Azure;
-using Azure.Security.KeyVault.Secrets;
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MultiTenantETL.Infrastructure.Configuration;
@@ -19,7 +15,7 @@ public class KeyVaultSecretStorageServiceTests
     public KeyVaultSecretStorageServiceTests()
     {
         _logger = Substitute.For<ILogger<KeyVaultSecretStorageService>>();
-        
+
         var keyVaultSettings = new AzureKeyVaultSettings
         {
             VaultUri = "https://test-vault.vault.azure.net/",

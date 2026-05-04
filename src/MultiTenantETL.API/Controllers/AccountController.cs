@@ -1,18 +1,18 @@
-using System.Collections.Immutable;
-using System.Text;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
-using MultiTenantETL.Application.Common.Models;
 using MultiTenantETL.Application.Authentication.Models;
+using MultiTenantETL.Application.Common.Models;
 using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Domain.Enums;
 using MultiTenantETL.Infrastructure.Identity;
 using MultiTenantETL.Infrastructure.Interfaces;
 using MultiTenantETL.Infrastructure.Persistence;
 using OpenIddict.Abstractions;
+using System.Collections.Immutable;
+using System.Text;
 
 namespace MultiTenantETL.API.Controllers
 {
@@ -329,7 +329,8 @@ namespace MultiTenantETL.API.Controllers
 
             _logger.LogInformation("User logged out");
 
-            return Ok(new {
+            return Ok(new
+            {
                 success = true,
                 message = "Logged out successfully. All refresh tokens have been revoked.",
                 clearTokens = true

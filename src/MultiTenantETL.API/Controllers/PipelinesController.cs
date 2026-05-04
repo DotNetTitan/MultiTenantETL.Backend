@@ -1,13 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MultiTenantETL.Application.Common.Interfaces;
-using MultiTenantETL.Application.Common.Models;
 using MultiTenantETL.Application.Executions;
 using MultiTenantETL.Application.Executions.Models;
 using MultiTenantETL.Application.Pipelines;
 using MultiTenantETL.Application.Pipelines.Models;
 using MultiTenantETL.Domain.Constants;
-using MultiTenantETL.Domain.Enums;
 using MultiTenantETL.Infrastructure.Authorization.Requirements;
 
 namespace MultiTenantETL.API.Controllers;
@@ -197,7 +195,7 @@ public class PipelinesController : ControllerBase
 
         var userId = _currentUserService.GetUserId();
         var execution = await _executionService.StartExecutionAsync(id, "Manual", userId);
-        
+
         return Ok(execution);
     }
 }

@@ -1,6 +1,3 @@
-using System.Collections.Concurrent;
-using System.Text;
-using System.Text.Json;
 using Microsoft.Extensions.Options;
 using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Messaging;
@@ -8,6 +5,9 @@ using MultiTenantETL.Application.Orchestration;
 using MultiTenantETL.Infrastructure.Configuration;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using System.Collections.Concurrent;
+using System.Text;
+using System.Text.Json;
 
 namespace MultiTenantETL.Worker;
 
@@ -33,7 +33,7 @@ public class Worker : BackgroundService
     public override Task StartAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("Pipeline Worker starting...");
-        
+
         var factory = _settings.CreateConnectionFactory();
 
         _connection = factory.CreateConnection();
@@ -70,7 +70,7 @@ public class Worker : BackgroundService
         _channel.BasicQos(prefetchSize: 0, prefetchCount: (ushort)_settings.PrefetchCount, global: false);
 
         _logger.LogInformation("Connected to RabbitMQ at {HostName}:{Port}", _settings.HostName, _settings.Port);
-        _logger.LogInformation("Queues declared: {ExecutionQueue}, {CancellationQueue}", 
+        _logger.LogInformation("Queues declared: {ExecutionQueue}, {CancellationQueue}",
             _settings.ExecutionQueueName, _settings.CancellationQueueName);
 
         return base.StartAsync(cancellationToken);
@@ -121,13 +121,13 @@ public class Worker : BackgroundService
     {
         var body = ea.Body.ToArray();
         var json = Encoding.UTF8.GetString(body);
-        
+
         ExecutionTask? task = null;
-        
+
         try
         {
             task = JsonSerializer.Deserialize<ExecutionTask>(json);
-            
+
             if (task == null)
             {
                 _logger.LogError("Failed to deserialize execution task");
@@ -155,7 +155,7 @@ public class Worker : BackgroundService
 
             // Execute pipeline in a new scope with tenant context
             var scope = _serviceProvider.CreateAsyncScope();
-            
+
             try
             {
                 // Set tenant context for this job scope
@@ -185,13 +185,13 @@ public class Worker : BackgroundService
 
             // Acknowledge message
             _channel?.BasicAck(ea.DeliveryTag, false);
-            
+
             _logger.LogInformation("Execution task completed: ExecutionId={ExecutionId}", task.ExecutionId);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error processing execution task: ExecutionId={ExecutionId}", task?.ExecutionId);
-            
+
             if (task != null)
             {
                 CompleteExecution(task.ExecutionId);
@@ -200,7 +200,7 @@ public class Worker : BackgroundService
             // Don't retry - just fail and move on
             // Retrying would cause duplicate batch records and infinite loops
             _logger.LogError("Execution task failed, sending to DLX: ExecutionId={ExecutionId}", task?.ExecutionId);
-            
+
             // Nack without requeue (sends to dead letter exchange)
             _channel?.BasicNack(ea.DeliveryTag, false, false);
         }
@@ -210,11 +210,11 @@ public class Worker : BackgroundService
     {
         var body = ea.Body.ToArray();
         var json = Encoding.UTF8.GetString(body);
-        
+
         try
         {
             var message = JsonSerializer.Deserialize<CancellationRequest>(json);
-            
+
             if (message != null)
             {
                 if (CancelExecution(message.ExecutionId))
@@ -223,7 +223,7 @@ public class Worker : BackgroundService
                 }
                 else
                 {
-                    _logger.LogWarning("Cancellation requested for non-running execution: ExecutionId={ExecutionId}", 
+                    _logger.LogWarning("Cancellation requested for non-running execution: ExecutionId={ExecutionId}",
                         message.ExecutionId);
                 }
             }
@@ -269,7 +269,7 @@ public class Worker : BackgroundService
     {
         _channel?.Dispose();
         _connection?.Dispose();
-        
+
         foreach (var execution in _runningExecutions.ToArray())
         {
             if (_runningExecutions.TryRemove(execution.Key, out var cts))
@@ -277,7 +277,7 @@ public class Worker : BackgroundService
                 cts.Dispose();
             }
         }
-        
+
         base.Dispose();
     }
 

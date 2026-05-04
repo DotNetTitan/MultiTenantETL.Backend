@@ -1,5 +1,3 @@
-using System.Text;
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MultiTenantETL.Application.Connectors.DataReaders;
@@ -7,6 +5,7 @@ using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
 using MySqlConnector;
+using System.Text.Json;
 
 namespace MultiTenantETL.Infrastructure.DataWriters;
 
@@ -28,7 +27,7 @@ public class MySqlDataWriter : IDataWriter
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        
+
         var result = new DataWriteResult { BatchId = batch.BatchId };
 
         // For empty batches, return success without database operations
@@ -38,7 +37,7 @@ public class MySqlDataWriter : IDataWriter
         }
 
         var config = ParseConfig(connector.ConfigJson);
-        
+
         try
         {
             await using var connection = new MySqlConnection(config.ConnectionString);

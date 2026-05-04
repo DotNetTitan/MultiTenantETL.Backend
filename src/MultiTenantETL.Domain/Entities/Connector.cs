@@ -26,9 +26,9 @@ public class Connector : ITenantResource
     /// Optional description of the connector.
     /// </summary>
     public string? Description { get; set; }
-    
+
     // Relational columns for querying/filtering
-    
+
     /// <summary>
     /// Type of connector (Database, File, API).
     /// </summary>
@@ -63,9 +63,9 @@ public class Connector : ITenantResource
     /// Whether this connector is active.
     /// </summary>
     public bool IsActive { get; set; }
-    
+
     // JSON columns for flexible configuration (PostgreSQL JSONB)
-    
+
     /// <summary>
     /// JSON configuration including connection settings and credentials.
     /// </summary>
@@ -75,9 +75,9 @@ public class Connector : ITenantResource
     /// JSON schema defining the data fields.
     /// </summary>
     public string? SchemaJson { get; set; }
-    
+
     // Testing and audit
-    
+
     /// <summary>
     /// When the connector was last tested.
     /// </summary>
@@ -114,7 +114,7 @@ public class Connector : ITenantResource
     public Guid? UpdatedBy { get; set; }
 
     // Navigation properties
-    
+
     /// <summary>
     /// Tenant that owns this connector.
     /// </summary>

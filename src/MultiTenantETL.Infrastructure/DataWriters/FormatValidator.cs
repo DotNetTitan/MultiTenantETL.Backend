@@ -9,7 +9,7 @@ namespace MultiTenantETL.Infrastructure.DataWriters;
 public class FormatValidator : IFormatValidator
 {
     private readonly ILogger<FormatValidator> _logger;
-    
+
     // Thresholds for recommendations
     private const long LargeDatasetThreshold = 10_000;
     private const long VeryLargeDatasetThreshold = 100_000;

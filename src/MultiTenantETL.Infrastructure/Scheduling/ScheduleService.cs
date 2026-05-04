@@ -41,7 +41,7 @@ public class ScheduleService : IScheduleService
         var tenantId = _currentUserService.GetTenantId();
         var userId = _currentUserService.GetUserId();
 
-        _logger.LogInformation("Creating schedule for pipeline {PipelineId} in tenant {TenantId}", 
+        _logger.LogInformation("Creating schedule for pipeline {PipelineId} in tenant {TenantId}",
             request.PipelineId, tenantId);
 
         // Verify pipeline exists and belongs to tenant
@@ -185,7 +185,7 @@ public class ScheduleService : IScheduleService
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
-            query = query.Where(s => 
+            query = query.Where(s =>
                 s.Pipeline!.Name.Contains(request.Search) ||
                 (s.Description != null && s.Description.Contains(request.Search)));
         }
@@ -253,7 +253,7 @@ public class ScheduleService : IScheduleService
         schedule.CronExpression = request.CronExpression;
         schedule.Timezone = request.Timezone;
         schedule.Description = request.Description;
-        
+
         if (request.IsActive.HasValue)
         {
             // Check if trying to activate schedule for a deactivated pipeline
@@ -481,7 +481,7 @@ public class ScheduleService : IScheduleService
         {
             // Validate cron expression
             var cron = new CronExpression(cronExpression);
-            
+
             // Validate timezone
             TimeZoneInfo timeZone;
             try
@@ -500,7 +500,7 @@ public class ScheduleService : IScheduleService
             // Get next 5 executions
             var nextExecutions = new List<DateTimeOffset>();
             var currentTime = DateTimeOffset.UtcNow;
-            
+
             for (int i = 0; i < 5; i++)
             {
                 var nextTime = cron.GetNextValidTimeAfter(currentTime);
@@ -536,7 +536,7 @@ public class ScheduleService : IScheduleService
     {
         var tenantId = _currentUserService.GetTenantId();
 
-        _logger.LogInformation("Pausing schedules for pipeline {PipelineId} in tenant {TenantId}", 
+        _logger.LogInformation("Pausing schedules for pipeline {PipelineId} in tenant {TenantId}",
             pipelineId, tenantId);
 
         // Find all active schedules for this pipeline
@@ -558,7 +558,7 @@ public class ScheduleService : IScheduleService
         {
             // Unregister from Quartz
             await UnregisterQuartzJobAsync(schedule, cancellationToken);
-            
+
             // Mark the schedule as pipeline-paused so we only restore schedules
             // that were active before the pipeline was deactivated.
             schedule.IsActive = false;
@@ -583,7 +583,7 @@ public class ScheduleService : IScheduleService
     {
         var tenantId = _currentUserService.GetTenantId();
 
-        _logger.LogInformation("Resuming schedules for pipeline {PipelineId} in tenant {TenantId}", 
+        _logger.LogInformation("Resuming schedules for pipeline {PipelineId} in tenant {TenantId}",
             pipelineId, tenantId);
 
         // Only resume schedules that were auto-paused due to pipeline deactivation.
@@ -609,12 +609,12 @@ public class ScheduleService : IScheduleService
             // Recalculate next run time
             var cronExpression = new CronExpression(schedule.CronExpression);
             schedule.NextRunAt = cronExpression.GetNextValidTimeAfter(DateTimeOffset.UtcNow);
-            
+
             // Set schedule to active
             schedule.IsActive = true;
             schedule.IsPausedByPipeline = false;
             schedule.UpdatedAt = DateTime.UtcNow;
-            
+
             // Pipeline should not be null after Include, but check for safety
             if (schedule.Pipeline != null)
             {

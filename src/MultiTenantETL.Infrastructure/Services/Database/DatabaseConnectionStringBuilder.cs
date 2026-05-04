@@ -88,7 +88,7 @@ public class DatabaseConnectionStringBuilder : IDatabaseConnectionStringBuilder
         var actualPort = port > 0 ? port : 27017;
         var auth = !string.IsNullOrEmpty(username) ? $"{username}:{password}@" : "";
         var ssl = useSsl ? "?ssl=true" : "";
-        
+
         if (!string.IsNullOrEmpty(additionalParams))
         {
             ssl += string.IsNullOrEmpty(ssl) ? $"?{additionalParams}" : $"&{additionalParams}";

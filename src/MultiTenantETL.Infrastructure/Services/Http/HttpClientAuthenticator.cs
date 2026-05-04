@@ -1,6 +1,6 @@
+using Microsoft.Extensions.Logging;
 using System.Net.Http.Headers;
 using System.Text.Json;
-using Microsoft.Extensions.Logging;
 
 namespace MultiTenantETL.Infrastructure.Services.Http;
 

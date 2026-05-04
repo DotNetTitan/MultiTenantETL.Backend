@@ -1,9 +1,9 @@
-using System.Text.Json;
 using FluentFTP;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Domain.Entities;
+using System.Text.Json;
 
 namespace MultiTenantETL.Infrastructure.DataWriters;
 
@@ -31,12 +31,12 @@ public class FtpDataWriter : IDataWriter
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        
+
         var result = new DataWriteResult { BatchId = batch.BatchId };
 
         // Parse and validate config upfront
         var config = ParseConfig(connector.ConfigJson);
-        
+
         try
         {
             if (_config == null)
@@ -181,7 +181,7 @@ public class FtpDataWriter : IDataWriter
                 await client.UploadStream(_bufferStream, _config.FilePath, FtpRemoteExists.Overwrite);
 
                 await client.Disconnect();
-                
+
                 _logger.LogInformation("Successfully uploaded file to FTP: {FilePath}", _config.FilePath);
             }
         }

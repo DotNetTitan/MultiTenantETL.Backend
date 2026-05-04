@@ -1,17 +1,11 @@
-using System.Data;
-using System.Linq;
-using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
-using MultiTenantETL.Infrastructure.DataReaders;
 using NSubstitute;
-using NSubstitute.ExceptionExtensions;
-using Oracle.ManagedDataAccess.Client;
-using IDataReader = MultiTenantETL.Application.Connectors.DataReaders.IDataReader;
+using System.Text.Json;
 
 namespace MultiTenantETL.UnitTests.DataReaders;
 

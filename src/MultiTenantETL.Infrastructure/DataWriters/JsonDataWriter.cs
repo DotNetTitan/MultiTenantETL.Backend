@@ -1,8 +1,8 @@
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Domain.Entities;
+using System.Text.Json;
 
 namespace MultiTenantETL.Infrastructure.DataWriters;
 

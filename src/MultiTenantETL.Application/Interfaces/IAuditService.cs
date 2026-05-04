@@ -17,7 +17,7 @@ public interface IAuditService
         string severity = "Info",
         bool success = true,
         string? errorMessage = null);
-    
+
     /// <summary>
     /// Log an authentication event
     /// </summary>
@@ -26,7 +26,7 @@ public interface IAuditService
         string? userEmail = null,
         bool success = true,
         string? errorMessage = null);
-    
+
     /// <summary>
     /// Get audit logs with filtering
     /// </summary>

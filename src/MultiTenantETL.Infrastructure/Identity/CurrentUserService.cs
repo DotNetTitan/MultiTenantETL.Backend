@@ -1,7 +1,7 @@
-using System.Security.Claims;
-using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using MultiTenantETL.Application.Common.Interfaces;
+using System.Security.Claims;
+using System.Text.Json;
 using CustomClaims = MultiTenantETL.Domain.Constants.ClaimTypes;
 
 namespace MultiTenantETL.Infrastructure.Identity;
@@ -23,7 +23,7 @@ public class CurrentUserService : ICurrentUserService
 
     public Guid GetUserId()
     {
-        var userIdClaim = User?.FindFirst(ClaimTypes.NameIdentifier)?.Value 
+        var userIdClaim = User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
                           ?? User?.FindFirst("sub")?.Value;
         return Guid.TryParse(userIdClaim, out var userId) ? userId : Guid.Empty;
     }
@@ -46,15 +46,15 @@ public class CurrentUserService : ICurrentUserService
 
     public string GetEmail()
     {
-        return User?.FindFirst(ClaimTypes.Email)?.Value 
-               ?? User?.FindFirst("email")?.Value 
+        return User?.FindFirst(ClaimTypes.Email)?.Value
+               ?? User?.FindFirst("email")?.Value
                ?? string.Empty;
     }
 
     public string GetName()
     {
-        return User?.FindFirst(ClaimTypes.Name)?.Value 
-               ?? User?.FindFirst("name")?.Value 
+        return User?.FindFirst(ClaimTypes.Name)?.Value
+               ?? User?.FindFirst("name")?.Value
                ?? string.Empty;
     }
 

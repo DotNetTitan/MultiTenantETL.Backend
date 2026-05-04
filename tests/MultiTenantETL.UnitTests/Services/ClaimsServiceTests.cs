@@ -1,5 +1,3 @@
-using System.Collections.Immutable;
-using System.Security.Claims;
 using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +8,8 @@ using MultiTenantETL.Infrastructure.Persistence;
 using MultiTenantETL.Infrastructure.Services;
 using NSubstitute;
 using OpenIddict.Abstractions;
+using System.Collections.Immutable;
+using System.Security.Claims;
 using CustomClaims = MultiTenantETL.Domain.Constants.ClaimTypes;
 
 namespace MultiTenantETL.UnitTests.Services;
@@ -44,7 +44,7 @@ public class ClaimsServiceTests : IDisposable
 
         // Mock SignInManager
         _signInManager = Substitute.For<SignInManager<ApplicationUser>>(
-            _userManager, 
+            _userManager,
             Substitute.For<Microsoft.AspNetCore.Http.IHttpContextAccessor>(),
             Substitute.For<IUserClaimsPrincipalFactory<ApplicationUser>>(),
             null, null, null, null);
@@ -82,7 +82,7 @@ public class ClaimsServiceTests : IDisposable
         // Assert
         result.Should().NotBeNull();
         var identity = (ClaimsIdentity)result.Identity!;
-        
+
         // Check basic claims
         identity.FindFirst(OpenIddictConstants.Claims.Subject)?.Value.Should().Be(userId.ToString());
         identity.FindFirst(OpenIddictConstants.Claims.Email)?.Value.Should().Be("john@example.com");
@@ -146,13 +146,13 @@ public class ClaimsServiceTests : IDisposable
         // Assert
         result.Should().NotBeNull();
         var identity = (ClaimsIdentity)result.Identity!;
-        
+
         identity.FindFirst(CustomClaims.TenantId)?.Value.Should().Be(tenantId.ToString());
         identity.FindFirst(CustomClaims.TenantName)?.Value.Should().Be("Acme Corp");
-        
+
         var roleClaims = identity.FindAll(ClaimTypes.Role).ToList();
         roleClaims.Should().Contain(c => c.Value == "TenantAdmin");
-        
+
         var permissionClaims = identity.FindAll(CustomClaims.Permission).ToList();
         permissionClaims.Should().HaveCount(2);
         permissionClaims.Should().Contain(c => c.Value == "tenants.manage");
@@ -192,10 +192,10 @@ public class ClaimsServiceTests : IDisposable
         // Assert
         result.Should().NotBeNull();
         var identity = (ClaimsIdentity)result.Identity!;
-        
+
         var roleClaims = identity.FindAll(ClaimTypes.Role).ToList();
         roleClaims.Should().Contain(c => c.Value == "SuperAdmin");
-        
+
         var permissionClaims = identity.FindAll(CustomClaims.Permission).ToList();
         permissionClaims.Should().Contain(c => c.Value == "*");
     }
@@ -256,11 +256,11 @@ public class ClaimsServiceTests : IDisposable
         // Assert
         result.Should().NotBeNull();
         var identity = (ClaimsIdentity)result.Identity!;
-        
+
         // Should use SuperAdmin permissions, not User role permissions
         var permissionClaims = identity.FindAll(CustomClaims.Permission).ToList();
         permissionClaims.Should().Contain(c => c.Value == "*");
-        
+
         identity.FindFirst(CustomClaims.TenantName)?.Value.Should().Be("Test Tenant");
     }
 
@@ -312,7 +312,7 @@ public class ClaimsServiceTests : IDisposable
         // Assert
         result.Should().NotBeNull();
         var identity = (ClaimsIdentity)result.Identity!;
-        
+
         // Should not have tenant-specific role or permissions since membership is inactive
         identity.FindFirst(CustomClaims.TenantName).Should().BeNull();
     }
@@ -357,7 +357,7 @@ public class ClaimsServiceTests : IDisposable
 
         var mockPrincipal = new ClaimsPrincipal(new ClaimsIdentity());
         _signInManager.CreateUserPrincipalAsync(user).Returns(mockPrincipal);
-        
+
         // User has both global Developer role and TenantAdmin role in tenant
         _userManager.GetRolesAsync(user).Returns(new List<string> { "Developer" });
 
@@ -375,7 +375,7 @@ public class ClaimsServiceTests : IDisposable
         // Assert
         result.Should().NotBeNull();
         var identity = (ClaimsIdentity)result.Identity!;
-        
+
         var roleClaims = identity.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
         roleClaims.Should().Contain("Developer"); // Global role
         roleClaims.Should().Contain("TenantAdmin"); // Tenant-specific role
@@ -437,7 +437,7 @@ public class ClaimsServiceTests : IDisposable
         // Assert
         result.Should().NotBeNull();
         var identity = (ClaimsIdentity)result.Identity!;
-        
+
         var permissionClaims = identity.FindAll(CustomClaims.Permission).ToList();
         permissionClaims.Should().BeEmpty();
     }
@@ -469,7 +469,7 @@ public class ClaimsServiceTests : IDisposable
         // Assert
         result.Should().NotBeNull();
         var identity = (ClaimsIdentity)result.Identity!;
-        
+
         var permissionClaims = identity.FindAll(CustomClaims.Permission).ToList();
         permissionClaims.Should().BeEmpty();
     }
@@ -499,7 +499,7 @@ public class ClaimsServiceTests : IDisposable
         // Assert
         result.Should().NotBeNull();
         var identity = (ClaimsIdentity)result.Identity!;
-        
+
         identity.FindFirst(OpenIddictConstants.Claims.Name)?.Value.Should().Be("Marie Curie");
     }
 }

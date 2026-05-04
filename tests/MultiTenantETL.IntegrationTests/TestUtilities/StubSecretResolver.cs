@@ -10,7 +10,7 @@ namespace MultiTenantETL.IntegrationTests.TestUtilities;
 /// </summary>
 public sealed class StubSecretResolver : SecretResolver
 {
-    public StubSecretResolver() 
+    public StubSecretResolver()
         : base(CreateStubSecretStorageService(), NullLogger<SecretResolver>.Instance)
     {
     }

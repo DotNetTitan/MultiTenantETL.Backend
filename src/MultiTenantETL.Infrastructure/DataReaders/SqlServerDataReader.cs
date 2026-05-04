@@ -1,12 +1,11 @@
-using System.Data;
-using System.Runtime.CompilerServices;
-using System.Text.Json;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
+using System.Runtime.CompilerServices;
+using System.Text.Json;
 using IDataReader = MultiTenantETL.Application.Connectors.DataReaders.IDataReader;
 
 namespace MultiTenantETL.Infrastructure.DataReaders;
@@ -23,8 +22,8 @@ public class SqlServerDataReader : IDataReader
     }
 
     public async IAsyncEnumerable<ReadBatch> ReadAsync(
-        Connector connector, 
-        ReadOptions options, 
+        Connector connector,
+        ReadOptions options,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var config = ParseConfig(connector.ConfigJson);
@@ -45,7 +44,7 @@ public class SqlServerDataReader : IDataReader
         while (await reader.ReadAsync(cancellationToken))
         {
             var row = new Dictionary<string, object?>();
-            
+
             for (int i = 0; i < reader.FieldCount; i++)
             {
                 var fieldName = reader.GetName(i);

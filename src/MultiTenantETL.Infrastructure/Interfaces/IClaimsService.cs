@@ -1,6 +1,6 @@
+using MultiTenantETL.Infrastructure.Identity;
 using System.Collections.Immutable;
 using System.Security.Claims;
-using MultiTenantETL.Infrastructure.Identity;
 
 namespace MultiTenantETL.Infrastructure.Interfaces;
 
@@ -13,6 +13,6 @@ public interface IClaimsService
     /// Builds a ClaimsPrincipal with all necessary claims for the user
     /// </summary>
     Task<ClaimsPrincipal> BuildClaimsPrincipalAsync(
-        ApplicationUser user, 
+        ApplicationUser user,
         ImmutableArray<string> scopes);
 }

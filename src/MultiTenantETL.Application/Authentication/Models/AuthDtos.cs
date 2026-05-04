@@ -1,5 +1,3 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace MultiTenantETL.Application.Authentication.Models
 {
     public class RegisterRequest
