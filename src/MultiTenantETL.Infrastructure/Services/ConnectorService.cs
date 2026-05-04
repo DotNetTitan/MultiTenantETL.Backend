@@ -301,15 +301,6 @@ public class ConnectorService : IConnectorService
         // For truly new connections (no keyvault refs), config comes in plain text
         var result = await _connectionTester.TestConnectionAsync(request.Type, request.Provider, configToTest);
 
-        // Audit log
-        await _auditService.LogAsync(
-            action: AuditActions.ConnectorTested,
-            resourceType: "Connector",
-            description: $"Tested new connection ({request.Type}/{request.Provider})",
-            metadata: new { request.Type, request.Provider, result.Success },
-            success: result.Success
-        );
-
         return new TestConnectionResponse
         {
             Success = result.Success,
@@ -341,16 +332,6 @@ public class ConnectorService : IConnectorService
         connector.LastTestResult = result.Success ? TestResults.Success : TestResults.Failed;
         connector.LastTestMessage = result.Message;
         await _context.SaveChangesAsync();
-
-        // Audit log
-        await _auditService.LogAsync(
-            action: AuditActions.ConnectorTested,
-            resourceType: "Connector",
-            resourceId: connector.Id.ToString(),
-            description: $"Tested connector '{connector.Name}'",
-            metadata: new { connector.Name, result.Success },
-            success: result.Success
-        );
 
         return new TestConnectionResponse
         {
@@ -387,15 +368,6 @@ public class ConnectorService : IConnectorService
             // Update connector with detected schema
             connector.SchemaJson = JsonSerializer.Serialize(result.Schema);
             await _context.SaveChangesAsync();
-
-            // Audit log
-            await _auditService.LogAsync(
-                action: AuditActions.ConnectorSchemaDetected,
-                resourceType: "Connector",
-                resourceId: connector.Id.ToString(),
-                description: $"Detected schema for connector '{connector.Name}'",
-                metadata: new { connector.Name, TableOrResource = request.TableOrResourceName }
-            );
         }
 
         return new DetectSchemaResponse
@@ -420,14 +392,6 @@ public class ConnectorService : IConnectorService
             request.Provider,
             request.Config,
             request.TableOrResourceName);
-
-        // Audit log
-        await _auditService.LogAsync(
-            action: AuditActions.ConnectorSchemaDetected,
-            resourceType: "Connector",
-            description: $"Detected schema preview ({request.Type}/{request.Provider})",
-            metadata: new { request.Type, request.Provider, TableOrResource = request.TableOrResourceName, result.Success }
-        );
 
         return new DetectSchemaResponse
         {
