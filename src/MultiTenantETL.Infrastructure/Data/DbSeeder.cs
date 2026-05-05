@@ -121,7 +121,7 @@ public static class DbSeeder
                 Id = Guid.NewGuid(),
                 Name = "Default Organization",
                 Slug = "default",
-                IsActive = true,
+                Status = MultiTenantETL.Domain.Enums.TenantStatus.Active,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -155,7 +155,7 @@ public static class DbSeeder
                 LastName = "Administrator",
                 CurrentTenantId = defaultTenant?.Id,
                 CreatedAt = DateTime.UtcNow,
-                IsActive = true
+                Status = MultiTenantETL.Domain.Enums.UserStatus.Active
             };
 
             var result = await userManager.CreateAsync(adminUser, adminPassword);
@@ -299,7 +299,7 @@ public static class DbSeeder
                 Id = Guid.NewGuid(),
                 Name = "Demo Organization",
                 Slug = "demo",
-                IsActive = true,
+                Status = MultiTenantETL.Domain.Enums.TenantStatus.Active,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -316,7 +316,7 @@ public static class DbSeeder
                 LastName = "User",
                 CurrentTenantId = guestTenant.Id,
                 CreatedAt = DateTime.UtcNow,
-                IsActive = true
+                Status = MultiTenantETL.Domain.Enums.UserStatus.Active
             };
 
             var result = await userManager.CreateAsync(guestUser, guestPassword);

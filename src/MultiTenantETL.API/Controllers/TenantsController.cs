@@ -45,7 +45,7 @@ public class TenantsController : ControllerBase
             Id = t.Id,
             Name = t.Name,
             Slug = t.Slug,
-            IsActive = t.IsActive,
+            Status = t.Status,
             CreatedAt = t.CreatedAt
         });
 
@@ -68,6 +68,7 @@ public class TenantsController : ControllerBase
             TenantName = ut.Tenant!.Name!,
             TenantSlug = ut.Tenant!.Slug!,
             RoleCode = ut.RoleCode,
+            Status = ut.Tenant!.Status,
             IsActive = ut.IsActive,
             IsCurrent = ut.TenantId == currentTenantId
         });
@@ -108,7 +109,7 @@ public class TenantsController : ControllerBase
             Id = tenant.Id,
             Name = tenant.Name,
             Slug = tenant.Slug,
-            IsActive = tenant.IsActive,
+            Status = tenant.Status,
             CreatedAt = tenant.CreatedAt
         };
 
@@ -142,7 +143,7 @@ public class TenantsController : ControllerBase
             Id = result.Data!.Id,
             Name = result.Data.Name,
             Slug = result.Data.Slug,
-            IsActive = result.Data.IsActive,
+            Status = result.Data.Status,
             CreatedAt = result.Data.CreatedAt
         };
 
@@ -167,7 +168,7 @@ public class TenantsController : ControllerBase
             }
         }
 
-        var result = await _tenantService.UpdateTenantAsync(id, request.Name, request.IsActive);
+        var result = await _tenantService.UpdateTenantAsync(id, request.Name, request.Status);
 
         if (!result.Success)
         {
@@ -187,7 +188,7 @@ public class TenantsController : ControllerBase
             Id = result.Data!.Id,
             Name = result.Data.Name,
             Slug = result.Data.Slug,
-            IsActive = result.Data.IsActive,
+            Status = result.Data.Status,
             CreatedAt = result.Data.CreatedAt
         };
 
@@ -246,6 +247,7 @@ public class TenantsController : ControllerBase
             FirstName = ut.User!.FirstName!,
             LastName = ut.User!.LastName!,
             RoleCode = ut.RoleCode,
+            Status = ut.User!.Status,
             IsActive = ut.IsActive
         });
 

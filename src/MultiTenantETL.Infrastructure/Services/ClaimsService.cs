@@ -101,7 +101,7 @@ public class ClaimsService : IClaimsService
                 // Add tenant name if tenant exists
                 var tenant = await _context.Tenants
                     .IgnoreQueryFilters()
-                    .FirstOrDefaultAsync(t => t.Id == user.CurrentTenantId.Value && t.IsActive);
+                    .FirstOrDefaultAsync(t => t.Id == user.CurrentTenantId.Value && t.Status == Domain.Enums.TenantStatus.Active);
                 if (tenant != null)
                 {
                     identity.SetClaim(CustomClaims.TenantName, tenant.Name);

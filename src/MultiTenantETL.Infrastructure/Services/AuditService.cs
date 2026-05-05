@@ -125,6 +125,7 @@ public class AuditService : IAuditService
         int pageSize = 50)
     {
         var query = _context.AuditLogs
+            .IgnoreQueryFilters()
             .Include(a => a.Tenant)
             .AsQueryable();
 

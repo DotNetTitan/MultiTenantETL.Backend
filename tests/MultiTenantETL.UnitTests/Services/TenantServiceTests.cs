@@ -32,7 +32,8 @@ public class TenantServiceTests : IDisposable
         _userManager = Substitute.For<UserManager<ApplicationUser>>(
             userStore, null, null, null, null, null, null, null, null);
 
-        _sut = new TenantService(_userManager, _context);
+        var currentUserService = Substitute.For<ICurrentUserService>();
+        _sut = new TenantService(_userManager, _context, currentUserService);
     }
 
     public void Dispose()
@@ -55,7 +56,7 @@ public class TenantServiceTests : IDisposable
         result.Data.Should().NotBeNull();
         result.Data!.Name.Should().Be(name);
         result.Data.Slug.Should().Be(slug);
-        result.Data.IsActive.Should().BeTrue();
+        result.Data.Status.Should().Be(TenantStatus.Active);
         result.Data.Id.Should().NotBe(Guid.Empty);
 
         // Verify it was saved to database
@@ -73,7 +74,7 @@ public class TenantServiceTests : IDisposable
             Id = Guid.NewGuid(),
             Name = "Existing Company",
             Slug = "existing-slug",
-            IsActive = true,
+            Status = TenantStatus.Active,
             CreatedAt = DateTime.UtcNow
         };
         _context.Tenants.Add(existingTenant);
@@ -97,7 +98,7 @@ public class TenantServiceTests : IDisposable
             Id = Guid.NewGuid(),
             Name = "Test Company",
             Slug = "test-company",
-            IsActive = true,
+            Status = TenantStatus.Active,
             CreatedAt = DateTime.UtcNow
         };
         _context.Tenants.Add(tenant);
@@ -131,7 +132,7 @@ public class TenantServiceTests : IDisposable
             Id = Guid.NewGuid(),
             Name = "Test Company",
             Slug = "test-company",
-            IsActive = true,
+            Status = TenantStatus.Active,
             CreatedAt = DateTime.UtcNow
         };
         _context.Tenants.Add(tenant);
@@ -151,9 +152,9 @@ public class TenantServiceTests : IDisposable
         // Arrange
         var tenants = new[]
         {
-            new Tenant { Id = Guid.NewGuid(), Name = "Charlie Company", Slug = "charlie", IsActive = true, CreatedAt = DateTime.UtcNow },
-            new Tenant { Id = Guid.NewGuid(), Name = "Alpha Company", Slug = "alpha", IsActive = true, CreatedAt = DateTime.UtcNow },
-            new Tenant { Id = Guid.NewGuid(), Name = "Bravo Company", Slug = "bravo", IsActive = true, CreatedAt = DateTime.UtcNow }
+            new Tenant { Id = Guid.NewGuid(), Name = "Charlie Company", Slug = "charlie", Status = TenantStatus.Active, CreatedAt = DateTime.UtcNow },
+            new Tenant { Id = Guid.NewGuid(), Name = "Alpha Company", Slug = "alpha", Status = TenantStatus.Active, CreatedAt = DateTime.UtcNow },
+            new Tenant { Id = Guid.NewGuid(), Name = "Bravo Company", Slug = "bravo", Status = TenantStatus.Active, CreatedAt = DateTime.UtcNow }
         };
         _context.Tenants.AddRange(tenants);
         await _context.SaveChangesAsync();
@@ -177,31 +178,31 @@ public class TenantServiceTests : IDisposable
             Id = Guid.NewGuid(),
             Name = "Old Name",
             Slug = "old-slug",
-            IsActive = true,
+            Status = TenantStatus.Active,
             CreatedAt = DateTime.UtcNow
         };
         _context.Tenants.Add(tenant);
         await _context.SaveChangesAsync();
 
         // Act
-        var result = await _sut.UpdateTenantAsync(tenant.Id, "New Name", false);
+        var result = await _sut.UpdateTenantAsync(tenant.Id, "New Name", TenantStatus.Inactive);
 
         // Assert
         result.Success.Should().BeTrue();
         result.Data!.Name.Should().Be("New Name");
-        result.Data.IsActive.Should().BeFalse();
+        result.Data.Status.Should().Be(TenantStatus.Inactive);
 
         // Verify database was updated
         var updated = await _context.Tenants.FindAsync(tenant.Id);
         updated!.Name.Should().Be("New Name");
-        updated.IsActive.Should().BeFalse();
+        updated.Status.Should().Be(TenantStatus.Inactive);
     }
 
     [Fact]
     public async Task UpdateTenantAsync_NonExistentTenant_ReturnsError()
     {
         // Act
-        var result = await _sut.UpdateTenantAsync(Guid.NewGuid(), "New Name", true);
+        var result = await _sut.UpdateTenantAsync(Guid.NewGuid(), "New Name", TenantStatus.Active);
 
         // Assert
         result.Success.Should().BeFalse();
@@ -217,7 +218,7 @@ public class TenantServiceTests : IDisposable
             Id = Guid.NewGuid(),
             Name = "Test Company",
             Slug = "test-company",
-            IsActive = true,
+            Status = TenantStatus.Active,
             CreatedAt = DateTime.UtcNow
         };
         _context.Tenants.Add(tenant);
@@ -229,10 +230,14 @@ public class TenantServiceTests : IDisposable
         // Assert
         result.Success.Should().BeTrue();
 
-        // Verify it was soft deleted
-        var deletedTenant = await _context.Tenants.FindAsync(tenant.Id);
+        // Verify it was soft deleted with new logic
+        var deletedTenant = await _context.Tenants
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(t => t.Id == tenant.Id);
         deletedTenant.Should().NotBeNull();
-        deletedTenant!.IsActive.Should().BeFalse();
+        deletedTenant!.Status.Should().Be(TenantStatus.Deleted);
+        deletedTenant.DeletedAt.Should().NotBeNull();
+        deletedTenant.Slug.Should().Contain("_deleted_");
     }
 
     [Fact]
@@ -252,7 +257,7 @@ public class TenantServiceTests : IDisposable
             Id = Guid.NewGuid(),
             Name = "Test Company",
             Slug = "test-company",
-            IsActive = true,
+            Status = TenantStatus.Active,
             CreatedAt = DateTime.UtcNow
         };
         _context.Tenants.Add(tenant);
@@ -286,7 +291,7 @@ public class TenantServiceTests : IDisposable
             Id = Guid.NewGuid(),
             Name = "Test Company",
             Slug = "test-company",
-            IsActive = true,
+            Status = TenantStatus.Active,
             CreatedAt = DateTime.UtcNow
         };
         _context.Tenants.Add(tenant);
@@ -341,7 +346,7 @@ public class TenantServiceTests : IDisposable
             Id = Guid.NewGuid(),
             Name = "Test Company",
             Slug = "test-company",
-            IsActive = true,
+            Status = TenantStatus.Active,
             CreatedAt = DateTime.UtcNow
         };
         var existingUserTenant = new UserTenant
@@ -430,7 +435,7 @@ public class TenantServiceTests : IDisposable
             Id = tenantId,
             Name = "Test Company",
             Slug = "test-company",
-            IsActive = true,
+            Status = TenantStatus.Active,
             CreatedAt = DateTime.UtcNow
         };
         var user = new ApplicationUser
@@ -483,9 +488,9 @@ public class TenantServiceTests : IDisposable
     {
         // Arrange
         var userId = Guid.NewGuid();
-        var tenant1 = new Tenant { Id = Guid.NewGuid(), Name = "Zulu Company", Slug = "zulu", IsActive = true, CreatedAt = DateTime.UtcNow };
-        var tenant2 = new Tenant { Id = Guid.NewGuid(), Name = "Alpha Company", Slug = "alpha", IsActive = true, CreatedAt = DateTime.UtcNow };
-        var tenant3 = new Tenant { Id = Guid.NewGuid(), Name = "Mike Company", Slug = "mike", IsActive = true, CreatedAt = DateTime.UtcNow };
+        var tenant1 = new Tenant { Id = Guid.NewGuid(), Name = "Zulu Company", Slug = "zulu", Status = TenantStatus.Active, CreatedAt = DateTime.UtcNow };
+        var tenant2 = new Tenant { Id = Guid.NewGuid(), Name = "Alpha Company", Slug = "alpha", Status = TenantStatus.Active, CreatedAt = DateTime.UtcNow };
+        var tenant3 = new Tenant { Id = Guid.NewGuid(), Name = "Mike Company", Slug = "mike", Status = TenantStatus.Active, CreatedAt = DateTime.UtcNow };
 
         var userTenant1 = new UserTenant { UserId = userId, TenantId = tenant1.Id, RoleCode = "User", IsActive = true, Tenant = tenant1 };
         var userTenant2 = new UserTenant { UserId = userId, TenantId = tenant2.Id, RoleCode = "Admin", IsActive = true, Tenant = tenant2 };
@@ -524,7 +529,7 @@ public class TenantServiceTests : IDisposable
             Id = tenantId,
             Name = "Test Company",
             Slug = "test",
-            IsActive = true,
+            Status = TenantStatus.Active,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -580,7 +585,7 @@ public class TenantServiceTests : IDisposable
             Id = tenantId,
             Name = "Test Company",
             Slug = "test",
-            IsActive = true,
+            Status = TenantStatus.Active,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -618,7 +623,7 @@ public class TenantServiceTests : IDisposable
             Id = tenantId,
             Name = "Test Company",
             Slug = "test",
-            IsActive = true,
+            Status = TenantStatus.Active,
             CreatedAt = DateTime.UtcNow
         };
 

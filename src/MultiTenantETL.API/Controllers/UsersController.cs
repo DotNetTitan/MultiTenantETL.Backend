@@ -51,6 +51,13 @@ public class UsersController : ControllerBase
                 "User not found"));
         }
 
+        if (user.Status != Domain.Enums.UserStatus.Active)
+        {
+            return Unauthorized(new ErrorResponse(
+                Domain.Enums.AuthErrorCode.UserInactive,
+                "Account is inactive or deleted"));
+        }
+
         var tenants = await _userService.GetUserTenantsAsync(userId);
         var roles = await _userService.GetUserRolesAsync(userId);
 
@@ -60,7 +67,7 @@ public class UsersController : ControllerBase
             Email = user.Email!,
             FirstName = user.FirstName,
             LastName = user.LastName,
-            IsActive = user.IsActive,
+            Status = user.Status,
             EmailConfirmed = user.EmailConfirmed,
             CreatedAt = user.CreatedAt,
             CurrentTenantId = user.CurrentTenantId,
@@ -104,7 +111,7 @@ public class UsersController : ControllerBase
             Email = result.Data.Email!,
             FirstName = result.Data.FirstName,
             LastName = result.Data.LastName,
-            IsActive = result.Data.IsActive,
+            Status = result.Data.Status,
             EmailConfirmed = result.Data.EmailConfirmed,
             CreatedAt = result.Data.CreatedAt,
             CurrentTenantId = result.Data.CurrentTenantId,
@@ -138,7 +145,7 @@ public class UsersController : ControllerBase
         var (users, totalCount) = await _userService.GetUsersAsync(
             request.Email,
             request.Name,
-            request.IsActive,
+            request.Status,
             tenantFilter,
             request.Page,
             request.PageSize);
@@ -153,7 +160,7 @@ public class UsersController : ControllerBase
                 Email = u.Email!,
                 FirstName = u.FirstName,
                 LastName = u.LastName,
-                IsActive = u.IsActive,
+                Status = u.Status,
                 EmailConfirmed = u.EmailConfirmed,
                 CreatedAt = u.CreatedAt,
                 CurrentTenantId = u.CurrentTenantId,
@@ -212,7 +219,7 @@ public class UsersController : ControllerBase
             Email = user.Email!,
             FirstName = user.FirstName,
             LastName = user.LastName,
-            IsActive = user.IsActive,
+            Status = user.Status,
             EmailConfirmed = user.EmailConfirmed,
             CreatedAt = user.CreatedAt,
             CurrentTenantId = user.CurrentTenantId,
@@ -262,7 +269,7 @@ public class UsersController : ControllerBase
             Email = result.Data.Email!,
             FirstName = result.Data.FirstName,
             LastName = result.Data.LastName,
-            IsActive = result.Data.IsActive,
+            Status = result.Data.Status,
             EmailConfirmed = result.Data.EmailConfirmed,
             CreatedAt = result.Data.CreatedAt,
             CurrentTenantId = result.Data.CurrentTenantId,
@@ -279,22 +286,22 @@ public class UsersController : ControllerBase
     [Authorize(Roles = Roles.SuperAdmin)]
     public async Task<IActionResult> UpdateUserStatus(Guid id, [FromBody] UpdateUserStatusRequest request)
     {
-        var result = await _userService.UpdateUserStatusAsync(id, request.IsActive);
+        var result = await _userService.UpdateUserStatusAsync(id, request.Status);
 
         if (!result.Success)
         {
             return BadRequest(new ErrorResponse(result.ErrorCode!.Value, result.ErrorMessage!));
         }
 
-        _logger.LogInformation("User {UserId} status updated to {IsActive}", id, request.IsActive);
+        _logger.LogInformation("User {UserId} status updated to {Status}", id, request.Status);
 
         await _auditService.LogAsync(
-            request.IsActive ? Domain.Constants.AuditActions.Users.Activated : Domain.Constants.AuditActions.Users.Deactivated,
+            request.Status == Domain.Enums.UserStatus.Active ? Domain.Constants.AuditActions.Users.Activated : Domain.Constants.AuditActions.Users.Deactivated,
             "User",
             id.ToString(),
-            $"User {(request.IsActive ? "activated" : "deactivated")}");
+            $"User status updated to {request.Status}");
 
-        return Ok(new { message = $"User {(request.IsActive ? "activated" : "deactivated")} successfully" });
+        return Ok(new { message = $"User status updated to {request.Status} successfully" });
     }
 
     /// <summary>

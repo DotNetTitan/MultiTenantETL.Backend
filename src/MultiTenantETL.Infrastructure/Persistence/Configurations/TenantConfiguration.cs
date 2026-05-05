@@ -17,10 +17,10 @@ public class TenantConfiguration : IEntityTypeConfiguration<Tenant>
         builder.HasIndex(t => t.Slug)
             .IsUnique();
 
-        // Index for filtering by active status
-        builder.HasIndex(t => t.IsActive);
+        // Index for filtering by status
+        builder.HasIndex(t => t.Status);
 
         // Composite index for common query patterns
-        builder.HasIndex(t => new { t.IsActive, t.Name });
+        builder.HasIndex(t => new { t.Status, t.Name });
     }
 }

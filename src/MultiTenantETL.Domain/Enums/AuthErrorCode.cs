@@ -1,4 +1,4 @@
-﻿namespace MultiTenantETL.Domain.Enums
+namespace MultiTenantETL.Domain.Enums
 {
     /// <summary>
     /// Error codes for authentication and authorization operations.
@@ -12,6 +12,9 @@
 
         /// <summary>The account has been locked.</summary>
         AccountLocked,
+        
+        /// <summary>The account is inactive or deleted.</summary>
+        UserInactive,
 
         /// <summary>The email address has not been confirmed.</summary>
         EmailNotConfirmed,

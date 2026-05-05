@@ -24,7 +24,7 @@ public interface IUserService
     Task<(List<ApplicationUser> Users, int TotalCount)> GetUsersAsync(
         string? email = null,
         string? name = null,
-        bool? isActive = null,
+        MultiTenantETL.Domain.Enums.UserStatus? status = null,
         Guid? tenantId = null,
         int page = 1,
         int pageSize = 20);
@@ -39,9 +39,9 @@ public interface IUserService
         string email);
 
     /// <summary>
-    /// Updates a user's active status
+    /// Updates a user's status
     /// </summary>
-    Task<ServiceResult<ApplicationUser>> UpdateUserStatusAsync(Guid userId, bool isActive);
+    Task<ServiceResult<ApplicationUser>> UpdateUserStatusAsync(Guid userId, MultiTenantETL.Domain.Enums.UserStatus status);
 
     /// <summary>
     /// Deletes a user (soft delete)

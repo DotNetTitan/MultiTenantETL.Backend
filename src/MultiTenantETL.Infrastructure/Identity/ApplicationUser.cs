@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using MultiTenantETL.Domain.Entities;
 
 namespace MultiTenantETL.Infrastructure.Identity
@@ -9,7 +9,9 @@ namespace MultiTenantETL.Infrastructure.Identity
         public string LastName { get; set; } = string.Empty;
         public Guid? CurrentTenantId { get; set; }
         public DateTime CreatedAt { get; set; }
-        public bool IsActive { get; set; }
+        public MultiTenantETL.Domain.Enums.UserStatus Status { get; set; } = MultiTenantETL.Domain.Enums.UserStatus.Active;
+        public DateTime? DeletedAt { get; set; }
+        public Guid? DeletedBy { get; set; }
 
         // Navigation properties
         public virtual ICollection<UserTenant> UserTenants { get; set; } = new List<UserTenant>();

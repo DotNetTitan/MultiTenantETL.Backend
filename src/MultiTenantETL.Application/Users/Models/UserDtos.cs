@@ -8,7 +8,7 @@ public record UserResponse
     public required string Email { get; init; }
     public required string FirstName { get; init; }
     public required string LastName { get; init; }
-    public bool IsActive { get; init; }
+    public MultiTenantETL.Domain.Enums.UserStatus Status { get; init; }
     public bool EmailConfirmed { get; init; }
     public DateTime CreatedAt { get; init; }
     public Guid? CurrentTenantId { get; init; }
@@ -22,7 +22,7 @@ public record UserDetailResponse
     public required string Email { get; init; }
     public required string FirstName { get; init; }
     public required string LastName { get; init; }
-    public bool IsActive { get; init; }
+    public MultiTenantETL.Domain.Enums.UserStatus Status { get; init; }
     public bool EmailConfirmed { get; init; }
     public DateTime CreatedAt { get; init; }
     public Guid? CurrentTenantId { get; init; }
@@ -50,7 +50,7 @@ public record UpdateUserRequest
 
 public record UpdateUserStatusRequest
 {
-    public bool IsActive { get; init; }
+    public MultiTenantETL.Domain.Enums.UserStatus Status { get; init; }
 }
 
 public record AssignRoleRequest
@@ -74,7 +74,7 @@ public record UserSearchRequest
 {
     public string? Email { get; init; }
     public string? Name { get; init; }
-    public bool? IsActive { get; init; }
+    public MultiTenantETL.Domain.Enums.UserStatus? Status { get; init; }
     public Guid? TenantId { get; init; }
     public int Page { get; init; } = 1;
     public int PageSize { get; init; } = 20;

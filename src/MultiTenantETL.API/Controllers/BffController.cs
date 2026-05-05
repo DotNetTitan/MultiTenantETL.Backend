@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using MultiTenantETL.Infrastructure.Identity;
+using MultiTenantETL.Domain.Enums;
 using MultiTenantETL.Infrastructure.Interfaces;
 using System.Collections.Immutable;
 
@@ -65,7 +66,7 @@ public class BffController : ControllerBase
         const string guestEmail = "guest@multitenant-etl.com";
         var guestUser = await _userManager.FindByEmailAsync(guestEmail);
 
-        if (guestUser == null || !guestUser.IsActive)
+        if (guestUser == null || guestUser.Status != UserStatus.Active)
         {
             return Unauthorized(new
             {

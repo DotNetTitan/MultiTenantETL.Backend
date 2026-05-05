@@ -11,6 +11,7 @@ using OpenIddict.Abstractions;
 using System.Collections.Immutable;
 using System.Security.Claims;
 using CustomClaims = MultiTenantETL.Domain.Constants.ClaimTypes;
+using MultiTenantETL.Domain.Enums;
 
 namespace MultiTenantETL.UnitTests.Services;
 
@@ -101,7 +102,7 @@ public class ClaimsServiceTests : IDisposable
             Id = tenantId,
             Name = "Acme Corp",
             Slug = "acme",
-            IsActive = true,
+            Status = TenantStatus.Active,
             CreatedAt = DateTime.UtcNow
         };
         var user = new ApplicationUser
@@ -211,7 +212,7 @@ public class ClaimsServiceTests : IDisposable
             Id = tenantId,
             Name = "Test Tenant",
             Slug = "test",
-            IsActive = true,
+            Status = TenantStatus.Active,
             CreatedAt = DateTime.UtcNow
         };
         var user = new ApplicationUser
@@ -275,7 +276,7 @@ public class ClaimsServiceTests : IDisposable
             Id = tenantId,
             Name = "Inactive Tenant",
             Slug = "inactive",
-            IsActive = true,
+            Status = TenantStatus.Active,
             CreatedAt = DateTime.UtcNow
         };
         var user = new ApplicationUser
@@ -328,7 +329,7 @@ public class ClaimsServiceTests : IDisposable
             Id = tenantId,
             Name = "Multi-Role Tenant",
             Slug = "multi",
-            IsActive = true,
+            Status = TenantStatus.Active,
             CreatedAt = DateTime.UtcNow
         };
         var user = new ApplicationUser
@@ -392,7 +393,7 @@ public class ClaimsServiceTests : IDisposable
             Id = tenantId,
             Name = "No Perms Tenant",
             Slug = "noperms",
-            IsActive = true,
+            Status = TenantStatus.Active,
             CreatedAt = DateTime.UtcNow
         };
         var user = new ApplicationUser

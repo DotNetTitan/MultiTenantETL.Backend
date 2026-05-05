@@ -38,7 +38,7 @@ public interface ITenantService
     /// <summary>
     /// Updates a tenant
     /// </summary>
-    Task<ServiceResult<Tenant>> UpdateTenantAsync(Guid tenantId, string name, bool? isActive);
+    Task<ServiceResult<Tenant>> UpdateTenantAsync(Guid tenantId, string name, MultiTenantETL.Domain.Enums.TenantStatus? status);
 
     /// <summary>
     /// Deletes a tenant (soft delete by setting IsActive = false)

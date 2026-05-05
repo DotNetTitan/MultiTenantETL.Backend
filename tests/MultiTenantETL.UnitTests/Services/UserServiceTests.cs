@@ -5,6 +5,8 @@ using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Infrastructure.Identity;
 using MultiTenantETL.Infrastructure.Persistence;
 using MultiTenantETL.Infrastructure.Services;
+using MultiTenantETL.Domain.Enums;
+using MultiTenantETL.Infrastructure.Interfaces;
 using NSubstitute;
 using OpenIddict.Abstractions;
 
@@ -32,7 +34,9 @@ public class UserServiceTests : IDisposable
 
         _tokenManager = Substitute.For<IOpenIddictTokenManager>();
 
-        _sut = new UserService(_userManager, _context, _tokenManager);
+        var tenantService = Substitute.For<ITenantService>();
+        var currentUserService = Substitute.For<ICurrentUserService>();
+        _sut = new UserService(_userManager, _context, _tokenManager, currentUserService, tenantService);
     }
 
     public void Dispose()
@@ -84,7 +88,7 @@ public class UserServiceTests : IDisposable
             Id = userId,
             Email = "test@example.com",
             UserName = "test@example.com",
-            IsActive = true
+            Status = UserStatus.Active
         };
 
         var token = new object();
@@ -95,11 +99,11 @@ public class UserServiceTests : IDisposable
             .Returns(GetTokens(token));
 
         // Act
-        var result = await _sut.UpdateUserStatusAsync(userId, false);
+        var result = await _sut.UpdateUserStatusAsync(userId, UserStatus.Inactive);
 
         // Assert
         result.Success.Should().BeTrue();
-        user.IsActive.Should().BeFalse();
+        user.Status.Should().Be(UserStatus.Inactive);
         await _tokenManager.Received(1).TryRevokeAsync(token, Arg.Any<CancellationToken>());
     }
 

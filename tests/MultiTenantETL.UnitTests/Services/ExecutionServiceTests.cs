@@ -55,7 +55,7 @@ public class ExecutionServiceTests : IDisposable
         _tenantProvider.TenantId.Returns(tenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
 
-        var tenant = new Tenant { Id = tenantId, Name = "Test Tenant", Slug = "test", IsActive = true, CreatedAt = DateTime.UtcNow };
+        var tenant = new Tenant { Id = tenantId, Name = "Test Tenant", Slug = "test", Status = TenantStatus.Active, CreatedAt = DateTime.UtcNow };
         _context.Tenants.Add(tenant);
 
         var pipeline = new Pipeline
@@ -120,7 +120,7 @@ public class ExecutionServiceTests : IDisposable
         _tenantProvider.TenantId.Returns(tenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
 
-        var tenant = new Tenant { Id = tenantId, Name = "Test Tenant", Slug = "test", IsActive = true, CreatedAt = DateTime.UtcNow };
+        var tenant = new Tenant { Id = tenantId, Name = "Test Tenant", Slug = "test", Status = TenantStatus.Active, CreatedAt = DateTime.UtcNow };
         _context.Tenants.Add(tenant);
 
         var pipeline = new Pipeline
@@ -160,8 +160,8 @@ public class ExecutionServiceTests : IDisposable
         _tenantProvider.TenantId.Returns(otherTenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
 
-        var tenant = new Tenant { Id = tenantId, Name = "Test Tenant", Slug = "test", IsActive = true, CreatedAt = DateTime.UtcNow };
-        var otherTenant = new Tenant { Id = otherTenantId, Name = "Other Tenant", Slug = "other", IsActive = true, CreatedAt = DateTime.UtcNow };
+        var tenant = new Tenant { Id = tenantId, Name = "Test Tenant", Slug = "test", Status = TenantStatus.Active, CreatedAt = DateTime.UtcNow };
+        var otherTenant = new Tenant { Id = otherTenantId, Name = "Other Tenant", Slug = "other", Status = TenantStatus.Active, CreatedAt = DateTime.UtcNow };
         _context.Tenants.AddRange(tenant, otherTenant);
 
         var pipeline = new Pipeline
@@ -312,7 +312,7 @@ public class ExecutionServiceTests : IDisposable
         _tenantProvider.TenantId.Returns(tenantId);
         _currentUserService.GetTenantId().Returns(tenantId);
 
-        var tenant = new Tenant { Id = tenantId, Name = "Test Tenant", Slug = "test", IsActive = true, CreatedAt = DateTime.UtcNow };
+        var tenant = new Tenant { Id = tenantId, Name = "Test Tenant", Slug = "test", Status = TenantStatus.Active, CreatedAt = DateTime.UtcNow };
         _context.Tenants.Add(tenant);
 
         var pipeline = new Pipeline

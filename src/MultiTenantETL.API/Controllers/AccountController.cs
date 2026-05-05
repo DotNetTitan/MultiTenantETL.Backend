@@ -77,7 +77,7 @@ namespace MultiTenantETL.API.Controllers
                 FirstName = request.FirstName,
                 LastName = request.LastName,
                 CreatedAt = DateTime.UtcNow,
-                IsActive = true
+                Status = UserStatus.Active
             };
 
             var result = await _userManager.CreateAsync(user, request.Password);

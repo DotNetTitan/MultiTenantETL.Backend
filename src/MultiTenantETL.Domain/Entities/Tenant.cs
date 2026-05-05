@@ -1,4 +1,4 @@
-﻿namespace MultiTenantETL.Domain.Entities
+namespace MultiTenantETL.Domain.Entities
 {
     /// <summary>
     /// Represents a tenant organization in the multi-tenant system.
@@ -21,9 +21,19 @@
         public required string Slug { get; set; }
 
         /// <summary>
-        /// Indicates whether the tenant is active.
+        /// Current status of the tenant.
         /// </summary>
-        public bool IsActive { get; set; }
+        public MultiTenantETL.Domain.Enums.TenantStatus Status { get; set; } = MultiTenantETL.Domain.Enums.TenantStatus.Active;
+
+        /// <summary>
+        /// When the tenant was deleted (if applicable).
+        /// </summary>
+        public DateTime? DeletedAt { get; set; }
+
+        /// <summary>
+        /// Who deleted the tenant (if applicable).
+        /// </summary>
+        public Guid? DeletedBy { get; set; }
 
         /// <summary>
         /// When the tenant was created.

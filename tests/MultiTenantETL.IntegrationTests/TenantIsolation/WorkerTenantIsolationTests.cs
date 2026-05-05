@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Domain.Entities;
+using MultiTenantETL.Domain.Enums;
 using MultiTenantETL.Infrastructure.Identity;
 using MultiTenantETL.Infrastructure.Persistence;
 using Testcontainers.PostgreSql;
@@ -77,7 +78,7 @@ public class WorkerTenantIsolationTests : IAsyncLifetime
                 Id = tenant1Id,
                 Name = "Tenant 1",
                 Slug = "tenant1",
-                IsActive = true,
+                Status = TenantStatus.Active,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -86,7 +87,7 @@ public class WorkerTenantIsolationTests : IAsyncLifetime
                 Id = tenant2Id,
                 Name = "Tenant 2",
                 Slug = "tenant2",
-                IsActive = true,
+                Status = TenantStatus.Active,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -170,7 +171,7 @@ public class WorkerTenantIsolationTests : IAsyncLifetime
                 Id = tenant1Id,
                 Name = "Tenant A",
                 Slug = "tenant-a",
-                IsActive = true,
+                Status = TenantStatus.Active,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -179,7 +180,7 @@ public class WorkerTenantIsolationTests : IAsyncLifetime
                 Id = tenant2Id,
                 Name = "Tenant B",
                 Slug = "tenant-b",
-                IsActive = true,
+                Status = TenantStatus.Active,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -284,7 +285,7 @@ public class WorkerTenantIsolationTests : IAsyncLifetime
                 Id = tenantId,
                 Name = "Test Tenant",
                 Slug = "test",
-                IsActive = true,
+                Status = TenantStatus.Active,
                 CreatedAt = DateTime.UtcNow
             };
 

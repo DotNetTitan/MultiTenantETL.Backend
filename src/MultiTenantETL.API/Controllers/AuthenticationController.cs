@@ -123,7 +123,7 @@ namespace MultiTenantETL.API.Controllers
             if (result.Succeeded && result.Principal != null && !forceLogin)
             {
                 var user = await _userManager.GetUserAsync(result.Principal);
-                if (user != null && await _signInManager.CanSignInAsync(user) && user.IsActive)
+                if (user != null && await _signInManager.CanSignInAsync(user) && user.Status == MultiTenantETL.Domain.Enums.UserStatus.Active)
                 {
                     var principal = await CreateClaimsPrincipalAsync(user, request.GetScopes());
                     principal.SetScopes(request.GetScopes());
@@ -174,7 +174,7 @@ namespace MultiTenantETL.API.Controllers
             }
 
             // Check if user account is active
-            if (!user.IsActive)
+            if (user.Status != MultiTenantETL.Domain.Enums.UserStatus.Active)
             {
                 return Forbid(
                     authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
@@ -259,7 +259,7 @@ namespace MultiTenantETL.API.Controllers
             }
 
             // Check if user account is still active
-            if (!user.IsActive)
+            if (user.Status != MultiTenantETL.Domain.Enums.UserStatus.Active)
             {
                 return Forbid(
                     authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
@@ -282,7 +282,7 @@ namespace MultiTenantETL.API.Controllers
             var info = await HttpContext.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
             var user = info.Principal != null ? await _userManager.GetUserAsync(info.Principal) : null;
 
-            if (user == null || !await _signInManager.CanSignInAsync(user) || !user.IsActive)
+            if (user == null || !await _signInManager.CanSignInAsync(user) || user.Status != MultiTenantETL.Domain.Enums.UserStatus.Active)
             {
                 return Forbid(
                     authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,

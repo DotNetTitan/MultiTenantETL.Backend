@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Infrastructure.Identity;
+using MultiTenantETL.Domain.Enums;
 using MultiTenantETL.Infrastructure.Interfaces;
 using System.Collections.Immutable;
 using System.ComponentModel.DataAnnotations;
@@ -81,7 +82,7 @@ public class LoginModel : PageModel
         }
 
         // Check if account is active
-        if (!user.IsActive)
+        if (user.Status != UserStatus.Active)
         {
             await _auditService.LogAuthenticationAsync(
                 Domain.Constants.AuditActions.Authentication.LoginFailed,

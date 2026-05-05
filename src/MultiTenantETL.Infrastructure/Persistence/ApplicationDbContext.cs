@@ -57,6 +57,10 @@ namespace MultiTenantETL.Infrastructure.Persistence
             // Apply all configurations from the assembly
             builder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
 
+            // Global Query Filters to automatically hide deleted records
+            builder.Entity<ApplicationUser>().HasQueryFilter(u => u.Status != Domain.Enums.UserStatus.Deleted);
+            builder.Entity<Tenant>().HasQueryFilter(t => t.Status != Domain.Enums.TenantStatus.Deleted);
+
             // Apply global query filters for tenant isolation
             ApplyTenantQueryFilters(builder);
         }

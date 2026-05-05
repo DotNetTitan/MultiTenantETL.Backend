@@ -6,6 +6,7 @@ using MultiTenantETL.Infrastructure.Identity;
 using MultiTenantETL.Infrastructure.Interfaces;
 using MultiTenantETL.Infrastructure.Persistence;
 using OpenIddict.Abstractions;
+using MultiTenantETL.Application.Common.Interfaces;
 
 namespace MultiTenantETL.Infrastructure.Services;
 
@@ -14,15 +15,21 @@ public class UserService : IUserService
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ApplicationDbContext _context;
     private readonly IOpenIddictTokenManager _tokenManager;
+    private readonly ICurrentUserService _currentUserService;
+    private readonly ITenantService _tenantService;
 
     public UserService(
         UserManager<ApplicationUser> userManager,
         ApplicationDbContext context,
-        IOpenIddictTokenManager tokenManager)
+        IOpenIddictTokenManager tokenManager,
+        ICurrentUserService currentUserService,
+        ITenantService tenantService)
     {
         _userManager = userManager;
         _context = context;
         _tokenManager = tokenManager;
+        _currentUserService = currentUserService;
+        _tenantService = tenantService;
     }
 
     public async Task<ApplicationUser?> GetUserByIdAsync(Guid userId)
@@ -42,7 +49,7 @@ public class UserService : IUserService
     public async Task<(List<ApplicationUser> Users, int TotalCount)> GetUsersAsync(
         string? email = null,
         string? name = null,
-        bool? isActive = null,
+        UserStatus? status = null,
         Guid? tenantId = null,
         int page = 1,
         int pageSize = 20)
@@ -64,9 +71,9 @@ public class UserService : IUserService
                 u.LastName.Contains(name));
         }
 
-        if (isActive.HasValue)
+        if (status.HasValue)
         {
-            query = query.Where(u => u.IsActive == isActive.Value);
+            query = query.Where(u => u.Status == status.Value);
         }
 
         if (tenantId.HasValue)
@@ -130,7 +137,7 @@ public class UserService : IUserService
         return ServiceResult<ApplicationUser>.SuccessResult(user);
     }
 
-    public async Task<ServiceResult<ApplicationUser>> UpdateUserStatusAsync(Guid userId, bool isActive)
+    public async Task<ServiceResult<ApplicationUser>> UpdateUserStatusAsync(Guid userId, UserStatus status)
     {
         var user = await _userManager.FindByIdAsync(userId.ToString());
         if (user == null)
@@ -140,7 +147,7 @@ public class UserService : IUserService
                 "User not found");
         }
 
-        user.IsActive = isActive;
+        user.Status = status;
         var result = await _userManager.UpdateAsync(user);
 
         if (!result.Succeeded)
@@ -150,8 +157,9 @@ public class UserService : IUserService
                 string.Join(", ", result.Errors.Select(e => e.Description)));
         }
 
-        if (!isActive)
+        if (status != UserStatus.Active)
         {
+            await _userManager.UpdateSecurityStampAsync(user);
             await RevokeUserTokensAsync(userId);
         }
 
@@ -168,8 +176,19 @@ public class UserService : IUserService
                 "User not found");
         }
 
-        // Soft delete by deactivating
-        user.IsActive = false;
+        // 1. Scramble Email and Username to free them up
+        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        user.Email = $"{user.Email}_deleted_{timestamp}";
+        user.UserName = $"{user.UserName}_deleted_{timestamp}";
+        user.NormalizedEmail = user.Email.ToUpperInvariant();
+        user.NormalizedUserName = user.UserName.ToUpperInvariant();
+
+        // 2. Set Status and metadata
+        user.Status = UserStatus.Deleted;
+        user.DeletedAt = DateTime.UtcNow;
+        user.DeletedBy = _currentUserService.GetUserId();
+
+        await _userManager.UpdateSecurityStampAsync(user);
         var result = await _userManager.UpdateAsync(user);
 
         if (!result.Succeeded)
@@ -179,6 +198,24 @@ public class UserService : IUserService
                 string.Join(", ", result.Errors.Select(e => e.Description)));
         }
 
+        // 3. Remove all tenant memberships
+        var userTenants = await _context.UserTenants
+            .Where(ut => ut.UserId == userId)
+            .ToListAsync();
+        _context.UserTenants.RemoveRange(userTenants);
+
+        // 4. Soft-delete personal workspace tenant
+        var personalTenantSlug = $"user-{userId.ToString()[..8]}";
+        var personalTenant = await _context.Tenants
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(t => t.Slug == personalTenantSlug);
+        
+        if (personalTenant != null)
+        {
+            await _tenantService.DeleteTenantAsync(personalTenant.Id);
+        }
+
+        await _context.SaveChangesAsync();
         await RevokeUserTokensAsync(userId);
 
         return ServiceResult.SuccessResult();

@@ -7,6 +7,7 @@ using MultiTenantETL.Domain.Enums;
 using MultiTenantETL.Infrastructure.Identity;
 using MultiTenantETL.Infrastructure.Interfaces;
 using MultiTenantETL.Infrastructure.Persistence;
+using MultiTenantETL.Application.Common.Interfaces;
 
 namespace MultiTenantETL.Infrastructure.Services;
 
@@ -14,13 +15,16 @@ public class TenantService : ITenantService
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ApplicationDbContext _context;
+    private readonly ICurrentUserService _currentUserService;
 
     public TenantService(
         UserManager<ApplicationUser> userManager,
-        ApplicationDbContext context)
+        ApplicationDbContext context,
+        ICurrentUserService currentUserService)
     {
         _userManager = userManager;
         _context = context;
+        _currentUserService = currentUserService;
     }
 
     public async Task<ServiceResult<Tenant>> CreateTenantAsync(string name, string slug)
@@ -42,7 +46,7 @@ public class TenantService : ITenantService
             Id = Guid.NewGuid(),
             Name = name,
             Slug = slug,
-            IsActive = true,
+            Status = TenantStatus.Active,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -69,7 +73,6 @@ public class TenantService : ITenantService
     public async Task<List<Tenant>> GetAllTenantsAsync()
     {
         return await _context.Tenants
-            .IgnoreQueryFilters()
             .OrderBy(t => t.Name)
             .ToListAsync();
     }
@@ -77,14 +80,13 @@ public class TenantService : ITenantService
     public async Task<List<UserTenant>> GetUserTenantsAsync(Guid userId)
     {
         return await _context.UserTenants
-            .IgnoreQueryFilters()
             .Include(ut => ut.Tenant!)
             .Where(ut => ut.UserId == userId && ut.IsActive)
             .OrderBy(ut => ut.Tenant!.Name)
             .ToListAsync();
     }
 
-    public async Task<ServiceResult<Tenant>> UpdateTenantAsync(Guid tenantId, string name, bool? isActive)
+    public async Task<ServiceResult<Tenant>> UpdateTenantAsync(Guid tenantId, string name, TenantStatus? status)
     {
         var tenant = await _context.Tenants.FindAsync(tenantId);
         if (tenant == null)
@@ -95,9 +97,9 @@ public class TenantService : ITenantService
         }
 
         tenant.Name = name;
-        if (isActive.HasValue)
+        if (status.HasValue)
         {
-            tenant.IsActive = isActive.Value;
+            tenant.Status = status.Value;
         }
 
         await _context.SaveChangesAsync();
@@ -107,7 +109,10 @@ public class TenantService : ITenantService
 
     public async Task<ServiceResult> DeleteTenantAsync(Guid tenantId)
     {
-        var tenant = await _context.Tenants.FindAsync(tenantId);
+        var tenant = await _context.Tenants
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(t => t.Id == tenantId);
+
         if (tenant == null)
         {
             return ServiceResult.FailureResult(
@@ -115,8 +120,19 @@ public class TenantService : ITenantService
                 "Tenant not found");
         }
 
-        // Soft delete
-        tenant.IsActive = false;
+        if (tenant.Status == TenantStatus.Deleted)
+        {
+            return ServiceResult.SuccessResult(); // Already deleted, consider it a success
+        }
+
+        // Irreversible delete logic
+        tenant.Status = TenantStatus.Deleted;
+        tenant.DeletedAt = DateTime.UtcNow;
+        tenant.DeletedBy = _currentUserService.GetUserId();
+        
+        // Scramble slug to allow reuse
+        tenant.Slug = $"{tenant.Slug}_deleted_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
+        
         await _context.SaveChangesAsync();
 
         return ServiceResult.SuccessResult();
@@ -260,7 +276,7 @@ public class TenantService : ITenantService
         // Validate tenant exists
         var tenant = await _context.Tenants
             .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(t => t.Id == tenantId && t.IsActive);
+            .FirstOrDefaultAsync(t => t.Id == tenantId && t.Status == TenantStatus.Active);
 
         if (tenant == null)
         {
