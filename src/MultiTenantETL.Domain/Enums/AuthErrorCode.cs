@@ -12,7 +12,7 @@ namespace MultiTenantETL.Domain.Enums
 
         /// <summary>The account has been locked.</summary>
         AccountLocked,
-        
+
         /// <summary>The account is inactive or deleted.</summary>
         UserInactive,
 

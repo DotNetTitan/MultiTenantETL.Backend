@@ -2,11 +2,11 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MultiTenantETL.Application.Common.Interfaces;
+using MultiTenantETL.Domain.Enums;
 using MultiTenantETL.Infrastructure.Identity;
+using MultiTenantETL.Infrastructure.Interfaces;
 using MultiTenantETL.Infrastructure.Persistence;
 using MultiTenantETL.Infrastructure.Services;
-using MultiTenantETL.Domain.Enums;
-using MultiTenantETL.Infrastructure.Interfaces;
 using NSubstitute;
 using OpenIddict.Abstractions;
 

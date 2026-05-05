@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Domain.Entities;
+using MultiTenantETL.Domain.Enums;
 using MultiTenantETL.Infrastructure.Identity;
 using MultiTenantETL.Infrastructure.Persistence;
 using MultiTenantETL.Infrastructure.Services;
@@ -11,7 +12,6 @@ using OpenIddict.Abstractions;
 using System.Collections.Immutable;
 using System.Security.Claims;
 using CustomClaims = MultiTenantETL.Domain.Constants.ClaimTypes;
-using MultiTenantETL.Domain.Enums;
 
 namespace MultiTenantETL.UnitTests.Services;
 

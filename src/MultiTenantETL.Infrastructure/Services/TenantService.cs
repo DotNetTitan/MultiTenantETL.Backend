@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Common.Models;
 using MultiTenantETL.Application.Tenants.Models;
 using MultiTenantETL.Domain.Entities;
@@ -7,7 +8,6 @@ using MultiTenantETL.Domain.Enums;
 using MultiTenantETL.Infrastructure.Identity;
 using MultiTenantETL.Infrastructure.Interfaces;
 using MultiTenantETL.Infrastructure.Persistence;
-using MultiTenantETL.Application.Common.Interfaces;
 
 namespace MultiTenantETL.Infrastructure.Services;
 
@@ -129,10 +129,10 @@ public class TenantService : ITenantService
         tenant.Status = TenantStatus.Deleted;
         tenant.DeletedAt = DateTime.UtcNow;
         tenant.DeletedBy = _currentUserService.GetUserId();
-        
+
         // Scramble slug to allow reuse
         tenant.Slug = $"{tenant.Slug}_deleted_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
-        
+
         await _context.SaveChangesAsync();
 
         return ServiceResult.SuccessResult();

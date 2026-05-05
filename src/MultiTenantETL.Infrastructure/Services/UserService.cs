@@ -1,12 +1,12 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Common.Models;
 using MultiTenantETL.Domain.Enums;
 using MultiTenantETL.Infrastructure.Identity;
 using MultiTenantETL.Infrastructure.Interfaces;
 using MultiTenantETL.Infrastructure.Persistence;
 using OpenIddict.Abstractions;
-using MultiTenantETL.Application.Common.Interfaces;
 
 namespace MultiTenantETL.Infrastructure.Services;
 
@@ -209,7 +209,7 @@ public class UserService : IUserService
         var personalTenant = await _context.Tenants
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(t => t.Slug == personalTenantSlug);
-        
+
         if (personalTenant != null)
         {
             await _tenantService.DeleteTenantAsync(personalTenant.Id);
