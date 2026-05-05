@@ -68,6 +68,23 @@ public static class DbSeeder
             },
             new ApplicationRole
             {
+                Name = Roles.PlatformAdmin,
+                Description = "Platform administrator with cross-tenant operational access",
+                Permissions = new List<string>
+                {
+                    Permissions.Users.Manage,
+                    Permissions.Tenants.All,
+                    Permissions.TenantSettings.Manage,
+                    Permissions.TenantData.Manage,
+                    Permissions.Connectors.All,
+                    Permissions.Pipelines.All,
+                    Permissions.Executions.All,
+                    Permissions.Dashboard.Read,
+                    Permissions.ETL.Manage
+                }
+            },
+            new ApplicationRole
+            {
                 Name = Roles.User,
                 Description = "Standard user with read and basic write access",
                 Permissions = new List<string>

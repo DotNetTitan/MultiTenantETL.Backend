@@ -27,10 +27,10 @@ public class AuditLogsController : ControllerBase
 
     /// <summary>
     /// Get audit logs with filtering
-    /// SuperAdmin can see all logs, TenantAdmin can see their tenant's logs
+    /// SuperAdmin/PlatformAdmin can see all logs, TenantAdmin can see their tenant's logs
     /// </summary>
     [HttpGet]
-    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.TenantAdmin}")]
+    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin},{Roles.TenantAdmin}")]
     public async Task<IActionResult> GetAuditLogs(
         [FromQuery] Guid? userId = null,
         [FromQuery] string? action = null,
@@ -75,7 +75,7 @@ public class AuditLogsController : ControllerBase
     /// Get audit log by ID
     /// </summary>
     [HttpGet("{id:guid}")]
-    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.TenantAdmin}")]
+    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin},{Roles.TenantAdmin}")]
     public async Task<IActionResult> GetAuditLogById(Guid id)
     {
         var userRole = _currentUserService.GetRole();

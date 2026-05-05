@@ -80,6 +80,7 @@ public class TenantService : ITenantService
     public async Task<List<UserTenant>> GetUserTenantsAsync(Guid userId)
     {
         return await _context.UserTenants
+            .IgnoreQueryFilters()
             .Include(ut => ut.Tenant!)
             .Where(ut => ut.UserId == userId && ut.IsActive)
             .OrderBy(ut => ut.Tenant!.Name)
@@ -160,6 +161,7 @@ public class TenantService : ITenantService
 
         // Check if user is already in tenant
         var existingUserTenant = await _context.UserTenants
+            .IgnoreQueryFilters()
             .FirstOrDefaultAsync(ut => ut.UserId == userId && ut.TenantId == tenantId);
 
         if (existingUserTenant != null)
@@ -202,6 +204,7 @@ public class TenantService : ITenantService
     public async Task<ServiceResult> RemoveUserFromTenantAsync(Guid userId, Guid tenantId)
     {
         var userTenant = await _context.UserTenants
+            .IgnoreQueryFilters()
             .FirstOrDefaultAsync(ut => ut.UserId == userId && ut.TenantId == tenantId);
 
         if (userTenant == null)
@@ -229,6 +232,7 @@ public class TenantService : ITenantService
     public async Task<ServiceResult<UserTenant>> UpdateUserTenantRoleAsync(Guid userId, Guid tenantId, string roleCode)
     {
         var userTenant = await _context.UserTenants
+            .IgnoreQueryFilters()
             .Include(ut => ut.Tenant)
             .Include(ut => ut.User)
             .FirstOrDefaultAsync(ut => ut.UserId == userId && ut.TenantId == tenantId);

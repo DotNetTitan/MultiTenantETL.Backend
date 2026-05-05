@@ -16,7 +16,7 @@ public static class Policies
     public const string RequireSuperAdmin = "RequireSuperAdmin";
 
     /// <summary>
-    /// Policy requiring TenantAdmin or SuperAdmin role
+    /// Policy requiring TenantAdmin, PlatformAdmin, or SuperAdmin role
     /// </summary>
     public const string RequireTenantAdmin = "RequireTenantAdmin";
 }

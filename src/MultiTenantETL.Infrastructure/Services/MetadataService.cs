@@ -126,6 +126,7 @@ public class MetadataService : IMetadataService
             Roles = new RolesDto
             {
                 SuperAdmin = Roles.SuperAdmin,
+                PlatformAdmin = Roles.PlatformAdmin,
                 TenantAdmin = Roles.TenantAdmin,
                 User = Roles.User,
                 Viewer = Roles.Viewer

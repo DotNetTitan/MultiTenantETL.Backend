@@ -295,7 +295,7 @@ builder.Services.AddAuthorization(options =>
 
     options.AddPolicy(Policies.RequireTenantAdmin, policy =>
     {
-        policy.RequireRole(Roles.SuperAdmin, Roles.TenantAdmin);
+        policy.RequireRole(Roles.SuperAdmin, Roles.PlatformAdmin, Roles.TenantAdmin);
     });
 });
 

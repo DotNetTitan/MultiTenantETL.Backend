@@ -15,27 +15,30 @@ namespace MultiTenantETL.API.Controllers;
 public class TenantsController : ControllerBase
 {
     private readonly ITenantService _tenantService;
+    private readonly IUserService _userService;
     private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<TenantsController> _logger;
     private readonly IAuditService _auditService;
 
     public TenantsController(
         ITenantService tenantService,
+        IUserService userService,
         ICurrentUserService currentUserService,
         ILogger<TenantsController> logger,
         IAuditService auditService)
     {
         _tenantService = tenantService;
+        _userService = userService;
         _currentUserService = currentUserService;
         _logger = logger;
         _auditService = auditService;
     }
 
     /// <summary>
-    /// Get all tenants (SuperAdmin only)
+    /// Get all tenants (SuperAdmin or PlatformAdmin)
     /// </summary>
     [HttpGet]
-    [Authorize(Roles = Roles.SuperAdmin)]
+    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin}")]
     public async Task<IActionResult> GetAllTenants()
     {
         var tenants = await _tenantService.GetAllTenantsAsync();
@@ -91,11 +94,11 @@ public class TenantsController : ControllerBase
                 "Tenant not found"));
         }
 
-        // Check if user has access to this tenant (unless SuperAdmin)
+        // Check if user has access to this tenant (unless SuperAdmin/PlatformAdmin)
         var userId = _currentUserService.GetUserId();
         var userRole = _currentUserService.GetRole();
 
-        if (userRole != Roles.SuperAdmin)
+        if (userRole != Roles.SuperAdmin && userRole != Roles.PlatformAdmin)
         {
             var userTenants = await _tenantService.GetUserTenantsAsync(userId);
             if (!userTenants.Any(ut => ut.TenantId == id))
@@ -117,10 +120,10 @@ public class TenantsController : ControllerBase
     }
 
     /// <summary>
-    /// Create a new tenant (SuperAdmin only)
+    /// Create a new tenant (SuperAdmin or PlatformAdmin)
     /// </summary>
     [HttpPost]
-    [Authorize(Roles = Roles.SuperAdmin)]
+    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin}")]
     public async Task<IActionResult> CreateTenant([FromBody] CreateTenantRequest request)
     {
         var result = await _tenantService.CreateTenantAsync(request.Name, request.Slug);
@@ -151,10 +154,10 @@ public class TenantsController : ControllerBase
     }
 
     /// <summary>
-    /// Update a tenant (SuperAdmin or TenantAdmin)
+    /// Update a tenant (SuperAdmin, PlatformAdmin, or TenantAdmin)
     /// </summary>
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.TenantAdmin}")]
+    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin},{Roles.TenantAdmin}")]
     public async Task<IActionResult> UpdateTenant(Guid id, [FromBody] UpdateTenantRequest request)
     {
         // TenantAdmin can only update their own tenant
@@ -221,10 +224,10 @@ public class TenantsController : ControllerBase
     }
 
     /// <summary>
-    /// Get all users in a tenant (SuperAdmin or TenantAdmin)
+    /// Get all users in a tenant (SuperAdmin, PlatformAdmin, or TenantAdmin)
     /// </summary>
     [HttpGet("{id:guid}/users")]
-    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.TenantAdmin}")]
+    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin},{Roles.TenantAdmin}")]
     public async Task<IActionResult> GetTenantUsers(Guid id)
     {
         // TenantAdmin can only view their own tenant's users
@@ -255,12 +258,25 @@ public class TenantsController : ControllerBase
     }
 
     /// <summary>
-    /// Add a user to a tenant (SuperAdmin or TenantAdmin)
+    /// Add a user to a tenant (SuperAdmin, PlatformAdmin, or TenantAdmin)
     /// </summary>
     [HttpPost("{id:guid}/users")]
-    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.TenantAdmin}")]
+    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin},{Roles.TenantAdmin}")]
     public async Task<IActionResult> AddUserToTenant(Guid id, [FromBody] AddUserToTenantRequest request)
     {
+        var currentUserRole = _currentUserService.GetRole();
+        if (currentUserRole != Roles.SuperAdmin && await IsSuperAdminUserAsync(request.UserId))
+        {
+            return Forbid();
+        }
+
+        if (request.RoleCode == Roles.SuperAdmin || request.RoleCode == Roles.PlatformAdmin)
+        {
+            return BadRequest(new ErrorResponse(
+                Domain.Enums.AuthErrorCode.ValidationError,
+                "Tenant membership role cannot be a global role"));
+        }
+
         // Validate tenant ID matches route
         if (id != request.TenantId)
         {
@@ -270,8 +286,7 @@ public class TenantsController : ControllerBase
         }
 
         // TenantAdmin can only add users to their own tenant
-        var userRole = _currentUserService.GetRole();
-        if (userRole == Roles.TenantAdmin)
+        if (currentUserRole == Roles.TenantAdmin)
         {
             var currentTenantId = _currentUserService.GetTenantId();
             if (id != currentTenantId)
@@ -312,15 +327,20 @@ public class TenantsController : ControllerBase
     }
 
     /// <summary>
-    /// Remove a user from a tenant (SuperAdmin or TenantAdmin)
+    /// Remove a user from a tenant (SuperAdmin, PlatformAdmin, or TenantAdmin)
     /// </summary>
     [HttpDelete("{tenantId:guid}/users/{userId:guid}")]
-    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.TenantAdmin}")]
+    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin},{Roles.TenantAdmin}")]
     public async Task<IActionResult> RemoveUserFromTenant(Guid tenantId, Guid userId)
     {
+        var currentUserRole = _currentUserService.GetRole();
+        if (currentUserRole != Roles.SuperAdmin && await IsSuperAdminUserAsync(userId))
+        {
+            return Forbid();
+        }
+
         // TenantAdmin can only remove users from their own tenant
-        var userRole = _currentUserService.GetRole();
-        if (userRole == Roles.TenantAdmin)
+        if (currentUserRole == Roles.TenantAdmin)
         {
             var currentTenantId = _currentUserService.GetTenantId();
             if (tenantId != currentTenantId)
@@ -348,18 +368,30 @@ public class TenantsController : ControllerBase
     }
 
     /// <summary>
-    /// Update a user's role within a tenant (SuperAdmin or TenantAdmin)
+    /// Update a user's role within a tenant (SuperAdmin, PlatformAdmin, or TenantAdmin)
     /// </summary>
     [HttpPut("{tenantId:guid}/users/{userId:guid}/role")]
-    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.TenantAdmin}")]
+    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin},{Roles.TenantAdmin}")]
     public async Task<IActionResult> UpdateUserTenantRole(
         Guid tenantId,
         Guid userId,
         [FromBody] UpdateUserTenantRoleRequest request)
     {
+        var currentUserRole = _currentUserService.GetRole();
+        if (currentUserRole != Roles.SuperAdmin && await IsSuperAdminUserAsync(userId))
+        {
+            return Forbid();
+        }
+
+        if (request.RoleCode == Roles.SuperAdmin || request.RoleCode == Roles.PlatformAdmin)
+        {
+            return BadRequest(new ErrorResponse(
+                Domain.Enums.AuthErrorCode.ValidationError,
+                "Tenant membership role cannot be a global role"));
+        }
+
         // TenantAdmin can only update roles in their own tenant
-        var userRole = _currentUserService.GetRole();
-        if (userRole == Roles.TenantAdmin)
+        if (currentUserRole == Roles.TenantAdmin)
         {
             var currentTenantId = _currentUserService.GetTenantId();
             if (tenantId != currentTenantId)
@@ -394,5 +426,11 @@ public class TenantsController : ControllerBase
             roleCode = result.Data.RoleCode,
             message = "User role updated successfully"
         });
+    }
+
+    private async Task<bool> IsSuperAdminUserAsync(Guid userId)
+    {
+        var roles = await _userService.GetUserRolesAsync(userId);
+        return roles.Contains(Roles.SuperAdmin);
     }
 }

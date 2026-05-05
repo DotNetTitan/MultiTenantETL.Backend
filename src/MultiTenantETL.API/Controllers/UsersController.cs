@@ -122,10 +122,10 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
-    /// Search/list users (SuperAdmin or TenantAdmin)
+    /// Search/list users (SuperAdmin, PlatformAdmin, or TenantAdmin)
     /// </summary>
     [HttpGet]
-    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.TenantAdmin}")]
+    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin},{Roles.TenantAdmin}")]
     public async Task<IActionResult> GetUsers([FromQuery] UserSearchRequest request)
     {
         var userRole = _currentUserService.GetRole();
@@ -182,10 +182,10 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
-    /// Get user by ID (SuperAdmin or TenantAdmin for their tenant users)
+    /// Get user by ID (SuperAdmin, PlatformAdmin, or TenantAdmin for their tenant users)
     /// </summary>
     [HttpGet("{id:guid}")]
-    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.TenantAdmin}")]
+    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin},{Roles.TenantAdmin}")]
     public async Task<IActionResult> GetUserById(Guid id)
     {
         var user = await _userService.GetUserByIdAsync(id);
@@ -238,12 +238,18 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
-    /// Update user (SuperAdmin only)
+    /// Update user (SuperAdmin or PlatformAdmin)
     /// </summary>
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = Roles.SuperAdmin)]
+    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin}")]
     public async Task<IActionResult> UpdateUser(Guid id, [FromBody] UpdateUserRequest request)
     {
+        var currentUserRole = _currentUserService.GetRole();
+        if (currentUserRole != Roles.SuperAdmin && await IsSuperAdminUserAsync(id))
+        {
+            return Forbid();
+        }
+
         var result = await _userService.UpdateUserAsync(
             id,
             request.FirstName,
@@ -402,7 +408,7 @@ public class UsersController : ControllerBase
     /// Get user's tenant memberships
     /// </summary>
     [HttpGet("{id:guid}/tenants")]
-    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.TenantAdmin}")]
+    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin},{Roles.TenantAdmin}")]
     public async Task<IActionResult> GetUserTenants(Guid id)
     {
         var userRole = _currentUserService.GetRole();
@@ -433,15 +439,27 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
-    /// Add user to tenant (SuperAdmin or TenantAdmin)
+    /// Add user to tenant (SuperAdmin, PlatformAdmin, or TenantAdmin)
     /// </summary>
     [HttpPost("{id:guid}/tenants")]
-    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.TenantAdmin}")]
+    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin},{Roles.TenantAdmin}")]
     public async Task<IActionResult> AddUserToTenant(Guid id, [FromBody] AddUserToTenantRequest request)
     {
+        var currentUserRole = _currentUserService.GetRole();
+        if (currentUserRole != Roles.SuperAdmin && await IsSuperAdminUserAsync(id))
+        {
+            return Forbid();
+        }
+
+        if (request.RoleCode == Roles.SuperAdmin || request.RoleCode == Roles.PlatformAdmin)
+        {
+            return BadRequest(new ErrorResponse(
+                Domain.Enums.AuthErrorCode.ValidationError,
+                "Tenant membership role cannot be a global role"));
+        }
+
         // TenantAdmin can only add users to their own tenant
-        var userRole = _currentUserService.GetRole();
-        if (userRole == Roles.TenantAdmin)
+        if (currentUserRole == Roles.TenantAdmin)
         {
             var currentTenantId = _currentUserService.GetTenantId();
             if (request.TenantId != currentTenantId)
@@ -470,15 +488,20 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
-    /// Remove user from tenant (SuperAdmin or TenantAdmin)
+    /// Remove user from tenant (SuperAdmin, PlatformAdmin, or TenantAdmin)
     /// </summary>
     [HttpDelete("{userId:guid}/tenants/{tenantId:guid}")]
-    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.TenantAdmin}")]
+    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin},{Roles.TenantAdmin}")]
     public async Task<IActionResult> RemoveUserFromTenant(Guid userId, Guid tenantId)
     {
+        var currentUserRole = _currentUserService.GetRole();
+        if (currentUserRole != Roles.SuperAdmin && await IsSuperAdminUserAsync(userId))
+        {
+            return Forbid();
+        }
+
         // TenantAdmin can only remove users from their own tenant
-        var userRole = _currentUserService.GetRole();
-        if (userRole == Roles.TenantAdmin)
+        if (currentUserRole == Roles.TenantAdmin)
         {
             var currentTenantId = _currentUserService.GetTenantId();
             if (tenantId != currentTenantId)
@@ -506,15 +529,27 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
-    /// Update user's role in tenant (SuperAdmin or TenantAdmin)
+    /// Update user's role in tenant (SuperAdmin, PlatformAdmin, or TenantAdmin)
     /// </summary>
     [HttpPut("{userId:guid}/tenants/{tenantId:guid}/role")]
-    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.TenantAdmin}")]
+    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin},{Roles.TenantAdmin}")]
     public async Task<IActionResult> UpdateUserTenantRole(Guid userId, Guid tenantId, [FromBody] UpdateUserTenantRoleRequest request)
     {
+        var currentUserRole = _currentUserService.GetRole();
+        if (currentUserRole != Roles.SuperAdmin && await IsSuperAdminUserAsync(userId))
+        {
+            return Forbid();
+        }
+
+        if (request.RoleCode == Roles.SuperAdmin || request.RoleCode == Roles.PlatformAdmin)
+        {
+            return BadRequest(new ErrorResponse(
+                Domain.Enums.AuthErrorCode.ValidationError,
+                "Tenant membership role cannot be a global role"));
+        }
+
         // TenantAdmin can only update roles in their own tenant
-        var userRole = _currentUserService.GetRole();
-        if (userRole == Roles.TenantAdmin)
+        if (currentUserRole == Roles.TenantAdmin)
         {
             var currentTenantId = _currentUserService.GetTenantId();
             if (tenantId != currentTenantId)
@@ -540,5 +575,11 @@ public class UsersController : ControllerBase
             $"User role updated to {request.RoleCode} in tenant");
 
         return Ok(new { message = "User role updated successfully" });
+    }
+
+    private async Task<bool> IsSuperAdminUserAsync(Guid userId)
+    {
+        var roles = await _userService.GetUserRolesAsync(userId);
+        return roles.Contains(Roles.SuperAdmin);
     }
 }

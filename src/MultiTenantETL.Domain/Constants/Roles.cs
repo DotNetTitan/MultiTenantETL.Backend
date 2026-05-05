@@ -11,6 +11,11 @@ public static class Roles
     public const string SuperAdmin = "SuperAdmin";
 
     /// <summary>
+    /// Platform administrator with cross-tenant operational access but no SuperAdmin security powers
+    /// </summary>
+    public const string PlatformAdmin = "PlatformAdmin";
+
+    /// <summary>
     /// Tenant administrator with full access within their tenant
     /// </summary>
     public const string TenantAdmin = "TenantAdmin";

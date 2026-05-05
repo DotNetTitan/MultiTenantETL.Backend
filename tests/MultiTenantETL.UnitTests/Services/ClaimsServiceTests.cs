@@ -266,6 +266,123 @@ public class ClaimsServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task BuildClaimsPrincipalAsync_PlatformAdminWithTenant_UsesPlatformAdminPermissions()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var tenant = new Tenant
+        {
+            Id = tenantId,
+            Name = "Ops Tenant",
+            Slug = "ops",
+            Status = TenantStatus.Active,
+            CreatedAt = DateTime.UtcNow
+        };
+        var user = new ApplicationUser
+        {
+            Id = userId,
+            FirstName = "Platform",
+            LastName = "Admin",
+            Email = "platformadmin@example.com",
+            UserName = "platformadmin@example.com",
+            CurrentTenantId = tenantId
+        };
+
+        var userTenant = new UserTenant
+        {
+            UserId = userId,
+            TenantId = tenantId,
+            RoleCode = "User",
+            IsActive = true,
+            Tenant = tenant,
+            User = user
+        };
+
+        _context.Tenants.Add(tenant);
+        _context.UserTenants.Add(userTenant);
+        await _context.SaveChangesAsync();
+
+        var mockPrincipal = new ClaimsPrincipal(new ClaimsIdentity());
+        _signInManager.CreateUserPrincipalAsync(user).Returns(mockPrincipal);
+        _userManager.GetRolesAsync(user).Returns(new List<string> { "PlatformAdmin" });
+
+        var platformAdminRole = new ApplicationRole
+        {
+            Name = "PlatformAdmin",
+            Description = "Platform Administrator",
+            Permissions = new List<string> { "tenants.*", "users.manage" }
+        };
+        _roleManager.FindByNameAsync("PlatformAdmin").Returns(platformAdminRole);
+
+        // Act
+        var result = await _sut.BuildClaimsPrincipalAsync(user, ImmutableArray<string>.Empty);
+
+        // Assert
+        result.Should().NotBeNull();
+        var identity = (ClaimsIdentity)result.Identity!;
+
+        var roleClaims = identity.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
+        roleClaims.Should().Contain("PlatformAdmin");
+        roleClaims.Should().Contain("User");
+
+        var permissionClaims = identity.FindAll(CustomClaims.Permission).Select(c => c.Value).ToList();
+        permissionClaims.Should().Contain("tenants.*");
+        permissionClaims.Should().Contain("users.manage");
+        identity.FindFirst(CustomClaims.TenantName)?.Value.Should().Be("Ops Tenant");
+    }
+
+    [Fact]
+    public async Task BuildClaimsPrincipalAsync_PlatformAdminWithoutMembership_UsesPlatformAdminPermissions()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var tenant = new Tenant
+        {
+            Id = tenantId,
+            Name = "Cross Tenant",
+            Slug = "cross-tenant",
+            Status = TenantStatus.Active,
+            CreatedAt = DateTime.UtcNow
+        };
+        var user = new ApplicationUser
+        {
+            Id = userId,
+            FirstName = "Cross",
+            LastName = "TenantAdmin",
+            Email = "cross@example.com",
+            UserName = "cross@example.com",
+            CurrentTenantId = tenantId
+        };
+
+        _context.Tenants.Add(tenant);
+        await _context.SaveChangesAsync();
+
+        var mockPrincipal = new ClaimsPrincipal(new ClaimsIdentity());
+        _signInManager.CreateUserPrincipalAsync(user).Returns(mockPrincipal);
+        _userManager.GetRolesAsync(user).Returns(new List<string> { "PlatformAdmin" });
+
+        var platformAdminRole = new ApplicationRole
+        {
+            Name = "PlatformAdmin",
+            Description = "Platform Administrator",
+            Permissions = new List<string> { "tenants.*" }
+        };
+        _roleManager.FindByNameAsync("PlatformAdmin").Returns(platformAdminRole);
+
+        // Act
+        var result = await _sut.BuildClaimsPrincipalAsync(user, ImmutableArray<string>.Empty);
+
+        // Assert
+        result.Should().NotBeNull();
+        var identity = (ClaimsIdentity)result.Identity!;
+
+        identity.FindFirst(CustomClaims.TenantName)?.Value.Should().Be("Cross Tenant");
+        identity.FindAll(CustomClaims.Permission).Should().Contain(c => c.Value == "tenants.*");
+    }
+
+    [Fact]
     public async Task BuildClaimsPrincipalAsync_InactiveTenantMembership_DoesNotAddTenantClaims()
     {
         // Arrange

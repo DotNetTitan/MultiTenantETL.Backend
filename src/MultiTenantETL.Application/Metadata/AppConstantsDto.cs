@@ -13,6 +13,7 @@ public class AppConstantsDto
 public class RolesDto
 {
     public string SuperAdmin { get; set; } = string.Empty;
+    public string PlatformAdmin { get; set; } = string.Empty;
     public string TenantAdmin { get; set; } = string.Empty;
     public string User { get; set; } = string.Empty;
     public string Viewer { get; set; } = string.Empty;

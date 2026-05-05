@@ -92,12 +92,14 @@ public class ClaimsService : IClaimsService
                 // Add permission claims based on the highest role
                 var roleForPermissions = globalRoles.Contains(Domain.Constants.Roles.SuperAdmin)
                     ? Domain.Constants.Roles.SuperAdmin
+                    : globalRoles.Contains(Domain.Constants.Roles.PlatformAdmin)
+                        ? Domain.Constants.Roles.PlatformAdmin
                     : userTenant.RoleCode;
                 await AddPermissionClaimsAsync(identity, roleForPermissions);
             }
-            else if (globalRoles.Contains(Domain.Constants.Roles.SuperAdmin))
+            else if (globalRoles.Contains(Domain.Constants.Roles.SuperAdmin) || globalRoles.Contains(Domain.Constants.Roles.PlatformAdmin))
             {
-                // SuperAdmin can access any tenant, even without UserTenant record
+                // SuperAdmin/PlatformAdmin can access any tenant, even without UserTenant record
                 // Add tenant name if tenant exists
                 var tenant = await _context.Tenants
                     .IgnoreQueryFilters()
@@ -107,8 +109,11 @@ public class ClaimsService : IClaimsService
                     identity.SetClaim(CustomClaims.TenantName, tenant.Name);
                 }
 
-                // Add SuperAdmin permissions
-                await AddPermissionClaimsAsync(identity, Domain.Constants.Roles.SuperAdmin);
+                // Add highest global role permissions
+                await AddPermissionClaimsAsync(identity,
+                    globalRoles.Contains(Domain.Constants.Roles.SuperAdmin)
+                        ? Domain.Constants.Roles.SuperAdmin
+                        : Domain.Constants.Roles.PlatformAdmin);
             }
         }
         else if (globalRoles.Any())
