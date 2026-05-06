@@ -38,9 +38,14 @@ public class TenantsController : ControllerBase
     /// Get all tenants (SuperAdmin or PlatformAdmin)
     /// </summary>
     [HttpGet]
-    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin}")]
+    [Authorize]
     public async Task<IActionResult> GetAllTenants()
     {
+        if (!await IsGlobalAdminAsync())
+        {
+            return Forbid();
+        }
+
         var tenants = await _tenantService.GetAllTenantsAsync();
 
         var response = tenants.Select(t => new TenantResponse
@@ -123,9 +128,14 @@ public class TenantsController : ControllerBase
     /// Create a new tenant (SuperAdmin or PlatformAdmin)
     /// </summary>
     [HttpPost]
-    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin}")]
+    [Authorize]
     public async Task<IActionResult> CreateTenant([FromBody] CreateTenantRequest request)
     {
+        if (!await IsGlobalAdminAsync())
+        {
+            return Forbid();
+        }
+
         var result = await _tenantService.CreateTenantAsync(request.Name, request.Slug);
 
         if (!result.Success)
@@ -157,9 +167,13 @@ public class TenantsController : ControllerBase
     /// Update a tenant (SuperAdmin or PlatformAdmin)
     /// </summary>
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin}")]
+    [Authorize]
     public async Task<IActionResult> UpdateTenant(Guid id, [FromBody] UpdateTenantRequest request)
     {
+        if (!await IsGlobalAdminAsync())
+        {
+            return Forbid();
+        }
 
         var result = await _tenantService.UpdateTenantAsync(id, request.Name, request.Status);
 
@@ -251,9 +265,14 @@ public class TenantsController : ControllerBase
     /// Add a user to a tenant (SuperAdmin or PlatformAdmin)
     /// </summary>
     [HttpPost("{id:guid}/users")]
-    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin}")]
+    [Authorize]
     public async Task<IActionResult> AddUserToTenant(Guid id, [FromBody] AddUserToTenantRequest request)
     {
+        if (!await IsGlobalAdminAsync())
+        {
+            return Forbid();
+        }
+
         var currentUserRole = _currentUserService.GetRole();
         if (currentUserRole != Roles.SuperAdmin && await IsSuperAdminUserAsync(request.UserId))
         {
@@ -312,9 +331,14 @@ public class TenantsController : ControllerBase
     /// Remove a user from a tenant (SuperAdmin or PlatformAdmin)
     /// </summary>
     [HttpDelete("{tenantId:guid}/users/{userId:guid}")]
-    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin}")]
+    [Authorize]
     public async Task<IActionResult> RemoveUserFromTenant(Guid tenantId, Guid userId)
     {
+        if (!await IsGlobalAdminAsync())
+        {
+            return Forbid();
+        }
+
         var currentUserRole = _currentUserService.GetRole();
         if (currentUserRole != Roles.SuperAdmin && await IsSuperAdminUserAsync(userId))
         {
@@ -345,12 +369,16 @@ public class TenantsController : ControllerBase
     /// Update a user's role within a tenant (SuperAdmin or PlatformAdmin)
     /// </summary>
     [HttpPut("{tenantId:guid}/users/{userId:guid}/role")]
-    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin}")]
+    [Authorize]
     public async Task<IActionResult> UpdateUserTenantRole(
         Guid tenantId,
         Guid userId,
         [FromBody] UpdateUserTenantRoleRequest request)
     {
+        if (!await IsGlobalAdminAsync())
+        {
+            return Forbid();
+        }
         var currentUserRole = _currentUserService.GetRole();
         if (currentUserRole != Roles.SuperAdmin && await IsSuperAdminUserAsync(userId))
         {
@@ -398,5 +426,12 @@ public class TenantsController : ControllerBase
     {
         var roles = await _userService.GetUserRolesAsync(userId);
         return roles.Contains(Roles.SuperAdmin);
+    }
+
+    private async Task<bool> IsGlobalAdminAsync()
+    {
+        var userId = _currentUserService.GetUserId();
+        var roles = await _userService.GetUserRolesAsync(userId);
+        return roles.Contains(Roles.SuperAdmin) || roles.Contains(Roles.PlatformAdmin);
     }
 }
