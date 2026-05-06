@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using MultiTenantETL.API.Authorization;
 using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Common.Models;
 using MultiTenantETL.Application.Interfaces;
@@ -20,19 +21,22 @@ public class UsersController : ControllerBase
     private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<UsersController> _logger;
     private readonly IAuditService _auditService;
+    private readonly IAdminAuthorizationService _adminAuthorizationService;
 
     public UsersController(
         IUserService userService,
         ITenantService tenantService,
         ICurrentUserService currentUserService,
         ILogger<UsersController> logger,
-        IAuditService auditService)
+        IAuditService auditService,
+        IAdminAuthorizationService adminAuthorizationService)
     {
         _userService = userService;
         _tenantService = tenantService;
         _currentUserService = currentUserService;
         _logger = logger;
         _auditService = auditService;
+        _adminAuthorizationService = adminAuthorizationService;
     }
 
     /// <summary>
@@ -238,23 +242,20 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
-    /// Update user (SuperAdmin or PlatformAdmin)
+    /// Update user (global admins)
     /// </summary>
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin}")]
+    [Authorize]
     public async Task<IActionResult> UpdateUser(Guid id, [FromBody] UpdateUserRequest request)
     {
-        var currentUserRole = _currentUserService.GetRole();
-        var currentUserId = _currentUserService.GetUserId();
-
-        // Non-SuperAdmin users cannot edit SuperAdmin/PlatformAdmin accounts,
-        // except they can edit their own profile details.
-        if (currentUserRole != Roles.SuperAdmin && id != currentUserId)
+        if (!await _adminAuthorizationService.IsGlobalAdminAsync())
         {
-            if (await IsSuperAdminUserAsync(id) || await IsPlatformAdminUserAsync(id))
-            {
-                return Forbid();
-            }
+            return Forbid();
+        }
+
+        if (!await _adminAuthorizationService.CanMutateGlobalAdminTargetAsync(id, allowSelf: true))
+        {
+            return Forbid();
         }
 
         var result = await _userService.UpdateUserAsync(
@@ -446,19 +447,20 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
-    /// Add user to tenant (SuperAdmin or PlatformAdmin)
+    /// Add user to tenant (global admins)
     /// </summary>
     [HttpPost("{id:guid}/tenants")]
-    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin}")]
+    [Authorize]
     public async Task<IActionResult> AddUserToTenant(Guid id, [FromBody] AddUserToTenantRequest request)
     {
-        var currentUserRole = _currentUserService.GetRole();
-        if (currentUserRole != Roles.SuperAdmin)
+        if (!await _adminAuthorizationService.IsGlobalAdminAsync())
         {
-            if (await IsSuperAdminUserAsync(id) || await IsPlatformAdminUserAsync(id))
-            {
-                return Forbid();
-            }
+            return Forbid();
+        }
+
+        if (!await _adminAuthorizationService.CanMutateGlobalAdminTargetAsync(id))
+        {
+            return Forbid();
         }
 
         if (request.RoleCode == Roles.SuperAdmin || request.RoleCode == Roles.PlatformAdmin)
@@ -490,19 +492,20 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
-    /// Remove user from tenant (SuperAdmin or PlatformAdmin)
+    /// Remove user from tenant (global admins)
     /// </summary>
     [HttpDelete("{userId:guid}/tenants/{tenantId:guid}")]
-    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin}")]
+    [Authorize]
     public async Task<IActionResult> RemoveUserFromTenant(Guid userId, Guid tenantId)
     {
-        var currentUserRole = _currentUserService.GetRole();
-        if (currentUserRole != Roles.SuperAdmin)
+        if (!await _adminAuthorizationService.IsGlobalAdminAsync())
         {
-            if (await IsSuperAdminUserAsync(userId) || await IsPlatformAdminUserAsync(userId))
-            {
-                return Forbid();
-            }
+            return Forbid();
+        }
+
+        if (!await _adminAuthorizationService.CanMutateGlobalAdminTargetAsync(userId))
+        {
+            return Forbid();
         }
 
 
@@ -526,19 +529,20 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
-    /// Update user's role in tenant (SuperAdmin or PlatformAdmin)
+    /// Update user's role in tenant (global admins)
     /// </summary>
     [HttpPut("{userId:guid}/tenants/{tenantId:guid}/role")]
-    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin}")]
+    [Authorize]
     public async Task<IActionResult> UpdateUserTenantRole(Guid userId, Guid tenantId, [FromBody] UpdateUserTenantRoleRequest request)
     {
-        var currentUserRole = _currentUserService.GetRole();
-        if (currentUserRole != Roles.SuperAdmin)
+        if (!await _adminAuthorizationService.IsGlobalAdminAsync())
         {
-            if (await IsSuperAdminUserAsync(userId) || await IsPlatformAdminUserAsync(userId))
-            {
-                return Forbid();
-            }
+            return Forbid();
+        }
+
+        if (!await _adminAuthorizationService.CanMutateGlobalAdminTargetAsync(userId))
+        {
+            return Forbid();
         }
 
         if (request.RoleCode == Roles.SuperAdmin || request.RoleCode == Roles.PlatformAdmin)
@@ -569,15 +573,4 @@ public class UsersController : ControllerBase
         return Ok(new { message = "User role updated successfully" });
     }
 
-    private async Task<bool> IsSuperAdminUserAsync(Guid userId)
-    {
-        var roles = await _userService.GetUserRolesAsync(userId);
-        return roles.Contains(Roles.SuperAdmin);
-    }
-
-    private async Task<bool> IsPlatformAdminUserAsync(Guid userId)
-    {
-        var roles = await _userService.GetUserRolesAsync(userId);
-        return roles.Contains(Roles.PlatformAdmin);
-    }
 }

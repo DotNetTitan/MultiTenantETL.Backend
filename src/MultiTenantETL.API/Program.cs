@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using MultiTenantETL.API.Authorization;
 using MultiTenantETL.API.Middleware;
 using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Interfaces;
@@ -509,6 +510,7 @@ builder.Services.AddScoped<MultiTenantETL.Infrastructure.Interfaces.ITenantServi
 builder.Services.AddScoped<MultiTenantETL.Infrastructure.Interfaces.IUserService,
     MultiTenantETL.Infrastructure.Services.UserService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
+builder.Services.AddScoped<IAdminAuthorizationService, AdminAuthorizationService>();
 builder.Services.AddSingleton<IInputSanitizer, InputSanitizer>();
 builder.Services.AddSingleton<IMetadataService, MetadataService>();
 builder.Services.AddSingleton<IEncryptionService, MultiTenantETL.Infrastructure.Security.EncryptionService>();

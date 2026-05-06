@@ -40,6 +40,11 @@ public interface IAuditService
         DateTime? endDate = null,
         int page = 1,
         int pageSize = 50);
+
+    /// <summary>
+    /// Get a single audit log by ID
+    /// </summary>
+    Task<AuditLogDto?> GetAuditLogByIdAsync(Guid id, Guid? tenantId = null);
 }
 
 /// <summary>

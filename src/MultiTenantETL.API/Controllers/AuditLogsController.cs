@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MultiTenantETL.Application.Common.Interfaces;
+using MultiTenantETL.API.Authorization;
 using MultiTenantETL.Application.Interfaces;
-using MultiTenantETL.Domain.Constants;
 
 namespace MultiTenantETL.API.Controllers;
 
@@ -13,23 +13,26 @@ public class AuditLogsController : ControllerBase
 {
     private readonly IAuditService _auditService;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IAdminAuthorizationService _adminAuthorizationService;
     private readonly ILogger<AuditLogsController> _logger;
 
     public AuditLogsController(
         IAuditService auditService,
         ICurrentUserService currentUserService,
+        IAdminAuthorizationService adminAuthorizationService,
         ILogger<AuditLogsController> logger)
     {
         _auditService = auditService;
         _currentUserService = currentUserService;
+        _adminAuthorizationService = adminAuthorizationService;
         _logger = logger;
     }
 
     /// <summary>
-    /// Get audit logs with filtering (SuperAdmin/PlatformAdmin)
+    /// Get audit logs with filtering (global admins)
     /// </summary>
     [HttpGet]
-    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin}")]
+    [Authorize]
     public async Task<IActionResult> GetAuditLogs(
         [FromQuery] Guid? userId = null,
         [FromQuery] string? action = null,
@@ -40,6 +43,11 @@ public class AuditLogsController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50)
     {
+        if (!await _adminAuthorizationService.IsGlobalAdminAsync())
+        {
+            return Forbid();
+        }
+
         Guid? tenantFilter = null;
 
         var (logs, totalCount) = await _auditService.GetAuditLogsAsync(
@@ -67,15 +75,15 @@ public class AuditLogsController : ControllerBase
     /// Get audit log by ID
     /// </summary>
     [HttpGet("{id:guid}")]
-    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin}")]
+    [Authorize]
     public async Task<IActionResult> GetAuditLogById(Guid id)
     {
-        var (logs, _) = await _auditService.GetAuditLogsAsync(
-            null,
-            page: 1,
-            pageSize: 1);
+        if (!await _adminAuthorizationService.IsGlobalAdminAsync())
+        {
+            return Forbid();
+        }
 
-        var log = logs.FirstOrDefault(l => l.Id == id);
+        var log = await _auditService.GetAuditLogByIdAsync(id);
 
         if (log == null)
         {
@@ -117,4 +125,6 @@ public class AuditLogsController : ControllerBase
             totalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
         });
     }
+
+
 }

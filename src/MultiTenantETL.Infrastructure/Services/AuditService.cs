@@ -190,4 +190,38 @@ public class AuditService : IAuditService
 
         return (logs, totalCount);
     }
+
+    public async Task<AuditLogDto?> GetAuditLogByIdAsync(Guid id, Guid? tenantId = null)
+    {
+        var query = _context.AuditLogs
+            .IgnoreQueryFilters()
+            .Include(a => a.Tenant)
+            .Where(a => a.Id == id);
+
+        if (tenantId.HasValue)
+        {
+            query = query.Where(a => a.TenantId == tenantId.Value);
+        }
+
+        return await query
+            .Select(a => new AuditLogDto
+            {
+                Id = a.Id,
+                TenantId = a.TenantId,
+                TenantName = a.Tenant != null ? a.Tenant.Name : null,
+                UserId = a.UserId,
+                UserEmail = a.UserEmail,
+                Action = a.Action,
+                ResourceType = a.ResourceType,
+                ResourceId = a.ResourceId,
+                Description = a.Description,
+                IpAddress = a.IpAddress,
+                Metadata = a.Metadata,
+                Severity = a.Severity,
+                Success = a.Success,
+                ErrorMessage = a.ErrorMessage,
+                CreatedAt = a.CreatedAt
+            })
+            .FirstOrDefaultAsync();
+    }
 }

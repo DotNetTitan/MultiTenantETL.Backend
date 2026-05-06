@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using MultiTenantETL.API.Authorization;
 using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Common.Models;
 using MultiTenantETL.Application.Interfaces;
@@ -19,19 +20,22 @@ public class TenantsController : ControllerBase
     private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<TenantsController> _logger;
     private readonly IAuditService _auditService;
+    private readonly IAdminAuthorizationService _adminAuthorizationService;
 
     public TenantsController(
         ITenantService tenantService,
         IUserService userService,
         ICurrentUserService currentUserService,
         ILogger<TenantsController> logger,
-        IAuditService auditService)
+        IAuditService auditService,
+        IAdminAuthorizationService adminAuthorizationService)
     {
         _tenantService = tenantService;
         _userService = userService;
         _currentUserService = currentUserService;
         _logger = logger;
         _auditService = auditService;
+        _adminAuthorizationService = adminAuthorizationService;
     }
 
     /// <summary>
@@ -41,7 +45,7 @@ public class TenantsController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetAllTenants()
     {
-        if (!await IsGlobalAdminAsync())
+        if (!await _adminAuthorizationService.IsGlobalAdminAsync())
         {
             return Forbid();
         }
@@ -131,7 +135,7 @@ public class TenantsController : ControllerBase
     [Authorize]
     public async Task<IActionResult> CreateTenant([FromBody] CreateTenantRequest request)
     {
-        if (!await IsGlobalAdminAsync())
+        if (!await _adminAuthorizationService.IsGlobalAdminAsync())
         {
             return Forbid();
         }
@@ -170,7 +174,7 @@ public class TenantsController : ControllerBase
     [Authorize]
     public async Task<IActionResult> UpdateTenant(Guid id, [FromBody] UpdateTenantRequest request)
     {
-        if (!await IsGlobalAdminAsync())
+        if (!await _adminAuthorizationService.IsGlobalAdminAsync())
         {
             return Forbid();
         }
@@ -268,18 +272,14 @@ public class TenantsController : ControllerBase
     [Authorize]
     public async Task<IActionResult> AddUserToTenant(Guid id, [FromBody] AddUserToTenantRequest request)
     {
-        if (!await IsGlobalAdminAsync())
+        if (!await _adminAuthorizationService.IsGlobalAdminAsync())
         {
             return Forbid();
         }
 
-        var currentUserRole = _currentUserService.GetRole();
-        if (currentUserRole != Roles.SuperAdmin)
+        if (!await _adminAuthorizationService.CanMutateGlobalAdminTargetAsync(request.UserId))
         {
-            if (await IsSuperAdminUserAsync(request.UserId) || await IsPlatformAdminUserAsync(request.UserId))
-            {
-                return Forbid();
-            }
+            return Forbid();
         }
 
         if (request.RoleCode == Roles.SuperAdmin || request.RoleCode == Roles.PlatformAdmin)
@@ -337,18 +337,14 @@ public class TenantsController : ControllerBase
     [Authorize]
     public async Task<IActionResult> RemoveUserFromTenant(Guid tenantId, Guid userId)
     {
-        if (!await IsGlobalAdminAsync())
+        if (!await _adminAuthorizationService.IsGlobalAdminAsync())
         {
             return Forbid();
         }
 
-        var currentUserRole = _currentUserService.GetRole();
-        if (currentUserRole != Roles.SuperAdmin)
+        if (!await _adminAuthorizationService.CanMutateGlobalAdminTargetAsync(userId))
         {
-            if (await IsSuperAdminUserAsync(userId) || await IsPlatformAdminUserAsync(userId))
-            {
-                return Forbid();
-            }
+            return Forbid();
         }
 
 
@@ -381,17 +377,14 @@ public class TenantsController : ControllerBase
         Guid userId,
         [FromBody] UpdateUserTenantRoleRequest request)
     {
-        if (!await IsGlobalAdminAsync())
+        if (!await _adminAuthorizationService.IsGlobalAdminAsync())
         {
             return Forbid();
         }
-        var currentUserRole = _currentUserService.GetRole();
-        if (currentUserRole != Roles.SuperAdmin)
+
+        if (!await _adminAuthorizationService.CanMutateGlobalAdminTargetAsync(userId))
         {
-            if (await IsSuperAdminUserAsync(userId) || await IsPlatformAdminUserAsync(userId))
-            {
-                return Forbid();
-            }
+            return Forbid();
         }
 
         if (request.RoleCode == Roles.SuperAdmin || request.RoleCode == Roles.PlatformAdmin)
@@ -431,22 +424,4 @@ public class TenantsController : ControllerBase
         });
     }
 
-    private async Task<bool> IsSuperAdminUserAsync(Guid userId)
-    {
-        var roles = await _userService.GetUserRolesAsync(userId);
-        return roles.Contains(Roles.SuperAdmin);
-    }
-
-    private async Task<bool> IsPlatformAdminUserAsync(Guid userId)
-    {
-        var roles = await _userService.GetUserRolesAsync(userId);
-        return roles.Contains(Roles.PlatformAdmin);
-    }
-
-    private async Task<bool> IsGlobalAdminAsync()
-    {
-        var userId = _currentUserService.GetUserId();
-        var roles = await _userService.GetUserRolesAsync(userId);
-        return roles.Contains(Roles.SuperAdmin) || roles.Contains(Roles.PlatformAdmin);
-    }
 }

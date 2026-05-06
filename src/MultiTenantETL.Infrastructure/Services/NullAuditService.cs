@@ -47,4 +47,10 @@ public class NullAuditService : IAuditService
         // No-op: Worker doesn't query audit logs
         return Task.FromResult((new List<AuditLogDto>(), 0));
     }
+
+    public Task<AuditLogDto?> GetAuditLogByIdAsync(Guid id, Guid? tenantId = null)
+    {
+        // No-op: Worker doesn't query audit logs
+        return Task.FromResult<AuditLogDto?>(null);
+    }
 }
