@@ -153,7 +153,8 @@ public class TenantsController : ControllerBase
             Domain.Constants.AuditActions.Tenants.Created,
             "Tenant",
             result.Data!.Id.ToString(),
-            $"Tenant created: {request.Name}");
+            $"Tenant created: {request.Name}",
+            tenantIdOverride: result.Data.Id);
 
         var response = new TenantResponse
         {
@@ -192,7 +193,8 @@ public class TenantsController : ControllerBase
             Domain.Constants.AuditActions.Tenants.Updated,
             "Tenant",
             id.ToString(),
-            $"Tenant updated: {result.Data!.Name}");
+            $"Tenant updated: {result.Data!.Name}",
+            tenantIdOverride: id);
 
         var response = new TenantResponse
         {
@@ -226,7 +228,8 @@ public class TenantsController : ControllerBase
             Domain.Constants.AuditActions.Tenants.Deleted,
             "Tenant",
             id.ToString(),
-            "Tenant deleted");
+            "Tenant deleted",
+            tenantIdOverride: id);
 
         return NoContent();
     }
@@ -319,7 +322,8 @@ public class TenantsController : ControllerBase
             Domain.Constants.AuditActions.Tenants.UserAdded,
             "Tenant",
             request.TenantId.ToString(),
-            $"User added to tenant with role {request.RoleCode}");
+            $"User added to tenant with role {request.RoleCode}",
+            tenantIdOverride: request.TenantId);
 
         return Ok(new
         {
@@ -362,7 +366,8 @@ public class TenantsController : ControllerBase
             Domain.Constants.AuditActions.Tenants.UserRemoved,
             "Tenant",
             tenantId.ToString(),
-            "User removed from tenant");
+            "User removed from tenant",
+            tenantIdOverride: tenantId);
 
         return NoContent();
     }
@@ -413,7 +418,8 @@ public class TenantsController : ControllerBase
             Domain.Constants.AuditActions.Tenants.UserRoleUpdated,
             "Tenant",
             tenantId.ToString(),
-            $"User role updated to {request.RoleCode}");
+            $"User role updated to {request.RoleCode}",
+            tenantIdOverride: tenantId);
 
         return Ok(new
         {

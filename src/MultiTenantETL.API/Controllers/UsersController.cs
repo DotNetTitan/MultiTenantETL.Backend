@@ -486,7 +486,8 @@ public class UsersController : ControllerBase
             Domain.Constants.AuditActions.Users.AddedToTenant,
             "User",
             id.ToString(),
-            $"User added to tenant with role {request.RoleCode}");
+            $"User added to tenant with role {request.RoleCode}",
+            tenantIdOverride: request.TenantId);
 
         return Ok(new { message = "User added to tenant successfully" });
     }
@@ -523,7 +524,8 @@ public class UsersController : ControllerBase
             Domain.Constants.AuditActions.Users.RemovedFromTenant,
             "User",
             userId.ToString(),
-            $"User removed from tenant");
+            $"User removed from tenant",
+            tenantIdOverride: tenantId);
 
         return NoContent();
     }
@@ -568,7 +570,8 @@ public class UsersController : ControllerBase
             Domain.Constants.AuditActions.Users.TenantRoleUpdated,
             "User",
             userId.ToString(),
-            $"User role updated to {request.RoleCode} in tenant");
+            $"User role updated to {request.RoleCode} in tenant",
+            tenantIdOverride: tenantId);
 
         return Ok(new { message = "User role updated successfully" });
     }

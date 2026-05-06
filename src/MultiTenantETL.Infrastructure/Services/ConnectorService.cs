@@ -84,7 +84,8 @@ public class ConnectorService : IConnectorService
             resourceType: "Connector",
             resourceId: connector.Id.ToString(),
             description: $"Created connector '{connector.Name}' ({connector.Type}/{connector.Provider})",
-            metadata: new { connector.Type, connector.Provider, connector.Direction }
+            metadata: new { connector.Type, connector.Provider, connector.Direction },
+            tenantIdOverride: tenantId
         );
 
         return MapToResponse(connector);
@@ -224,7 +225,8 @@ public class ConnectorService : IConnectorService
             resourceType: "Connector",
             resourceId: connector.Id.ToString(),
             description: $"Updated connector '{connector.Name}'",
-            metadata: new { Changes = changes }
+            metadata: new { Changes = changes },
+            tenantIdOverride: tenantId
         );
 
         return MapToResponse(connector);
@@ -275,7 +277,8 @@ public class ConnectorService : IConnectorService
             resourceType: "Connector",
             resourceId: id.ToString(),
             description: $"Deleted connector '{connectorName}' ({connectorType})",
-            metadata: new { Name = connectorName, Type = connectorType }
+            metadata: new { Name = connectorName, Type = connectorType },
+            tenantIdOverride: tenantId
         );
     }
 

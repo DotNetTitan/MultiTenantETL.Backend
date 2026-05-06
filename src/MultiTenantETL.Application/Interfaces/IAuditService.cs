@@ -16,7 +16,8 @@ public interface IAuditService
         object? metadata = null,
         string severity = "Info",
         bool success = true,
-        string? errorMessage = null);
+        string? errorMessage = null,
+        Guid? tenantIdOverride = null);
 
     /// <summary>
     /// Log an authentication event

@@ -92,7 +92,8 @@ public class PipelineService : IPipelineService
             resourceType: "Pipeline",
             resourceId: pipeline.Id.ToString(),
             description: $"Created pipeline '{pipeline.Name}'",
-            metadata: new { pipeline.SourceConnectorId, pipeline.DestinationConnectorId }
+            metadata: new { pipeline.SourceConnectorId, pipeline.DestinationConnectorId },
+            tenantIdOverride: tenantId
         );
 
         return await MapToResponseAsync(pipeline, cancellationToken);
@@ -253,7 +254,8 @@ public class PipelineService : IPipelineService
             resourceType: "Pipeline",
             resourceId: pipeline.Id.ToString(),
             description: $"Updated pipeline '{pipeline.Name}'",
-            metadata: new { Changes = changes }
+            metadata: new { Changes = changes },
+            tenantIdOverride: tenantId
         );
 
         return await MapToResponseAsync(pipeline, cancellationToken);
@@ -286,7 +288,8 @@ public class PipelineService : IPipelineService
             resourceType: "Pipeline",
             resourceId: id.ToString(),
             description: $"Deleted pipeline '{pipelineName}'",
-            metadata: new { Name = pipelineName }
+            metadata: new { Name = pipelineName },
+            tenantIdOverride: tenantId
         );
     }
 
@@ -329,7 +332,8 @@ public class PipelineService : IPipelineService
             resourceType: "Pipeline",
             resourceId: pipeline.Id.ToString(),
             description: $"{(pipeline.IsActive ? "Activated" : "Deactivated")} pipeline '{pipeline.Name}'",
-            metadata: new { pipeline.IsActive }
+            metadata: new { pipeline.IsActive },
+            tenantIdOverride: tenantId
         );
 
         return await MapToResponseAsync(pipeline, cancellationToken);

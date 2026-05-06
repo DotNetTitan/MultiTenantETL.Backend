@@ -36,7 +36,8 @@ public class AuditService : IAuditService
         object? metadata = null,
         string severity = "Info",
         bool success = true,
-        string? errorMessage = null)
+        string? errorMessage = null,
+        Guid? tenantIdOverride = null)
     {
         try
         {
@@ -48,10 +49,34 @@ public class AuditService : IAuditService
                 severity = "Error";
             }
 
+            // Resolve tenant ID safely to avoid FK violations when context has no active tenant
+            // (CurrentUserService returns Guid.Empty when tenant cannot be determined).
+            Guid? tenantId = null;
+            var currentTenantId = tenantIdOverride ?? _currentUser.GetTenantId();
+            if (currentTenantId != Guid.Empty)
+            {
+                var tenantExists = await _context.Tenants
+                    .IgnoreQueryFilters()
+                    .AsNoTracking()
+                    .AnyAsync(t => t.Id == currentTenantId);
+
+                if (tenantExists)
+                {
+                    tenantId = currentTenantId;
+                }
+                else
+                {
+                    _logger.LogWarning(
+                        "Skipping tenant association for audit action {Action}: tenant {TenantId} was not found.",
+                        action,
+                        currentTenantId);
+                }
+            }
+
             var auditLog = new AuditLog
             {
                 Id = Guid.NewGuid(),
-                TenantId = _currentUser.GetTenantId(),
+                TenantId = tenantId,
                 UserId = _currentUser.GetUserId(),
                 UserEmail = _currentUser.GetEmail(),
                 Action = action,

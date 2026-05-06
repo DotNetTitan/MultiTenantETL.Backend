@@ -16,7 +16,8 @@ public class NullAuditService : IAuditService
         object? metadata = null,
         string severity = "Info",
         bool success = true,
-        string? errorMessage = null)
+        string? errorMessage = null,
+        Guid? tenantIdOverride = null)
     {
         // No-op: Worker actions don't need separate audit logs
         // The pipeline execution itself is already tracked

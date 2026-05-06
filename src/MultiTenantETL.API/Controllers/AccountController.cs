@@ -360,7 +360,8 @@ namespace MultiTenantETL.API.Controllers
                 Domain.Constants.AuditActions.Authentication.TenantSwitched,
                 "Tenant",
                 request.TenantId.ToString(),
-                $"User switched to tenant: {result.UserTenant!.TenantName}");
+                $"User switched to tenant: {result.UserTenant!.TenantName}",
+                tenantIdOverride: request.TenantId);
 
             // Re-issue Identity cookie with updated tenant claims for BFF/session-based auth.
             var updatedUser = await _userManager.FindByIdAsync(user.Id.ToString());

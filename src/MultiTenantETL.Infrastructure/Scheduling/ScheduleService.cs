@@ -124,7 +124,8 @@ public class ScheduleService : IScheduleService
             resourceType: "PipelineSchedule",
             resourceId: schedule.Id.ToString(),
             description: $"Created schedule for pipeline '{pipeline.Name}'",
-            metadata: new { schedule.CronExpression, schedule.Timezone, schedule.IsActive }
+            metadata: new { schedule.CronExpression, schedule.Timezone, schedule.IsActive },
+            tenantIdOverride: tenantId
         );
 
         _logger.LogInformation("Schedule {ScheduleId} created for pipeline {PipelineId}", schedule.Id, request.PipelineId);
@@ -302,7 +303,8 @@ public class ScheduleService : IScheduleService
             resourceType: "PipelineSchedule",
             resourceId: schedule.Id.ToString(),
             description: $"Updated schedule for pipeline '{schedule.Pipeline?.Name}'",
-            metadata: new { schedule.CronExpression, schedule.Timezone, schedule.IsActive }
+            metadata: new { schedule.CronExpression, schedule.Timezone, schedule.IsActive },
+            tenantIdOverride: tenantId
         );
 
         _logger.LogInformation("Schedule {ScheduleId} updated", id);
@@ -336,7 +338,8 @@ public class ScheduleService : IScheduleService
             resourceType: "PipelineSchedule",
             resourceId: id.ToString(),
             description: $"Deleted schedule for pipeline '{pipelineName}'",
-            metadata: new { PipelineId = schedule.PipelineId }
+            metadata: new { PipelineId = schedule.PipelineId },
+            tenantIdOverride: tenantId
         );
 
         _logger.LogInformation("Schedule {ScheduleId} deleted", id);
@@ -387,7 +390,8 @@ public class ScheduleService : IScheduleService
             resourceType: "PipelineSchedule",
             resourceId: id.ToString(),
             description: $"Enabled schedule for pipeline '{schedule.Pipeline?.Name}'",
-            metadata: new { schedule.CronExpression }
+            metadata: new { schedule.CronExpression },
+            tenantIdOverride: tenantId
         );
 
         _logger.LogInformation("Schedule {ScheduleId} enabled", id);
@@ -429,7 +433,8 @@ public class ScheduleService : IScheduleService
             resourceType: "PipelineSchedule",
             resourceId: id.ToString(),
             description: $"Disabled schedule for pipeline '{schedule.Pipeline?.Name}'",
-            metadata: new { schedule.CronExpression }
+            metadata: new { schedule.CronExpression },
+            tenantIdOverride: tenantId
         );
 
         _logger.LogInformation("Schedule {ScheduleId} disabled", id);
@@ -467,7 +472,8 @@ public class ScheduleService : IScheduleService
             resourceType: "PipelineSchedule",
             resourceId: id.ToString(),
             description: $"Manually triggered schedule for pipeline '{schedule.Pipeline?.Name}'",
-            metadata: null
+            metadata: null,
+            tenantIdOverride: tenantId
         );
 
         _logger.LogInformation("Schedule {ScheduleId} triggered manually", id);
@@ -573,7 +579,8 @@ public class ScheduleService : IScheduleService
             resourceType: "Pipeline",
             resourceId: pipelineId.ToString(),
             description: $"Paused {schedules.Count} schedule(s) for pipeline '{pipelineName}' due to pipeline deactivation",
-            metadata: new { ScheduleIds = schedules.Select(s => s.Id).ToList(), Count = schedules.Count }
+            metadata: new { ScheduleIds = schedules.Select(s => s.Id).ToList(), Count = schedules.Count },
+            tenantIdOverride: tenantId
         );
 
         _logger.LogInformation("Paused {Count} schedule(s) for pipeline {PipelineId}", schedules.Count, pipelineId);
@@ -633,7 +640,8 @@ public class ScheduleService : IScheduleService
             resourceType: "Pipeline",
             resourceId: pipelineId.ToString(),
             description: $"Resumed {schedules.Count} schedule(s) for pipeline '{pipelineName}' due to pipeline activation",
-            metadata: new { ScheduleIds = schedules.Select(s => s.Id).ToList(), Count = schedules.Count }
+            metadata: new { ScheduleIds = schedules.Select(s => s.Id).ToList(), Count = schedules.Count },
+            tenantIdOverride: tenantId
         );
 
         _logger.LogInformation("Resumed {Count} schedule(s) for pipeline {PipelineId}", schedules.Count, pipelineId);
