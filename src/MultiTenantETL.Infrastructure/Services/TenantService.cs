@@ -273,9 +273,11 @@ public class TenantService : ITenantService
             };
         }
 
-        // Check if user is SuperAdmin
+        // Check if user is a global admin role
         var roles = await _userManager.GetRolesAsync(user);
         var isSuperAdmin = roles.Contains(Domain.Constants.Roles.SuperAdmin);
+        var isPlatformAdmin = roles.Contains(Domain.Constants.Roles.PlatformAdmin);
+        var isGlobalAdmin = isSuperAdmin || isPlatformAdmin;
 
         // Validate tenant exists
         var tenant = await _context.Tenants
@@ -294,10 +296,10 @@ public class TenantService : ITenantService
 
         UserTenant? userTenant = null;
 
-        // SuperAdmin can switch to any tenant without being a member
-        if (!isSuperAdmin)
+        // Global admins can switch to any tenant without being a member
+        if (!isGlobalAdmin)
         {
-            // Regular users must be a member of the tenant
+            // Non-global users must be a member of the tenant
             userTenant = await _context.UserTenants
                 .Include(ut => ut.Tenant)
                 .FirstOrDefaultAsync(ut =>
@@ -317,12 +319,12 @@ public class TenantService : ITenantService
         }
         else
         {
-            // For SuperAdmin, create a virtual UserTenant for the response
+            // For global admins, create a virtual UserTenant for the response
             userTenant = new UserTenant
             {
                 UserId = userId,
                 TenantId = tenantId,
-                RoleCode = Domain.Constants.Roles.SuperAdmin,
+                RoleCode = isSuperAdmin ? Domain.Constants.Roles.SuperAdmin : Domain.Constants.Roles.PlatformAdmin,
                 IsActive = true,
                 Tenant = tenant,
                 User = user

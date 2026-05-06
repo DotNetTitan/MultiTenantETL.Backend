@@ -26,11 +26,10 @@ public class AuditLogsController : ControllerBase
     }
 
     /// <summary>
-    /// Get audit logs with filtering
-    /// SuperAdmin/PlatformAdmin can see all logs, TenantAdmin can see their tenant's logs
+    /// Get audit logs with filtering (SuperAdmin/PlatformAdmin)
     /// </summary>
     [HttpGet]
-    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin},{Roles.TenantAdmin}")]
+    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin}")]
     public async Task<IActionResult> GetAuditLogs(
         [FromQuery] Guid? userId = null,
         [FromQuery] string? action = null,
@@ -41,14 +40,7 @@ public class AuditLogsController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50)
     {
-        var userRole = _currentUserService.GetRole();
         Guid? tenantFilter = null;
-
-        // TenantAdmin can only see their tenant's logs
-        if (userRole == Roles.TenantAdmin)
-        {
-            tenantFilter = _currentUserService.GetTenantId();
-        }
 
         var (logs, totalCount) = await _auditService.GetAuditLogsAsync(
             tenantFilter,
@@ -75,14 +67,11 @@ public class AuditLogsController : ControllerBase
     /// Get audit log by ID
     /// </summary>
     [HttpGet("{id:guid}")]
-    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin},{Roles.TenantAdmin}")]
+    [Authorize(Roles = $"{Roles.SuperAdmin},{Roles.PlatformAdmin}")]
     public async Task<IActionResult> GetAuditLogById(Guid id)
     {
-        var userRole = _currentUserService.GetRole();
-        var tenantFilter = userRole == Roles.TenantAdmin ? _currentUserService.GetTenantId() : (Guid?)null;
-
         var (logs, _) = await _auditService.GetAuditLogsAsync(
-            tenantFilter,
+            null,
             page: 1,
             pageSize: 1);
 
