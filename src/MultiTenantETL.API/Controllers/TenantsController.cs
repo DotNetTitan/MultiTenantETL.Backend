@@ -274,9 +274,12 @@ public class TenantsController : ControllerBase
         }
 
         var currentUserRole = _currentUserService.GetRole();
-        if (currentUserRole != Roles.SuperAdmin && await IsSuperAdminUserAsync(request.UserId))
+        if (currentUserRole != Roles.SuperAdmin)
         {
-            return Forbid();
+            if (await IsSuperAdminUserAsync(request.UserId) || await IsPlatformAdminUserAsync(request.UserId))
+            {
+                return Forbid();
+            }
         }
 
         if (request.RoleCode == Roles.SuperAdmin || request.RoleCode == Roles.PlatformAdmin)
@@ -340,9 +343,12 @@ public class TenantsController : ControllerBase
         }
 
         var currentUserRole = _currentUserService.GetRole();
-        if (currentUserRole != Roles.SuperAdmin && await IsSuperAdminUserAsync(userId))
+        if (currentUserRole != Roles.SuperAdmin)
         {
-            return Forbid();
+            if (await IsSuperAdminUserAsync(userId) || await IsPlatformAdminUserAsync(userId))
+            {
+                return Forbid();
+            }
         }
 
 
@@ -380,9 +386,12 @@ public class TenantsController : ControllerBase
             return Forbid();
         }
         var currentUserRole = _currentUserService.GetRole();
-        if (currentUserRole != Roles.SuperAdmin && await IsSuperAdminUserAsync(userId))
+        if (currentUserRole != Roles.SuperAdmin)
         {
-            return Forbid();
+            if (await IsSuperAdminUserAsync(userId) || await IsPlatformAdminUserAsync(userId))
+            {
+                return Forbid();
+            }
         }
 
         if (request.RoleCode == Roles.SuperAdmin || request.RoleCode == Roles.PlatformAdmin)
@@ -426,6 +435,12 @@ public class TenantsController : ControllerBase
     {
         var roles = await _userService.GetUserRolesAsync(userId);
         return roles.Contains(Roles.SuperAdmin);
+    }
+
+    private async Task<bool> IsPlatformAdminUserAsync(Guid userId)
+    {
+        var roles = await _userService.GetUserRolesAsync(userId);
+        return roles.Contains(Roles.PlatformAdmin);
     }
 
     private async Task<bool> IsGlobalAdminAsync()

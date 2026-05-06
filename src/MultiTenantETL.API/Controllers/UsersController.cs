@@ -245,9 +245,16 @@ public class UsersController : ControllerBase
     public async Task<IActionResult> UpdateUser(Guid id, [FromBody] UpdateUserRequest request)
     {
         var currentUserRole = _currentUserService.GetRole();
-        if (currentUserRole != Roles.SuperAdmin && await IsSuperAdminUserAsync(id))
+        var currentUserId = _currentUserService.GetUserId();
+
+        // Non-SuperAdmin users cannot edit SuperAdmin/PlatformAdmin accounts,
+        // except they can edit their own profile details.
+        if (currentUserRole != Roles.SuperAdmin && id != currentUserId)
         {
-            return Forbid();
+            if (await IsSuperAdminUserAsync(id) || await IsPlatformAdminUserAsync(id))
+            {
+                return Forbid();
+            }
         }
 
         var result = await _userService.UpdateUserAsync(
@@ -446,9 +453,12 @@ public class UsersController : ControllerBase
     public async Task<IActionResult> AddUserToTenant(Guid id, [FromBody] AddUserToTenantRequest request)
     {
         var currentUserRole = _currentUserService.GetRole();
-        if (currentUserRole != Roles.SuperAdmin && await IsSuperAdminUserAsync(id))
+        if (currentUserRole != Roles.SuperAdmin)
         {
-            return Forbid();
+            if (await IsSuperAdminUserAsync(id) || await IsPlatformAdminUserAsync(id))
+            {
+                return Forbid();
+            }
         }
 
         if (request.RoleCode == Roles.SuperAdmin || request.RoleCode == Roles.PlatformAdmin)
@@ -487,9 +497,12 @@ public class UsersController : ControllerBase
     public async Task<IActionResult> RemoveUserFromTenant(Guid userId, Guid tenantId)
     {
         var currentUserRole = _currentUserService.GetRole();
-        if (currentUserRole != Roles.SuperAdmin && await IsSuperAdminUserAsync(userId))
+        if (currentUserRole != Roles.SuperAdmin)
         {
-            return Forbid();
+            if (await IsSuperAdminUserAsync(userId) || await IsPlatformAdminUserAsync(userId))
+            {
+                return Forbid();
+            }
         }
 
 
@@ -520,9 +533,12 @@ public class UsersController : ControllerBase
     public async Task<IActionResult> UpdateUserTenantRole(Guid userId, Guid tenantId, [FromBody] UpdateUserTenantRoleRequest request)
     {
         var currentUserRole = _currentUserService.GetRole();
-        if (currentUserRole != Roles.SuperAdmin && await IsSuperAdminUserAsync(userId))
+        if (currentUserRole != Roles.SuperAdmin)
         {
-            return Forbid();
+            if (await IsSuperAdminUserAsync(userId) || await IsPlatformAdminUserAsync(userId))
+            {
+                return Forbid();
+            }
         }
 
         if (request.RoleCode == Roles.SuperAdmin || request.RoleCode == Roles.PlatformAdmin)
@@ -557,5 +573,11 @@ public class UsersController : ControllerBase
     {
         var roles = await _userService.GetUserRolesAsync(userId);
         return roles.Contains(Roles.SuperAdmin);
+    }
+
+    private async Task<bool> IsPlatformAdminUserAsync(Guid userId)
+    {
+        var roles = await _userService.GetUserRolesAsync(userId);
+        return roles.Contains(Roles.PlatformAdmin);
     }
 }
