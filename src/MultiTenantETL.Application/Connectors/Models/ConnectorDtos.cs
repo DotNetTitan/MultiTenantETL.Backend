@@ -166,6 +166,7 @@ public record SchemaField
 /// </summary>
 public record ConnectorSearchRequest
 {
+    public string? Search { get; init; }
     public string? Name { get; init; }
     public string? Type { get; init; }
     public string? Provider { get; init; }

@@ -110,6 +110,16 @@ public class ConnectorService : IConnectorService
         var query = _context.Connectors
             .Where(c => c.TenantId == tenantId);
 
+        // Apply search filter
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var searchLower = request.Search.ToLower();
+            query = query.Where(c => c.Name.ToLower().Contains(searchLower)
+                || c.Type.ToLower().Contains(searchLower)
+                || c.Provider.ToLower().Contains(searchLower)
+                || (c.Description != null && c.Description.ToLower().Contains(searchLower)));
+        }
+
         // Apply filters
         if (!string.IsNullOrWhiteSpace(request.Name))
         {

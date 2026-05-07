@@ -132,7 +132,9 @@ public class PipelineService : IPipelineService
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
             var searchLower = request.Search.ToLower();
-            query = query.Where(p => p.Name.ToLower().Contains(searchLower));
+            query = query.Where(p => p.Name.ToLower().Contains(searchLower)
+                || p.SourceConnector.Name.ToLower().Contains(searchLower)
+                || p.DestinationConnector.Name.ToLower().Contains(searchLower));
         }
 
         // Apply name filter
