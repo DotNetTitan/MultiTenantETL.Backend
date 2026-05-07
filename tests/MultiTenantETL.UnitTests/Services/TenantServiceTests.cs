@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MultiTenantETL.Application.Common.Interfaces;
+using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Domain.Enums;
 using MultiTenantETL.Infrastructure.Identity;
@@ -19,7 +20,6 @@ public class TenantServiceTests : IDisposable
 
     public TenantServiceTests()
     {
-        // Set up in-memory database
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
@@ -27,13 +27,13 @@ public class TenantServiceTests : IDisposable
         var tenantProvider = Substitute.For<ITenantProvider>();
         _context = new ApplicationDbContext(options, tenantProvider);
 
-        // Mock UserManager
         var userStore = Substitute.For<IUserStore<ApplicationUser>>();
         _userManager = Substitute.For<UserManager<ApplicationUser>>(
             userStore, null, null, null, null, null, null, null, null);
 
         var currentUserService = Substitute.For<ICurrentUserService>();
-        _sut = new TenantService(_userManager, _context, currentUserService);
+        var emailService = Substitute.For<IEmailService>();
+        _sut = new TenantService(_userManager, _context, currentUserService, emailService);
     }
 
     public void Dispose()

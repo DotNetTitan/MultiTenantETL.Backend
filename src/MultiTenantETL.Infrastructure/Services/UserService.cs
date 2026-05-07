@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Common.Models;
+using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Domain.Enums;
 using MultiTenantETL.Infrastructure.Identity;
 using MultiTenantETL.Infrastructure.Interfaces;
@@ -17,19 +18,22 @@ public class UserService : IUserService
     private readonly IOpenIddictTokenManager _tokenManager;
     private readonly ICurrentUserService _currentUserService;
     private readonly ITenantService _tenantService;
+    private readonly IEmailService _emailService;
 
     public UserService(
         UserManager<ApplicationUser> userManager,
         ApplicationDbContext context,
         IOpenIddictTokenManager tokenManager,
         ICurrentUserService currentUserService,
-        ITenantService tenantService)
+        ITenantService tenantService,
+        IEmailService emailService)
     {
         _userManager = userManager;
         _context = context;
         _tokenManager = tokenManager;
         _currentUserService = currentUserService;
         _tenantService = tenantService;
+        _emailService = emailService;
     }
 
     public async Task<ApplicationUser?> GetUserByIdAsync(Guid userId)
@@ -233,6 +237,9 @@ public class UserService : IUserService
                 "User not found");
         }
 
+        var oldRoles = await _userManager.GetRolesAsync(user);
+        var oldRole = oldRoles.FirstOrDefault() ?? "None";
+
         var result = await _userManager.AddToRoleAsync(user, roleName);
 
         if (!result.Succeeded)
@@ -241,6 +248,16 @@ public class UserService : IUserService
                 AuthErrorCode.ValidationError,
                 string.Join(", ", result.Errors.Select(e => e.Description)));
         }
+
+        var currentUser = await _userManager.FindByIdAsync(_currentUserService.GetUserId().ToString());
+        var changedBy = currentUser?.Email ?? "System";
+
+        _ = _emailService.SendRoleChangedNotificationAsync(
+            user.Email ?? string.Empty,
+            user.FirstName ?? "User",
+            oldRole,
+            roleName,
+            changedBy);
 
         return ServiceResult.SuccessResult();
     }

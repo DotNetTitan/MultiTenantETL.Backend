@@ -71,6 +71,20 @@ namespace MultiTenantETL.Infrastructure.Services
             await SendEmailAsync(email, subject, htmlContent);
         }
 
+        public async Task SendRoleChangedNotificationAsync(string email, string firstName, string oldRole, string newRole, string changedBy)
+        {
+            var subject = "Your Role Has Been Changed - MultiTenant ETL";
+            var htmlContent = EmailTemplates.GetRoleChanged(firstName, oldRole, newRole, changedBy);
+            await SendEmailAsync(email, subject, htmlContent);
+        }
+
+        public async Task SendTenantChangedNotificationAsync(string email, string firstName, string oldTenant, string newTenant, string changedBy)
+        {
+            var subject = "Your Tenant Has Been Changed - MultiTenant ETL";
+            var htmlContent = EmailTemplates.GetTenantChanged(firstName, oldTenant, newTenant, changedBy);
+            await SendEmailAsync(email, subject, htmlContent);
+        }
+
         public async Task SendPipelineExecutionReportAsync(
             string recipientEmail,
             string pipelineName,

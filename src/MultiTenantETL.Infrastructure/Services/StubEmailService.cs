@@ -46,6 +46,22 @@ namespace MultiTenantETL.Infrastructure.Services
             return Task.CompletedTask;
         }
 
+        public Task SendRoleChangedNotificationAsync(string email, string firstName, string oldRole, string newRole, string changedBy)
+        {
+            _logger.LogInformation("📧 [STUB] Role Changed Notification would be sent to {Email}", email);
+            _logger.LogInformation("   Name: {FirstName}", firstName);
+            _logger.LogInformation("   Old Role: {OldRole}, New Role: {NewRole}, Changed By: {ChangedBy}", oldRole, newRole, changedBy);
+            return Task.CompletedTask;
+        }
+
+        public Task SendTenantChangedNotificationAsync(string email, string firstName, string oldTenant, string newTenant, string changedBy)
+        {
+            _logger.LogInformation("📧 [STUB] Tenant Changed Notification would be sent to {Email}", email);
+            _logger.LogInformation("   Name: {FirstName}", firstName);
+            _logger.LogInformation("   Old Tenant: {OldTenant}, New Tenant: {NewTenant}, Changed By: {ChangedBy}", oldTenant, newTenant, changedBy);
+            return Task.CompletedTask;
+        }
+
         public Task SendPipelineExecutionReportAsync(
             string recipientEmail,
             string pipelineName,

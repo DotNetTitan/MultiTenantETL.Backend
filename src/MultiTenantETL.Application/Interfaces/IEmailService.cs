@@ -26,6 +26,16 @@ namespace MultiTenantETL.Application.Interfaces
         Task SendPasswordChangedNotificationAsync(string email, string firstName);
 
         /// <summary>
+        /// Send notification that user's role was changed
+        /// </summary>
+        Task SendRoleChangedNotificationAsync(string email, string firstName, string oldRole, string newRole, string changedBy);
+
+        /// <summary>
+        /// Send notification that user's tenant was changed
+        /// </summary>
+        Task SendTenantChangedNotificationAsync(string email, string firstName, string oldTenant, string newTenant, string changedBy);
+
+        /// <summary>
         /// Send pipeline execution report to specified email address
         /// </summary>
         Task SendPipelineExecutionReportAsync(

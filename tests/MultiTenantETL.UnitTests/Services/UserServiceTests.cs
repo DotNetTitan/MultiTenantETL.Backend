@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MultiTenantETL.Application.Common.Interfaces;
+using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Domain.Enums;
 using MultiTenantETL.Infrastructure.Identity;
 using MultiTenantETL.Infrastructure.Interfaces;
@@ -36,7 +37,8 @@ public class UserServiceTests : IDisposable
 
         var tenantService = Substitute.For<ITenantService>();
         var currentUserService = Substitute.For<ICurrentUserService>();
-        _sut = new UserService(_userManager, _context, _tokenManager, currentUserService, tenantService);
+        var emailService = Substitute.For<IEmailService>();
+        _sut = new UserService(_userManager, _context, _tokenManager, currentUserService, tenantService, emailService);
     }
 
     public void Dispose()

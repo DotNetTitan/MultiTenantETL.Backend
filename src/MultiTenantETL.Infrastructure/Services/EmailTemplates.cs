@@ -263,6 +263,88 @@ namespace MultiTenantETL.Infrastructure.Services
         }
 
         /// <summary>
+        /// Role changed notification for security
+        /// </summary>
+        public static string GetRoleChanged(string firstName, string oldRole, string newRole, string changedBy)
+        {
+            var header = $@"
+                <div style='padding-bottom:18px;border-left:4px solid {Primary};padding-left:14px;'>
+                    <div style='color:{TextMuted};font-family:{SansFont};font-size:11px;letter-spacing:1.2px;text-transform:uppercase;line-height:16px;'>
+                        Access change
+                    </div>
+                    <div style='margin-top:6px;color:{TextStrong};font-family:{SansFont};font-size:22px;line-height:28px;font-weight:800;'>
+                        Hi {HtmlEncode(firstName)}
+                    </div>
+                </div>";
+
+            var whenUtc = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.InvariantCulture);
+
+            var body = $@"
+                {CardBlock("Role updated", $@"<div style='color:{Success};font-family:{SansFont};font-weight:900;font-size:12px;letter-spacing:1px;text-transform:uppercase;margin:0 0 8px 0;'>Updated</div>" + Muted("Your role has been changed."))}
+                <div style='height:12px;'></div>
+                <table role='presentation' cellpadding='0' cellspacing='0' border='0' width='100%'>
+                    <tr>
+                        <td style='padding:10px 0;border-top:1px solid {Border};color:{TextMuted};font-family:{SansFont};font-size:12px;'>New role</td>
+                        <td align='right' style='padding:10px 0;border-top:1px solid {Border};color:{Success};font-family:{SansFont};font-size:14px;font-weight:700;'>{HtmlEncode(newRole)}</td>
+                    </tr>
+                    <tr>
+                        <td style='padding:10px 0;border-top:1px solid {Border};color:{TextMuted};font-family:{SansFont};font-size:12px;'>Changed by</td>
+                        <td align='right' style='padding:10px 0;border-top:1px solid {Border};color:{Text};font-family:{SansFont};font-size:12px;'>{HtmlEncode(changedBy)}</td>
+                    </tr>
+                    <tr>
+                        <td style='padding:10px 0;border-top:1px solid {Border};color:{TextMuted};font-family:{SansFont};font-size:12px;'>When</td>
+                        <td align='right' style='padding:10px 0;border-top:1px solid {Border};color:{Text};font-family:{SansFont};font-size:12px;'>{HtmlEncode(whenUtc)}</td>
+                    </tr>
+                </table>
+                <div style='height:12px;'></div>
+                {CardBlock("Security alert", Muted("If you didn't expect this change, contact support immediately.") +
+                                     $"<div style='margin-top:10px;'><a href='mailto:support@multitenantetl.com' style='color:{Primary};text-decoration:none;font-family:{SansFont};font-weight:700;'>support@multitenantetl.com</a></div>")}";
+
+            return GetDashboardTemplate(header + body);
+        }
+
+        /// <summary>
+        /// Tenant changed notification for security
+        /// </summary>
+        public static string GetTenantChanged(string firstName, string oldTenant, string newTenant, string changedBy)
+        {
+            var header = $@"
+                <div style='padding-bottom:18px;border-left:4px solid {Primary};padding-left:14px;'>
+                    <div style='color:{TextMuted};font-family:{SansFont};font-size:11px;letter-spacing:1.2px;text-transform:uppercase;line-height:16px;'>
+                        Access change
+                    </div>
+                    <div style='margin-top:6px;color:{TextStrong};font-family:{SansFont};font-size:22px;line-height:28px;font-weight:800;'>
+                        Hi {HtmlEncode(firstName)}
+                    </div>
+                </div>";
+
+            var whenUtc = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.InvariantCulture);
+
+            var body = $@"
+                {CardBlock("Tenant updated", $@"<div style='color:{Success};font-family:{SansFont};font-weight:900;font-size:12px;letter-spacing:1px;text-transform:uppercase;margin:0 0 8px 0;'>Updated</div>" + Muted("You have been added to a new tenant."))}
+                <div style='height:12px;'></div>
+                <table role='presentation' cellpadding='0' cellspacing='0' border='0' width='100%'>
+                    <tr>
+                        <td style='padding:10px 0;border-top:1px solid {Border};color:{TextMuted};font-family:{SansFont};font-size:12px;'>New tenant</td>
+                        <td align='right' style='padding:10px 0;border-top:1px solid {Border};color:{Success};font-family:{SansFont};font-size:14px;font-weight:700;'>{HtmlEncode(newTenant)}</td>
+                    </tr>
+                    <tr>
+                        <td style='padding:10px 0;border-top:1px solid {Border};color:{TextMuted};font-family:{SansFont};font-size:12px;'>Changed by</td>
+                        <td align='right' style='padding:10px 0;border-top:1px solid {Border};color:{Text};font-family:{SansFont};font-size:12px;'>{HtmlEncode(changedBy)}</td>
+                    </tr>
+                    <tr>
+                        <td style='padding:10px 0;border-top:1px solid {Border};color:{TextMuted};font-family:{SansFont};font-size:12px;'>When</td>
+                        <td align='right' style='padding:10px 0;border-top:1px solid {Border};color:{Text};font-family:{SansFont};font-size:12px;'>{HtmlEncode(whenUtc)}</td>
+                    </tr>
+                </table>
+                <div style='height:12px;'></div>
+                {CardBlock("Security alert", Muted("If you didn't expect this change, contact support immediately.") +
+                                     $"<div style='margin-top:10px;'><a href='mailto:support@multitenantetl.com' style='color:{Primary};text-decoration:none;font-family:{SansFont};font-weight:700;'>support@multitenantetl.com</a></div>")}";
+
+            return GetDashboardTemplate(header + body);
+        }
+
+        /// <summary>
         /// Pipeline execution report with execution summary and statistics
         /// </summary>
         public static string GetPipelineExecutionReport(

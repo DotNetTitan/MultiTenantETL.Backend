@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MultiTenantETL.Application.Common.Interfaces;
 using MultiTenantETL.Application.Common.Models;
+using MultiTenantETL.Application.Interfaces;
 using MultiTenantETL.Application.Tenants.Models;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Domain.Enums;
@@ -16,15 +17,18 @@ public class TenantService : ITenantService
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IEmailService _emailService;
 
     public TenantService(
         UserManager<ApplicationUser> userManager,
         ApplicationDbContext context,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IEmailService emailService)
     {
         _userManager = userManager;
         _context = context;
         _currentUserService = currentUserService;
+        _emailService = emailService;
     }
 
     public async Task<ServiceResult<Tenant>> CreateTenantAsync(string name, string slug)
@@ -198,6 +202,19 @@ public class TenantService : ITenantService
             .Reference(ut => ut.User)
             .LoadAsync();
 
+        var currentUser = await _userManager.FindByIdAsync(_currentUserService.GetUserId().ToString());
+        var changedBy = currentUser?.Email ?? "System";
+
+        if (userTenant.User?.Email != null)
+        {
+            _ = _emailService.SendTenantChangedNotificationAsync(
+                userTenant.User.Email,
+                userTenant.User.FirstName ?? "User",
+                "No Tenant",
+                tenant.Name,
+                changedBy);
+        }
+
         return ServiceResult<UserTenant>.SuccessResult(userTenant);
     }
 
@@ -244,8 +261,24 @@ public class TenantService : ITenantService
                 "User is not a member of this tenant");
         }
 
+        var oldRole = userTenant.RoleCode;
+        var oldTenantName = userTenant.Tenant?.Name ?? "Unknown Tenant";
+
         userTenant.RoleCode = roleCode;
         await _context.SaveChangesAsync();
+
+        var currentUser = await _userManager.FindByIdAsync(_currentUserService.GetUserId().ToString());
+        var changedBy = currentUser?.Email ?? "System";
+
+        if (userTenant.User?.Email != null)
+        {
+            _ = _emailService.SendTenantChangedNotificationAsync(
+                userTenant.User.Email,
+                userTenant.User.FirstName ?? "User",
+                oldTenantName,
+                userTenant.Tenant?.Name ?? oldTenantName,
+                changedBy);
+        }
 
         return ServiceResult<UserTenant>.SuccessResult(userTenant);
     }
