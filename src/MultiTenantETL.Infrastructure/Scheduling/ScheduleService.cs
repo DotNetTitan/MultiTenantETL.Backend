@@ -186,9 +186,9 @@ public class ScheduleService : IScheduleService
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
+            var searchLower = request.Search.ToLower();
             query = query.Where(s =>
-                s.Pipeline!.Name.Contains(request.Search) ||
-                (s.Description != null && s.Description.Contains(request.Search)));
+                s.Pipeline!.Name.ToLower().Contains(searchLower));
         }
 
         // Apply sorting

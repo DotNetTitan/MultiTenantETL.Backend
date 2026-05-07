@@ -113,22 +113,23 @@ public class ConnectorService : IConnectorService
         // Apply filters
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
-            query = query.Where(c => c.Name.Contains(request.Name));
+            var nameLower = request.Name.ToLower();
+            query = query.Where(c => c.Name.ToLower().Contains(nameLower));
         }
 
         if (!string.IsNullOrWhiteSpace(request.Type))
         {
-            query = query.Where(c => c.Type == request.Type);
+            query = query.Where(c => c.Type.ToLower() == request.Type.ToLower());
         }
 
         if (!string.IsNullOrWhiteSpace(request.Provider))
         {
-            query = query.Where(c => c.Provider == request.Provider);
+            query = query.Where(c => c.Provider.ToLower() == request.Provider.ToLower());
         }
 
         if (!string.IsNullOrWhiteSpace(request.Direction))
         {
-            query = query.Where(c => c.Direction == request.Direction);
+            query = query.Where(c => c.Direction.ToLower() == request.Direction.ToLower());
         }
 
         if (request.IsActive.HasValue)

@@ -131,20 +131,22 @@ public class PipelineService : IPipelineService
         // Apply search filter
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
-            query = query.Where(p => p.Name.Contains(request.Search) ||
-                                    (p.Description != null && p.Description.Contains(request.Search)));
+            var searchLower = request.Search.ToLower();
+            query = query.Where(p => p.Name.ToLower().Contains(searchLower));
         }
 
         // Apply name filter
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
-            query = query.Where(p => p.Name.Contains(request.Name));
+            var nameLower = request.Name.ToLower();
+            query = query.Where(p => p.Name.ToLower().Contains(nameLower));
         }
 
         // Apply status filter
         if (!string.IsNullOrWhiteSpace(request.Status) && request.Status != "All")
         {
-            query = query.Where(p => p.Status == request.Status);
+            var statusLower = request.Status.ToLower();
+            query = query.Where(p => p.Status.ToLower() == statusLower);
         }
 
         // Apply scheduled filter - IsScheduled is derived from having an active Schedule

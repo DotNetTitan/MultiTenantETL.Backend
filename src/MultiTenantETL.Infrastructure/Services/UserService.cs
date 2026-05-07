@@ -61,14 +61,16 @@ public class UserService : IUserService
         // Apply filters
         if (!string.IsNullOrWhiteSpace(email))
         {
-            query = query.Where(u => u.Email!.Contains(email));
+            var emailLower = email.ToLower();
+            query = query.Where(u => u.Email!.ToLower().Contains(emailLower));
         }
 
         if (!string.IsNullOrWhiteSpace(name))
         {
+            var nameLower = name.ToLower();
             query = query.Where(u =>
-                u.FirstName.Contains(name) ||
-                u.LastName.Contains(name));
+                u.FirstName.ToLower().Contains(nameLower) ||
+                u.LastName.ToLower().Contains(nameLower));
         }
 
         if (status.HasValue)

@@ -31,36 +31,12 @@ public class ConnectorsController : ControllerBase
     }
 
     /// <summary>
-    /// Get all connectors for the current tenant
+    /// Get all connectors for the current tenant with optional filters and pagination
     /// </summary>
     [HttpGet]
-    [ProducesResponseType(typeof(List<ConnectorListResponse>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    public async Task<IActionResult> GetAll()
-    {
-        // Check permission
-        var authResult = await _authorizationService.AuthorizeAsync(
-            User,
-            null,
-            new PermissionRequirement(Permissions.Connectors.Read));
-
-        if (!authResult.Succeeded)
-        {
-            return Forbid();
-        }
-
-        var tenantId = _currentUserService.GetTenantId();
-        var connectors = await _connectorService.GetAllAsync(tenantId);
-        return Ok(connectors);
-    }
-
-    /// <summary>
-    /// Search connectors with filters and pagination
-    /// </summary>
-    [HttpPost("search")]
     [ProducesResponseType(typeof(PagedConnectorResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    public async Task<IActionResult> Search([FromBody] ConnectorSearchRequest request)
+    public async Task<IActionResult> GetAll([FromQuery] ConnectorSearchRequest request)
     {
         // Check permission
         var authResult = await _authorizationService.AuthorizeAsync(
@@ -70,7 +46,6 @@ public class ConnectorsController : ControllerBase
 
         if (!authResult.Succeeded)
         {
-            _logger.LogWarning("Authorization failed for connectors.read");
             return Forbid();
         }
 
