@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Domain.Entities;
+using MultiTenantETL.Infrastructure.Security;
 using Renci.SshNet;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
@@ -17,18 +18,21 @@ public class SftpDataReader : IDataReader
     private readonly CsvDataReader _csvReader;
     private readonly JsonDataReader _jsonReader;
     private readonly JsonLinesDataReader _jsonLinesReader;
+    private readonly ISsrfGuard _ssrfGuard;
     private readonly ILogger<SftpDataReader> _logger;
 
     public SftpDataReader(
         CsvDataReader csvReader,
         JsonDataReader jsonReader,
         JsonLinesDataReader jsonLinesReader,
-        ILogger<SftpDataReader> logger)
+        ILogger<SftpDataReader> logger,
+        ISsrfGuard ssrfGuard)
     {
         _csvReader = csvReader ?? throw new ArgumentNullException(nameof(csvReader));
         _jsonReader = jsonReader ?? throw new ArgumentNullException(nameof(jsonReader));
         _jsonLinesReader = jsonLinesReader ?? throw new ArgumentNullException(nameof(jsonLinesReader));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _ssrfGuard = ssrfGuard;
     }
 
     public async IAsyncEnumerable<ReadBatch> ReadAsync(
@@ -222,6 +226,8 @@ public class SftpDataReader : IDataReader
                 throw new InvalidOperationException("SFTP password is required");
             if (string.IsNullOrEmpty(config.FilePath))
                 throw new InvalidOperationException("SFTP file path is required");
+
+            _ssrfGuard.ValidateHost(config.Host);
 
             return config;
         }

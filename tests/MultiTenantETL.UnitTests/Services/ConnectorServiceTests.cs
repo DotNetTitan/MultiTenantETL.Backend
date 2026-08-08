@@ -111,7 +111,8 @@ public class ConnectorServiceTests : IDisposable
             "Connector",
             result.Id.ToString(),
             Arg.Any<string>(),
-            Arg.Any<object>());
+            Arg.Any<object>(),
+            tenantIdOverride: Arg.Any<Guid?>());
     }
 
     [Fact]
@@ -313,7 +314,8 @@ public class ConnectorServiceTests : IDisposable
             "Connector",
             connectorId.ToString(),
             Arg.Any<string>(),
-            Arg.Any<object>());
+            Arg.Any<object>(),
+            tenantIdOverride: Arg.Any<Guid?>());
     }
 
     [Fact]

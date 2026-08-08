@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Domain.Entities;
+using MultiTenantETL.Infrastructure.Security;
 using System.Text.Json;
 
 namespace MultiTenantETL.Infrastructure.DataWriters;
@@ -13,15 +14,17 @@ namespace MultiTenantETL.Infrastructure.DataWriters;
 /// </summary>
 public class FtpDataWriter : IDataWriter
 {
+    private readonly ISsrfGuard _ssrfGuard;
     private readonly ILogger<FtpDataWriter> _logger;
     private MemoryStream? _bufferStream;
     private FtpConfig? _config;
     private string? _format;
     private bool _isFirstBatch = true;
 
-    public FtpDataWriter(ILogger<FtpDataWriter> logger)
+    public FtpDataWriter(ILogger<FtpDataWriter> logger, ISsrfGuard ssrfGuard)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _ssrfGuard = ssrfGuard;
     }
 
     public async Task<DataWriteResult> WriteBatchAsync(
@@ -157,8 +160,15 @@ public class FtpDataWriter : IDataWriter
     {
         try
         {
-            return JsonSerializer.Deserialize<FtpConfig>(configJson)
+            var config = JsonSerializer.Deserialize<FtpConfig>(configJson)
                 ?? throw new InvalidOperationException("Invalid FTP configuration");
+
+            if (!string.IsNullOrWhiteSpace(config.Host))
+            {
+                _ssrfGuard.ValidateHost(config.Host);
+            }
+
+            return config;
         }
         catch (JsonException ex)
         {

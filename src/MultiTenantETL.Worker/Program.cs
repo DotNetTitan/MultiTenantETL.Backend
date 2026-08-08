@@ -74,6 +74,12 @@ builder.Services.AddSingleton<IEncryptionService, MultiTenantETL.Infrastructure.
 builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.AzureKeyVaultSettings>(
     builder.Configuration.GetSection("AzureKeyVault"));
 
+// SSRF protection for outbound connector traffic
+builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.SsrfSettings>(
+    builder.Configuration.GetSection(MultiTenantETL.Infrastructure.Configuration.SsrfSettings.SectionName));
+builder.Services.AddSingleton<MultiTenantETL.Infrastructure.Security.ISsrfGuard,
+    MultiTenantETL.Infrastructure.Security.SsrfGuard>();
+
 // Secret Storage Services (Azure Key Vault)
 builder.Services.AddSingleton<MultiTenantETL.Application.Common.Interfaces.ISecretStorageService,
     MultiTenantETL.Infrastructure.Security.KeyVaultSecretStorageService>();

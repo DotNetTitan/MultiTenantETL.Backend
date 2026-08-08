@@ -4,6 +4,7 @@ using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.DataWriters;
+using MultiTenantETL.UnitTests.TestHelpers;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using System.Net;
@@ -24,14 +25,14 @@ public class RestApiDataWriterTests
         _logger = Substitute.For<ILogger<RestApiDataWriter>>();
         _httpClient = Substitute.For<HttpClient>();
         _httpClientFactory.CreateClient().Returns(_httpClient);
-        _sut = new RestApiDataWriter(_httpClientFactory, _logger);
+        _sut = new RestApiDataWriter(_httpClientFactory, _logger, TestSsrfGuard.AllowAll);
     }
 
     [Fact]
     public void Constructor_WithValidParameters_ShouldCreateInstance()
     {
         // Act
-        var instance = new RestApiDataWriter(_httpClientFactory, _logger);
+        var instance = new RestApiDataWriter(_httpClientFactory, _logger, TestSsrfGuard.AllowAll);
 
         // Assert
         instance.Should().NotBeNull();
@@ -41,7 +42,7 @@ public class RestApiDataWriterTests
     public void Constructor_WithNullHttpClientFactory_ShouldThrowArgumentNullException()
     {
         // Act
-        var act = () => new RestApiDataWriter(null!, _logger);
+        var act = () => new RestApiDataWriter(null!, _logger, TestSsrfGuard.AllowAll);
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
@@ -52,7 +53,7 @@ public class RestApiDataWriterTests
     public void Constructor_WithNullLogger_ShouldThrowArgumentNullException()
     {
         // Act
-        var act = () => new RestApiDataWriter(_httpClientFactory, null!);
+        var act = () => new RestApiDataWriter(_httpClientFactory, null!, TestSsrfGuard.AllowAll);
 
         // Assert
         act.Should().Throw<ArgumentNullException>()

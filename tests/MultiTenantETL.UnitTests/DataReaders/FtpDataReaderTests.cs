@@ -5,6 +5,7 @@ using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.Configuration;
 using MultiTenantETL.Infrastructure.DataReaders;
+using MultiTenantETL.UnitTests.TestHelpers;
 using NSubstitute;
 using System.Text.Json;
 
@@ -26,14 +27,14 @@ public class FtpDataReaderTests
             Options.Create(new EtlSettings()));
         _jsonLinesReader = Substitute.For<JsonLinesDataReader>(Substitute.For<ILogger<JsonLinesDataReader>>());
         _logger = Substitute.For<ILogger<FtpDataReader>>();
-        _sut = new FtpDataReader(_csvReader, _jsonReader, _jsonLinesReader, _logger);
+        _sut = new FtpDataReader(_csvReader, _jsonReader, _jsonLinesReader, _logger, TestSsrfGuard.AllowAll);
     }
 
     [Fact]
     public void Constructor_WithNullCsvReader_ShouldThrowArgumentNullException()
     {
         // Act
-        var act = () => new FtpDataReader(null!, _jsonReader, _jsonLinesReader, _logger);
+        var act = () => new FtpDataReader(null!, _jsonReader, _jsonLinesReader, _logger, TestSsrfGuard.AllowAll);
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
@@ -44,7 +45,7 @@ public class FtpDataReaderTests
     public void Constructor_WithNullJsonReader_ShouldThrowArgumentNullException()
     {
         // Act
-        var act = () => new FtpDataReader(_csvReader, null!, _jsonLinesReader, _logger);
+        var act = () => new FtpDataReader(_csvReader, null!, _jsonLinesReader, _logger, TestSsrfGuard.AllowAll);
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
@@ -55,7 +56,7 @@ public class FtpDataReaderTests
     public void Constructor_WithNullJsonLinesReader_ShouldThrowArgumentNullException()
     {
         // Act
-        var act = () => new FtpDataReader(_csvReader, _jsonReader, null!, _logger);
+        var act = () => new FtpDataReader(_csvReader, _jsonReader, null!, _logger, TestSsrfGuard.AllowAll);
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
@@ -66,7 +67,7 @@ public class FtpDataReaderTests
     public void Constructor_WithNullLogger_ShouldThrowArgumentNullException()
     {
         // Act
-        var act = () => new FtpDataReader(_csvReader, _jsonReader, _jsonLinesReader, null!);
+        var act = () => new FtpDataReader(_csvReader, _jsonReader, _jsonLinesReader, null!, TestSsrfGuard.AllowAll);
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
@@ -77,7 +78,7 @@ public class FtpDataReaderTests
     public void Constructor_WithValidParameters_ShouldCreateInstance()
     {
         // Act
-        var instance = new FtpDataReader(_csvReader, _jsonReader, _jsonLinesReader, _logger);
+        var instance = new FtpDataReader(_csvReader, _jsonReader, _jsonLinesReader, _logger, TestSsrfGuard.AllowAll);
 
         // Assert
         instance.Should().NotBeNull();

@@ -186,7 +186,8 @@ public class PipelineServiceTests : IDisposable
             "Pipeline",
             result.Id.ToString(),
             Arg.Any<string>(),
-            Arg.Any<object>());
+            Arg.Any<object>(),
+            tenantIdOverride: Arg.Any<Guid?>());
     }
 
     [Fact]
@@ -398,7 +399,8 @@ public class PipelineServiceTests : IDisposable
             "Pipeline",
             pipelineId.ToString(),
             Arg.Any<string>(),
-            Arg.Any<object>());
+            Arg.Any<object>(),
+            tenantIdOverride: Arg.Any<Guid?>());
     }
 
     [Fact]
@@ -440,7 +442,8 @@ public class PipelineServiceTests : IDisposable
             "Pipeline",
             pipelineId.ToString(),
             Arg.Any<string>(),
-            Arg.Any<object>());
+            Arg.Any<object>(),
+            tenantIdOverride: Arg.Any<Guid?>());
     }
 
     [Fact]
@@ -483,14 +486,16 @@ public class PipelineServiceTests : IDisposable
             "Pipeline",
             pipelineId.ToString(),
             Arg.Any<string>(),
-            Arg.Any<object>());
+            Arg.Any<object>(),
+            tenantIdOverride: Arg.Any<Guid?>());
 
         await _auditService.Received(1).LogAsync(
             Arg.Is<string>(s => s == AuditActions.Pipelines.Activated),
             "Pipeline",
             pipelineId.ToString(),
             Arg.Any<string>(),
-            Arg.Any<object>());
+            Arg.Any<object>(),
+            tenantIdOverride: Arg.Any<Guid?>());
 
         // Verify schedule service was called
         await _scheduleService.Received(1).PauseSchedulesForPipelineAsync(pipelineId, Arg.Any<CancellationToken>());

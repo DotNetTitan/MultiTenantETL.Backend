@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors;
 using MultiTenantETL.Application.Connectors.Models;
 using MultiTenantETL.Infrastructure.Configuration;
+using MultiTenantETL.Infrastructure.Security;
 using System.Text.Json;
 
 namespace MultiTenantETL.Infrastructure.Services.ConnectionTesting.Api;
@@ -10,11 +11,13 @@ public class ApiConnectionTester : IApiConnectionTester
 {
     private readonly ILogger<ApiConnectionTester> _logger;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ISsrfGuard _ssrfGuard;
 
-    public ApiConnectionTester(ILogger<ApiConnectionTester> logger, IHttpClientFactory httpClientFactory)
+    public ApiConnectionTester(ILogger<ApiConnectionTester> logger, IHttpClientFactory httpClientFactory, ISsrfGuard ssrfGuard)
     {
         _logger = logger;
         _httpClientFactory = httpClientFactory;
+        _ssrfGuard = ssrfGuard;
     }
 
     public async Task<ConnectionTestResult> TestConnectionAsync(string provider, JsonElement config)
@@ -43,6 +46,8 @@ public class ApiConnectionTester : IApiConnectionTester
         {
             var httpClient = _httpClientFactory.CreateClient();
             httpClient.Timeout = TimeSpan.FromSeconds(apiConfig.TimeoutSeconds);
+
+            _ssrfGuard.ValidateUrl(apiConfig.BaseUrl);
             httpClient.BaseAddress = new Uri(apiConfig.BaseUrl);
 
             // Add authentication
@@ -157,6 +162,8 @@ public class ApiConnectionTester : IApiConnectionTester
 
         try
         {
+            _ssrfGuard.ValidateUrl(apiConfig.TokenEndpointUrl);
+
             var tokenClient = _httpClientFactory.CreateClient();
             tokenClient.Timeout = TimeSpan.FromSeconds(30);
 

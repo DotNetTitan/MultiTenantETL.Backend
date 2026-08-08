@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.DataReaders;
+using MultiTenantETL.UnitTests.TestHelpers;
 using NSubstitute;
 using System.Net;
 using System.Text;
@@ -24,7 +25,7 @@ public class RestApiDataReaderTests
         _httpClient = new HttpClient();
         _httpClientFactory.CreateClient().Returns(_httpClient);
 
-        _sut = new RestApiDataReader(_httpClientFactory, _logger);
+        _sut = new RestApiDataReader(_httpClientFactory, _logger, TestSsrfGuard.AllowAll);
     }
 
     private HttpClient CreateMockHttpClient(HttpResponseMessage response)
@@ -477,5 +478,43 @@ public class RestApiDataReaderTests
 
         // Assert
         result.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ReadAsync_WithRestrictedUrl_ShouldThrow()
+    {
+        // Arrange
+        var strictGuard = new MultiTenantETL.Infrastructure.Security.SsrfGuard(
+            new MultiTenantETL.Infrastructure.Configuration.SsrfSettings { Enabled = true, BlockPrivateNetworks = true });
+        var sut = new RestApiDataReader(_httpClientFactory, _logger, strictGuard);
+        var connector = CreateConnector("http://169.254.169.254/latest/meta-data");
+        var options = new ReadOptions { BatchSize = 10 };
+
+        // Act
+        var act = async () =>
+        {
+            await foreach (var batch in sut.ReadAsync(connector, options, CancellationToken.None))
+            {
+            }
+        };
+
+        // Assert
+        await act.Should().ThrowAsync<MultiTenantETL.Infrastructure.Security.SsrfBlockedException>();
+    }
+
+    [Fact]
+    public async Task TestConnectionAsync_WithRestrictedUrl_ShouldReturnFalse()
+    {
+        // Arrange
+        var strictGuard = new MultiTenantETL.Infrastructure.Security.SsrfGuard(
+            new MultiTenantETL.Infrastructure.Configuration.SsrfSettings { Enabled = true, BlockPrivateNetworks = true });
+        var sut = new RestApiDataReader(_httpClientFactory, _logger, strictGuard);
+        var connector = CreateConnector("http://10.0.0.1/data");
+
+        // Act
+        var result = await sut.TestConnectionAsync(connector, CancellationToken.None);
+
+        // Assert
+        result.Should().BeFalse();
     }
 }

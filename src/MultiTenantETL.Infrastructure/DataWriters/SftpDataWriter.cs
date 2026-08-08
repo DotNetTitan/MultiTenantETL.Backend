@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Domain.Entities;
+using MultiTenantETL.Infrastructure.Security;
 using Renci.SshNet;
 using System.Text.Json;
 
@@ -13,15 +14,17 @@ namespace MultiTenantETL.Infrastructure.DataWriters;
 /// </summary>
 public class SftpDataWriter : IDataWriter
 {
+    private readonly ISsrfGuard _ssrfGuard;
     private readonly ILogger<SftpDataWriter> _logger;
     private MemoryStream? _bufferStream;
     private SftpConfig? _config;
     private string? _format;
     private bool _isFirstBatch = true;
 
-    public SftpDataWriter(ILogger<SftpDataWriter> logger)
+    public SftpDataWriter(ILogger<SftpDataWriter> logger, ISsrfGuard ssrfGuard)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _ssrfGuard = ssrfGuard;
     }
 
     public async Task<DataWriteResult> WriteBatchAsync(
@@ -164,6 +167,8 @@ public class SftpDataWriter : IDataWriter
                 throw new InvalidOperationException("SFTP password is required");
             if (string.IsNullOrEmpty(config.FilePath))
                 throw new InvalidOperationException("SFTP file path is required");
+
+            _ssrfGuard.ValidateHost(config.Host);
 
             return config;
         }

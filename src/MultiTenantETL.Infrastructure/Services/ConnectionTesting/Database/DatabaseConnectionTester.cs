@@ -7,20 +7,24 @@ using MultiTenantETL.Application.Connectors;
 using MultiTenantETL.Application.Connectors.Models;
 using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Infrastructure.Configuration;
+using MultiTenantETL.Infrastructure.Security;
 using MySqlConnector;
 using Npgsql;
 using Oracle.ManagedDataAccess.Client;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace MultiTenantETL.Infrastructure.Services.ConnectionTesting.Database;
 
 public class DatabaseConnectionTester : IDatabaseConnectionTester
 {
+    private readonly ISsrfGuard _ssrfGuard;
     private readonly ILogger<DatabaseConnectionTester> _logger;
 
-    public DatabaseConnectionTester(ILogger<DatabaseConnectionTester> logger)
+    public DatabaseConnectionTester(ILogger<DatabaseConnectionTester> logger, ISsrfGuard ssrfGuard)
     {
         _logger = logger;
+        _ssrfGuard = ssrfGuard;
     }
 
     public async Task<ConnectionTestResult> TestConnectionAsync(string provider, JsonElement config)
@@ -65,6 +69,10 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
 
         try
         {
+            // Validate the target host/endpoint against SSRF-protected ranges
+            // before attempting any connection.
+            ValidateDatabaseConfig(provider, dbConfig);
+
             return provider switch
             {
                 ConnectorProviders.SqlServer => await TestSqlServerConnectionAsync(dbConfig),
@@ -78,6 +86,15 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
                     Success = false,
                     Message = $"Database provider {provider} is not supported"
                 }
+            };
+        }
+        catch (SsrfBlockedException ex)
+        {
+            _logger.LogWarning("SSRF validation blocked database connection test for provider {Provider}: {Message}", provider, ex.Message);
+            return new ConnectionTestResult
+            {
+                Success = false,
+                Message = ex.Message
             };
         }
         catch (Exception ex)
@@ -329,5 +346,163 @@ public class DatabaseConnectionTester : IDatabaseConnectionTester
         return builder.ConnectionString;
     }
 
+    private void ValidateDatabaseConfig(string provider, DatabaseConfig config)
+    {
+        string? host = null;
 
+        switch (provider)
+        {
+            case ConnectorProviders.CosmosDb:
+                var endpoint = config.CosmosEndpoint ?? config.Host;
+                if (!string.IsNullOrWhiteSpace(endpoint))
+                {
+                    _ssrfGuard.ValidateUrl(endpoint);
+                }
+                return;
+
+            case ConnectorProviders.MongoDb:
+                if (!string.IsNullOrWhiteSpace(config.ConnectionString))
+                {
+                    var (isSrv, mongoHosts) = ExtractMongoHosts(config.ConnectionString);
+                    foreach (var mongoHost in mongoHosts)
+                    {
+                        // mongodb+srv hostnames have no A/AAAA record (SRV-only),
+                        // so they cannot be resolved to IPs here; apply name-based
+                        // checks only and document the residual SRV-target gap.
+                        if (isSrv)
+                        {
+                            _ssrfGuard.ValidateHostName(mongoHost);
+                        }
+                        else
+                        {
+                            _ssrfGuard.ValidateHost(mongoHost);
+                        }
+                    }
+                }
+                break;
+
+            case ConnectorProviders.SqlServer:
+            case ConnectorProviders.PostgreSQL:
+            case ConnectorProviders.MySQL:
+            case ConnectorProviders.Oracle:
+                host = !string.IsNullOrWhiteSpace(config.ConnectionString)
+                    ? ExtractHostFromConnectionString(provider, config.ConnectionString)
+                    : config.Host;
+                break;
+        }
+
+        if (!string.IsNullOrWhiteSpace(host))
+        {
+            _ssrfGuard.ValidateHost(host);
+        }
+    }
+
+    private static (bool IsSrv, string[] Hosts) ExtractMongoHosts(string connectionString)
+    {
+        var hosts = new List<string>();
+
+        var isSrv = connectionString.StartsWith("mongodb+srv://", StringComparison.OrdinalIgnoreCase);
+        if (!isSrv && !connectionString.StartsWith("mongodb://", StringComparison.OrdinalIgnoreCase))
+        {
+            return (false, hosts.ToArray());
+        }
+
+        var schemeLength = isSrv ? "mongodb+srv://".Length : "mongodb://".Length;
+
+        // Everything up to the first '/', '?' or '#' is the host section.
+        var remainder = connectionString.Substring(schemeLength);
+        var end = remainder.IndexOfAny(new[] { '/', '?', '#' });
+        if (end >= 0)
+        {
+            remainder = remainder.Substring(0, end);
+        }
+
+        // Strip any userinfo ("user:password@").
+        var at = remainder.LastIndexOf('@');
+        if (at >= 0)
+        {
+            remainder = remainder.Substring(at + 1);
+        }
+
+        if (string.IsNullOrWhiteSpace(remainder))
+        {
+            return (isSrv, hosts.ToArray());
+        }
+
+        if (isSrv)
+        {
+            // SRV hostnames have no port or seed list.
+            hosts.Add(remainder.Trim('[', ']'));
+            return (true, hosts.ToArray());
+        }
+
+        // mongodb:// supports a comma-separated seed list; uri.Host would only
+        // expose the first seed, so validate every host the driver may connect to.
+        foreach (var hostPort in remainder.Split(',', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var hp = hostPort.Trim();
+            string hostOnly;
+
+            if (hp.StartsWith('['))
+            {
+                var close = hp.IndexOf(']');
+                hostOnly = close > 0 ? hp.Substring(1, close - 1) : hp.Trim('[', ']');
+            }
+            else
+            {
+                var colon = hp.IndexOf(':');
+                hostOnly = colon > 0 ? hp.Substring(0, colon) : hp;
+            }
+
+            if (!string.IsNullOrWhiteSpace(hostOnly))
+            {
+                hosts.Add(hostOnly);
+            }
+        }
+
+        return (false, hosts.ToArray());
+    }
+
+    private static string? ExtractHostFromConnectionString(string provider, string connectionString)
+    {
+        try
+        {
+            switch (provider)
+            {
+                case ConnectorProviders.SqlServer:
+                    var sqlBuilder = new SqlConnectionStringBuilder(connectionString);
+                    return sqlBuilder.DataSource?.Split(',')[0].Trim();
+                case ConnectorProviders.PostgreSQL:
+                    var npgBuilder = new NpgsqlConnectionStringBuilder(connectionString);
+                    return npgBuilder.Host;
+                case ConnectorProviders.MySQL:
+                    var mySqlBuilder = new MySqlConnectionStringBuilder(connectionString);
+                    return mySqlBuilder.Server;
+                case ConnectorProviders.Oracle:
+                    var oracleBuilder = new OracleConnectionStringBuilder(connectionString);
+                    return ExtractHostFromOracleDataSource(oracleBuilder.DataSource);
+            }
+        }
+        catch
+        {
+            // Fall through to the generic regex extraction.
+        }
+
+        var match = Regex.Match(connectionString,
+            @"(?:Data\s*Source|Server|Host|Address)\s*=\s*([^;,\s]+)",
+            RegexOptions.IgnoreCase);
+
+        return match.Success ? match.Groups[1].Value.Trim() : null;
+    }
+
+    private static string? ExtractHostFromOracleDataSource(string? dataSource)
+    {
+        if (string.IsNullOrWhiteSpace(dataSource))
+        {
+            return null;
+        }
+
+        var match = Regex.Match(dataSource, @"HOST\s*=\s*([^\)\s]+)", RegexOptions.IgnoreCase);
+        return match.Success ? match.Groups[1].Value.Trim() : dataSource.Trim();
+    }
 }

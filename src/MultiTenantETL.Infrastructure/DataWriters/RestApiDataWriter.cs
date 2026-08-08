@@ -3,6 +3,7 @@ using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
+using MultiTenantETL.Infrastructure.Security;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -12,12 +13,17 @@ namespace MultiTenantETL.Infrastructure.DataWriters;
 public class RestApiDataWriter : IDataWriter
 {
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ISsrfGuard _ssrfGuard;
     private readonly ILogger<RestApiDataWriter> _logger;
 
-    public RestApiDataWriter(IHttpClientFactory httpClientFactory, ILogger<RestApiDataWriter> logger)
+    public RestApiDataWriter(
+        IHttpClientFactory httpClientFactory,
+        ILogger<RestApiDataWriter> logger,
+        ISsrfGuard ssrfGuard)
     {
         _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _ssrfGuard = ssrfGuard;
     }
 
     public async Task<DataWriteResult> WriteBatchAsync(
@@ -34,6 +40,8 @@ public class RestApiDataWriter : IDataWriter
             var httpClient = _httpClientFactory.CreateClient();
 
             ConfigureHttpClient(httpClient, config);
+
+            _ssrfGuard.ValidateUrl(config.FullUrl);
 
             var successCount = 0;
             var failCount = 0;

@@ -1,17 +1,20 @@
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors;
 using MultiTenantETL.Application.Connectors.Models;
+using MultiTenantETL.Infrastructure.Security;
 using Renci.SshNet;
 
 namespace MultiTenantETL.Infrastructure.Services.ConnectionTesting.Storage;
 
 public class SftpConnectionTester
 {
+    private readonly ISsrfGuard _ssrfGuard;
     private readonly ILogger<SftpConnectionTester> _logger;
 
-    public SftpConnectionTester(ILogger<SftpConnectionTester> logger)
+    public SftpConnectionTester(ILogger<SftpConnectionTester> logger, ISsrfGuard ssrfGuard)
     {
         _logger = logger;
+        _ssrfGuard = ssrfGuard;
     }
 
     public async Task<ConnectionTestResult> TestConnectionAsync(FileConfig config)
@@ -47,6 +50,8 @@ public class SftpConnectionTester
         try
         {
             var port = config.SftpPort ?? 22;
+
+            _ssrfGuard.ValidateHost(config.SftpHost);
 
             using var sftpClient = new SftpClient(config.SftpHost, port, config.SftpUsername, config.SftpPassword);
 

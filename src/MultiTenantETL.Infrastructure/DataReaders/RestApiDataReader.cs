@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Domain.Entities;
+using MultiTenantETL.Infrastructure.Security;
 using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
@@ -12,12 +13,17 @@ namespace MultiTenantETL.Infrastructure.DataReaders;
 public class RestApiDataReader : IDataReader
 {
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ISsrfGuard _ssrfGuard;
     private readonly ILogger<RestApiDataReader> _logger;
 
-    public RestApiDataReader(IHttpClientFactory httpClientFactory, ILogger<RestApiDataReader> logger)
+    public RestApiDataReader(
+        IHttpClientFactory httpClientFactory,
+        ILogger<RestApiDataReader> logger,
+        ISsrfGuard ssrfGuard)
     {
         _httpClientFactory = httpClientFactory;
         _logger = logger;
+        _ssrfGuard = ssrfGuard;
     }
 
     public async IAsyncEnumerable<ReadBatch> ReadAsync(
@@ -29,6 +35,8 @@ public class RestApiDataReader : IDataReader
         var httpClient = _httpClientFactory.CreateClient();
 
         ConfigureHttpClient(httpClient, config);
+
+        _ssrfGuard.ValidateUrl(config.FullUrl);
 
         var response = await httpClient.GetAsync(config.FullUrl, cancellationToken);
         response.EnsureSuccessStatusCode();
@@ -107,6 +115,8 @@ public class RestApiDataReader : IDataReader
 
             ConfigureHttpClient(httpClient, config);
 
+            _ssrfGuard.ValidateUrl(config.FullUrl);
+
             var response = await httpClient.GetAsync(config.FullUrl, cancellationToken);
             return response.IsSuccessStatusCode;
         }
@@ -125,6 +135,8 @@ public class RestApiDataReader : IDataReader
             var httpClient = _httpClientFactory.CreateClient();
 
             ConfigureHttpClient(httpClient, config);
+
+            _ssrfGuard.ValidateUrl(config.FullUrl);
 
             var response = await httpClient.GetAsync(config.FullUrl, cancellationToken);
             response.EnsureSuccessStatusCode();

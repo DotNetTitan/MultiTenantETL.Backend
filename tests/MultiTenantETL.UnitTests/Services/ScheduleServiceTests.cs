@@ -121,7 +121,8 @@ public class ScheduleServiceTests : IDisposable
             "PipelineSchedule",
             result.Id.ToString(),
             Arg.Any<string>(),
-            Arg.Any<object>());
+            Arg.Any<object>(),
+            tenantIdOverride: Arg.Any<Guid?>());
     }
 
     [Fact]
@@ -343,7 +344,8 @@ public class ScheduleServiceTests : IDisposable
             "PipelineSchedule",
             schedule.Id.ToString(),
             Arg.Any<string>(),
-            Arg.Any<object>());
+            Arg.Any<object>(),
+            tenantIdOverride: Arg.Any<Guid?>());
     }
 
     [Fact]
@@ -385,7 +387,8 @@ public class ScheduleServiceTests : IDisposable
             "PipelineSchedule",
             schedule.Id.ToString(),
             Arg.Any<string>(),
-            Arg.Any<object>());
+            Arg.Any<object>(),
+            tenantIdOverride: Arg.Any<Guid?>());
     }
 
     [Fact]
@@ -425,7 +428,8 @@ public class ScheduleServiceTests : IDisposable
             "PipelineSchedule",
             schedule.Id.ToString(),
             Arg.Any<string>(),
-            Arg.Any<object>());
+            Arg.Any<object>(),
+            tenantIdOverride: Arg.Any<Guid?>());
     }
 
     [Fact]
@@ -512,7 +516,8 @@ public class ScheduleServiceTests : IDisposable
             "PipelineSchedule",
             schedule.Id.ToString(),
             Arg.Any<string>(),
-            Arg.Any<object>());
+            Arg.Any<object>(),
+            tenantIdOverride: Arg.Any<Guid?>());
     }
 
     [Fact]
@@ -736,7 +741,8 @@ public class ScheduleServiceTests : IDisposable
             "Pipeline",
             pipeline.Id.ToString(),
             Arg.Any<string>(),
-            Arg.Any<object>());
+            Arg.Any<object>(),
+            tenantIdOverride: Arg.Any<Guid?>());
     }
 
     [Fact]
@@ -768,7 +774,8 @@ public class ScheduleServiceTests : IDisposable
             Arg.Any<string>(),
             Arg.Any<string>(),
             Arg.Any<string>(),
-            Arg.Any<object>());
+            Arg.Any<object>(),
+            tenantIdOverride: Arg.Any<Guid?>());
     }
 
     [Fact]
@@ -811,7 +818,8 @@ public class ScheduleServiceTests : IDisposable
             "Pipeline",
             pipeline.Id.ToString(),
             Arg.Any<string>(),
-            Arg.Any<object>());
+            Arg.Any<object>(),
+            tenantIdOverride: Arg.Any<Guid?>());
     }
 
     [Fact]
@@ -829,7 +837,8 @@ public class ScheduleServiceTests : IDisposable
             Arg.Any<string>(),
             Arg.Any<string>(),
             Arg.Any<string>(),
-            Arg.Any<object>());
+            Arg.Any<object>(),
+            tenantIdOverride: Arg.Any<Guid?>());
     }
 
     [Fact]
@@ -867,7 +876,8 @@ public class ScheduleServiceTests : IDisposable
             Arg.Any<string>(),
             Arg.Any<string>(),
             Arg.Any<string>(),
-            Arg.Any<object>());
+            Arg.Any<object>(),
+            tenantIdOverride: Arg.Any<Guid?>());
     }
 
     [Fact]

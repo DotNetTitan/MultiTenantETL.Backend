@@ -4,6 +4,7 @@ using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.DataWriters;
+using MultiTenantETL.UnitTests.TestHelpers;
 using NSubstitute;
 using System.Text.Json;
 
@@ -17,14 +18,14 @@ public class SftpDataWriterTests
     public SftpDataWriterTests()
     {
         _logger = Substitute.For<ILogger<SftpDataWriter>>();
-        _sut = new SftpDataWriter(_logger);
+        _sut = new SftpDataWriter(_logger, TestSsrfGuard.AllowAll);
     }
 
     [Fact]
     public void Constructor_WithNullLogger_ShouldThrowArgumentNullException()
     {
         // Act
-        var act = () => new SftpDataWriter(null!);
+        var act = () => new SftpDataWriter(null!, TestSsrfGuard.AllowAll);
 
         // Assert
         act.Should().Throw<ArgumentNullException>().WithParameterName("logger");

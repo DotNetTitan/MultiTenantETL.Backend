@@ -4,6 +4,7 @@ using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Application.Connectors.DataWriters;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.DataWriters;
+using MultiTenantETL.UnitTests.TestHelpers;
 using NSubstitute;
 
 namespace MultiTenantETL.UnitTests.DataWriters;
@@ -28,7 +29,7 @@ public class FtpDataWriterTests : IAsyncDisposable
 
     private FtpDataWriter CreateSut()
     {
-        _sut = new FtpDataWriter(_logger);
+        _sut = new FtpDataWriter(_logger, TestSsrfGuard.AllowAll);
         return _sut;
     }
 
@@ -46,7 +47,7 @@ public class FtpDataWriterTests : IAsyncDisposable
     public void Constructor_WithNullLogger_ShouldThrowArgumentNullException()
     {
         // Act
-        var act = () => new FtpDataWriter(null!);
+        var act = () => new FtpDataWriter(null!, TestSsrfGuard.AllowAll);
 
         // Assert
         act.Should().Throw<ArgumentNullException>()

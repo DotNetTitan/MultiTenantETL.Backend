@@ -2,6 +2,7 @@ using FluentFTP;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Domain.Entities;
+using MultiTenantETL.Infrastructure.Security;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using IDataReader = MultiTenantETL.Application.Connectors.DataReaders.IDataReader;
@@ -17,18 +18,21 @@ public class FtpDataReader : IDataReader
     private readonly CsvDataReader _csvReader;
     private readonly JsonDataReader _jsonReader;
     private readonly JsonLinesDataReader _jsonLinesReader;
+    private readonly ISsrfGuard _ssrfGuard;
     private readonly ILogger<FtpDataReader> _logger;
 
     public FtpDataReader(
         CsvDataReader csvReader,
         JsonDataReader jsonReader,
         JsonLinesDataReader jsonLinesReader,
-        ILogger<FtpDataReader> logger)
+        ILogger<FtpDataReader> logger,
+        ISsrfGuard ssrfGuard)
     {
         _csvReader = csvReader ?? throw new ArgumentNullException(nameof(csvReader));
         _jsonReader = jsonReader ?? throw new ArgumentNullException(nameof(jsonReader));
         _jsonLinesReader = jsonLinesReader ?? throw new ArgumentNullException(nameof(jsonLinesReader));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _ssrfGuard = ssrfGuard;
     }
 
     public async IAsyncEnumerable<ReadBatch> ReadAsync(
@@ -222,6 +226,8 @@ public class FtpDataReader : IDataReader
                 throw new InvalidOperationException("FTP password is required");
             if (string.IsNullOrEmpty(config.FilePath))
                 throw new InvalidOperationException("FTP file path is required");
+
+            _ssrfGuard.ValidateHost(config.Host);
 
             return config;
         }

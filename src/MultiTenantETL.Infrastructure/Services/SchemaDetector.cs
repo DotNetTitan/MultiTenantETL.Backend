@@ -5,6 +5,7 @@ using MultiTenantETL.Application.Connectors;
 using MultiTenantETL.Application.Connectors.Models;
 using MultiTenantETL.Domain.Constants;
 using MultiTenantETL.Infrastructure.Configuration;
+using MultiTenantETL.Infrastructure.Security;
 using MySqlConnector;
 using Npgsql;
 using Oracle.ManagedDataAccess.Client;
@@ -15,10 +16,12 @@ namespace MultiTenantETL.Infrastructure.Services;
 public class SchemaDetector : ISchemaDetector
 {
     private readonly ILogger<SchemaDetector> _logger;
+    private readonly ISsrfGuard _ssrfGuard;
 
-    public SchemaDetector(ILogger<SchemaDetector> logger)
+    public SchemaDetector(ILogger<SchemaDetector> logger, ISsrfGuard ssrfGuard)
     {
         _logger = logger;
+        _ssrfGuard = ssrfGuard;
     }
 
     public async Task<SchemaDetectionResult> DetectSchemaAsync(
@@ -365,6 +368,8 @@ public class SchemaDetector : ISchemaDetector
 
         try
         {
+            _ssrfGuard.ValidateUrl(apiConfig.BaseUrl!);
+
             // Create HTTP client
             var httpClient = new HttpClient
             {
@@ -505,6 +510,8 @@ public class SchemaDetector : ISchemaDetector
 
         try
         {
+            _ssrfGuard.ValidateUrl(apiConfig.TokenEndpointUrl);
+
             var tokenClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
             tokenClient.DefaultRequestHeaders.Add("User-Agent", "MultiTenantETL/1.0");
             tokenClient.DefaultRequestHeaders.Add("Accept", "*/*");

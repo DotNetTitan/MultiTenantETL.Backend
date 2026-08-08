@@ -2,6 +2,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MultiTenantETL.Infrastructure.Security;
 using System.Net;
 
 namespace MultiTenantETL.API.Middleware;
@@ -151,6 +152,12 @@ public class GlobalExceptionHandler : IExceptionHandler
             UnauthorizedAccessException ex => (
                 (int)HttpStatusCode.Forbidden,
                 "Access Denied",
+                ex.Message),
+
+            // SSRF protection
+            SsrfBlockedException ex => (
+                (int)HttpStatusCode.BadRequest,
+                "Request Blocked",
                 ex.Message),
 
             // Operation Cancelled

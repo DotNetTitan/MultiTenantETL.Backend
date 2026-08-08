@@ -21,6 +21,8 @@ using MultiTenantETL.Infrastructure.Security;
 using MultiTenantETL.Infrastructure.Services;
 using OpenIddict.Abstractions;
 using Quartz;
+using Sentry;
+using Sentry.Extensibility;
 using System.Security.Cryptography.X509Certificates;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -29,7 +31,15 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 
 // Add Sentry
-builder.WebHost.UseSentry();
+builder.WebHost.UseSentry(options =>
+{
+    // Harden: never send PII (identity claims, user IPs) and limit request body capture
+    options.SendDefaultPii = false;
+    options.MaxRequestBodySize = RequestSize.Small;
+
+    // Scrub credentials/secret values before any event is sent
+    options.SetBeforeSend(ScrubbingSentryEvent);
+});
 
 // Configure logging to suppress watch debug logs
 builder.Logging.AddFilter("Microsoft.AspNetCore.Watch", LogLevel.None);
@@ -519,6 +529,12 @@ builder.Services.AddSingleton<IEncryptionService, MultiTenantETL.Infrastructure.
 builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.AzureKeyVaultSettings>(
     builder.Configuration.GetSection("AzureKeyVault"));
 
+// SSRF protection for outbound connector traffic
+builder.Services.Configure<MultiTenantETL.Infrastructure.Configuration.SsrfSettings>(
+    builder.Configuration.GetSection(MultiTenantETL.Infrastructure.Configuration.SsrfSettings.SectionName));
+builder.Services.AddSingleton<MultiTenantETL.Infrastructure.Security.ISsrfGuard,
+    MultiTenantETL.Infrastructure.Security.SsrfGuard>();
+
 // Secret Storage Services (Azure Key Vault)
 builder.Services.AddSingleton<MultiTenantETL.Application.Common.Interfaces.ISecretStorageService,
     MultiTenantETL.Infrastructure.Security.KeyVaultSecretStorageService>();
@@ -766,6 +782,109 @@ if (app.Environment.IsDevelopment())
 
 
 app.Run();
+
+// Scrub sensitive data from Sentry events before they are transmitted
+static SentryEvent? ScrubbingSentryEvent(SentryEvent sentryEvent, SentryHint hint)
+{
+    var sensitiveFields = new[]
+    {
+        "password", "passwd", "pwd", "secret", "token", "apikey", "api_key",
+        "api-key", "authorization", "connectionstring", "dsn", "clientsecret",
+        "client_secret", "client-secret", "access_token", "refresh_token"
+    };
+
+    var sensitiveHeaders = new[]
+    {
+        "authorization", "cookie", "proxy-authorization", "x-api-key",
+        "api-key", "x-auth-token", "x-csrf-token"
+    };
+
+    // Drop the captured request body before it reaches Sentry
+    var bodyAttachments = hint.Attachments
+        .Where(a => a.FileName != null && a.FileName.Contains("SentryRequestBody", StringComparison.OrdinalIgnoreCase))
+        .ToList();
+    foreach (var attachment in bodyAttachments)
+    {
+        hint.Attachments.Remove(attachment);
+    }
+
+    if (sentryEvent.Request is { } request)
+    {
+        if (request.Headers is IDictionary<string, string> headers)
+        {
+            foreach (var header in sensitiveHeaders)
+            {
+                if (headers.ContainsKey(header))
+                {
+                    headers[header] = "[REDACTED]";
+                }
+            }
+        }
+
+        // The URL includes the query string; redact any credentials in it.
+        if (!string.IsNullOrEmpty(request.Url))
+        {
+            request.Url = RedactSensitiveValues(request.Url, sensitiveFields);
+        }
+
+        if (!string.IsNullOrEmpty(request.QueryString))
+        {
+            request.QueryString = RedactSensitiveValues(request.QueryString, sensitiveFields);
+        }
+
+        if (request.Data is string body)
+        {
+            request.Data = RedactSensitiveValues(body, sensitiveFields);
+        }
+    }
+
+    if (sentryEvent.Message is { } message)
+    {
+        if (!string.IsNullOrEmpty(message.Formatted))
+        {
+            message.Formatted = RedactSensitiveValues(message.Formatted, sensitiveFields);
+        }
+
+        if (!string.IsNullOrEmpty(message.Message))
+        {
+            message.Message = RedactSensitiveValues(message.Message, sensitiveFields);
+        }
+    }
+
+    return sentryEvent;
+}
+
+static string RedactSensitiveValues(string input, string[] sensitiveFields)
+{
+    if (string.IsNullOrEmpty(input))
+    {
+        return input;
+    }
+
+    var redacted = input;
+    foreach (var field in sensitiveFields)
+    {
+        var escapedField = System.Text.RegularExpressions.Regex.Escape(field);
+
+        // JSON-style: "password": "value"
+        redacted = System.Text.RegularExpressions.Regex.Replace(
+            redacted,
+            $"(\"{escapedField}\"\\s*[:=]\\s*\")([^\"]*)",
+            "$1[REDACTED]",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        // Bare key=value / key:value (query strings, form bodies, headers).
+        // A negative lookbehind prevents matching inside longer tokens
+        // (e.g. "access_token" is not matched by field "token").
+        redacted = System.Text.RegularExpressions.Regex.Replace(
+            redacted,
+            $"(?<![\\w.-])(?<key>{escapedField})(?<sep>\\s*[:=]\\s*)(?<val>[^\\s&;\"}}]*)",
+            "${key}${sep}[REDACTED]",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+    }
+
+    return redacted;
+}
 
 // Helper method to load certificate
 static X509Certificate2 LoadCertificate(string configKey, string subjectName, IConfiguration configuration)

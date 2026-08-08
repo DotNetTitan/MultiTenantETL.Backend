@@ -2,16 +2,19 @@ using FluentFTP;
 using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors;
 using MultiTenantETL.Application.Connectors.Models;
+using MultiTenantETL.Infrastructure.Security;
 
 namespace MultiTenantETL.Infrastructure.Services.ConnectionTesting.Storage;
 
 public class FtpConnectionTester
 {
+    private readonly ISsrfGuard _ssrfGuard;
     private readonly ILogger<FtpConnectionTester> _logger;
 
-    public FtpConnectionTester(ILogger<FtpConnectionTester> logger)
+    public FtpConnectionTester(ILogger<FtpConnectionTester> logger, ISsrfGuard ssrfGuard)
     {
         _logger = logger;
+        _ssrfGuard = ssrfGuard;
     }
 
     public async Task<ConnectionTestResult> TestConnectionAsync(FileConfig config)
@@ -47,6 +50,8 @@ public class FtpConnectionTester
         try
         {
             var port = config.FtpPort ?? 21;
+
+            _ssrfGuard.ValidateHost(config.FtpHost);
 
             using var ftpClient = new AsyncFtpClient(config.FtpHost, config.FtpUsername, config.FtpPassword, port);
 

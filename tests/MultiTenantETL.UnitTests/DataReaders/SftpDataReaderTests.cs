@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using MultiTenantETL.Application.Connectors.DataReaders;
 using MultiTenantETL.Domain.Entities;
 using MultiTenantETL.Infrastructure.DataReaders;
+using MultiTenantETL.UnitTests.TestHelpers;
 using NSubstitute;
 using System.Text.Json;
 
@@ -28,14 +29,14 @@ public class SftpDataReaderTests
         _logger = Substitute.For<ILogger<SftpDataReader>>();
 
         // Create SUT
-        _sut = new SftpDataReader(_csvDataReader, _jsonDataReader, _jsonLinesDataReader, _logger);
+        _sut = new SftpDataReader(_csvDataReader, _jsonDataReader, _jsonLinesDataReader, _logger, TestSsrfGuard.AllowAll);
     }
 
     [Fact]
     public void Constructor_WithNullCsvReader_ShouldThrowArgumentNullException()
     {
         // Act
-        var act = () => new SftpDataReader(null!, _jsonDataReader, _jsonLinesDataReader, _logger);
+        var act = () => new SftpDataReader(null!, _jsonDataReader, _jsonLinesDataReader, _logger, TestSsrfGuard.AllowAll);
 
         // Assert
         act.Should().Throw<ArgumentNullException>().WithParameterName("csvReader");
@@ -45,7 +46,7 @@ public class SftpDataReaderTests
     public void Constructor_WithNullJsonReader_ShouldThrowArgumentNullException()
     {
         // Act
-        var act = () => new SftpDataReader(_csvDataReader, null!, _jsonLinesDataReader, _logger);
+        var act = () => new SftpDataReader(_csvDataReader, null!, _jsonLinesDataReader, _logger, TestSsrfGuard.AllowAll);
 
         // Assert
         act.Should().Throw<ArgumentNullException>().WithParameterName("jsonReader");
@@ -55,7 +56,7 @@ public class SftpDataReaderTests
     public void Constructor_WithNullJsonLinesReader_ShouldThrowArgumentNullException()
     {
         // Act
-        var act = () => new SftpDataReader(_csvDataReader, _jsonDataReader, null!, _logger);
+        var act = () => new SftpDataReader(_csvDataReader, _jsonDataReader, null!, _logger, TestSsrfGuard.AllowAll);
 
         // Assert
         act.Should().Throw<ArgumentNullException>().WithParameterName("jsonLinesReader");
@@ -65,7 +66,7 @@ public class SftpDataReaderTests
     public void Constructor_WithNullLogger_ShouldThrowArgumentNullException()
     {
         // Act
-        var act = () => new SftpDataReader(_csvDataReader, _jsonDataReader, _jsonLinesDataReader, null!);
+        var act = () => new SftpDataReader(_csvDataReader, _jsonDataReader, _jsonLinesDataReader, null!, TestSsrfGuard.AllowAll);
 
         // Assert
         act.Should().Throw<ArgumentNullException>().WithParameterName("logger");
